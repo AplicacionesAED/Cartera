@@ -31,31 +31,31 @@ colors:
 typography:
   display:
     fontFamily: "\"Inter Variable\", Inter, system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "clamp(1.5rem, 1.2rem + 1vw, 2rem)"
+    fontSize: "clamp(1.375rem, 1.1rem + 0.8vw, 1.75rem)"
     fontWeight: 600
     lineHeight: 1.2
     letterSpacing: "-0.01em"
   headline:
     fontFamily: "\"Inter Variable\", Inter, system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "1.25rem"
+    fontSize: "1.125rem"
     fontWeight: 600
     lineHeight: 1.3
     letterSpacing: "-0.012em"
   title:
     fontFamily: "\"Inter Variable\", Inter, system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "1.0625rem"
+    fontSize: "1rem"
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: "normal"
   body:
     fontFamily: "\"Inter Variable\", Inter, system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "1rem"
+    fontSize: "0.9375rem"
     fontWeight: 400
     lineHeight: 1.55
     letterSpacing: "-0.006em"
   data:
     fontFamily: "\"Inter Variable\", Inter, system-ui, -apple-system, \"Segoe UI\", sans-serif"
-    fontSize: "0.875rem"
+    fontSize: "0.8125rem"
     fontWeight: 400
     lineHeight: 1.4
     letterSpacing: "-0.006em"
@@ -67,7 +67,7 @@ typography:
     letterSpacing: "0.03em"
   mono:
     fontFamily: "ui-monospace, \"SF Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace"
-    fontSize: "1rem"
+    fontSize: "0.9375rem"
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: "0.02em"
@@ -430,21 +430,21 @@ person must copy exactly — temporary passwords, codes.
 tightened tracking; body is 400; micro-labels are 600 uppercase with open tracking.
 
 ### Hierarchy
-- **Display** (600, clamp(1.5rem, 1.2rem + 1vw, 2rem), 1.2): large standalone numbers only
+- **Display** (600, clamp(1.375rem, 1.1rem + 0.8vw, 1.75rem), 1.2): large standalone numbers only
   (`StatTile.jsx`'s `.statValue`, the KPI figure itself) and the login screen's marketing-scale
   brand headline (`.brandHeadline`, its own clamp, only reuses the weight token). Not page
   titles (see Headline, below) — this is a tool, not a landing page.
-- **Headline** (600, 1.25rem, 1.3): page-level titles ("Perfil de Juan Pérez", "Empleados") AND
+- **Headline** (600, 1.125rem, 1.3): page-level titles ("Perfil de Juan Pérez", "Empleados") AND
   section/tab-panel headers within a page (e.g. "Información Laboral") — the same scale for
   both since 2026-09-04 (matches Contratación/ex-Solicitudes-Indirectos, adopted after the user
   preferred its smaller, more consistent page titles over the previous Display-scale ones;
   `margin: 0` on the `.title` class, no explicit `letter-spacing`/`color` — those come from the
   inherited body color and this scale's own line-height, not overridden per page).
-- **Title** (500, 1.0625rem, 1.4): card headers, modal titles, table section headers.
-- **Body** (400, 1rem, 1.55): form field values, paragraph text, modal/dialog copy. Never
+- **Title** (500, 1rem, 1.4): card headers, modal titles, table section headers.
+- **Body** (400, 0.9375rem, 1.55): form field values, paragraph text, modal/dialog copy. Never
   smaller — WCAG floor for primary reading text. Max 75ch on any prose block (help text,
   descriptions).
-- **Data** (400, 0.875rem, 1.4): dense table cells only — the "secondary UI, metadata" rung,
+- **Data** (400, 0.8125rem, 1.4): dense table cells only — the "secondary UI, metadata" rung,
   distinct from Body. Never used for form inputs or anything the user reads at length.
 - **Label** (600, 0.75rem, letter-spacing 0.03em): table column headers (uppercase) and the small
   captions under a name or value (document number, email, timestamps; sentence case). Form-field and

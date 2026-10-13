@@ -1052,3 +1052,7 @@ comparación en tiempo constante). La llave solo abre esa ruta; sin la variable,
 queda deshabilitada. Verificado a nivel de middleware (llave correcta/incorrecta/corta/sin credenciales).
 n8n debe apuntar a `https://<dominio-gateway>/cartera/api/fiducia/upload` (multipart, campo `archivo`
 + opcionales `nombre, codigo, emailId, emailAsunto, emailFecha`; máx. 50 MB).
+
+## Tipografía más compacta (2026-10-13)
+
+Pedido del usuario: las fuentes se veían muy grandes. Se redujo la escala en `frontend/src/tokens.css` (y se documentó en `DESIGN.md`): Display `clamp(1.375rem, 1.1rem + 0.8vw, 1.75rem)`, Headline 1.125rem, Title 1rem, Body 0.9375rem, Data 0.8125rem; Label queda en 0.75rem. Es el mismo cambio en Solicitudes, Cartera y HRMS (comparten el bloque tipográfico). Todo lo que usa los tokens se ajusta solo; los tamaños escritos a mano en px/rem en algunos CSS no cambian.
