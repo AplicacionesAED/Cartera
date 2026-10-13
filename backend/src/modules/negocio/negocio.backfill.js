@@ -97,8 +97,16 @@ async function runBackfill() {
   running = true;
   result = null;
   const startedAt = Date.now();
+  let marcasManuales = [];
 
   try {
+    // Las marcas manuales (en trámite / canje, ver negocio.service.js#updateFlags) no vienen del
+    // Excel: se guardan antes de vaciar la tabla y se devuelven al final, para que reconstruir
+    // (ahora a diario y sin que nadie lo mire, ver programador.js) no las borre.
+    marcasManuales = await sequelize.query(
+      'SELECT referencia, en_tramite, es_canje FROM negocios WHERE en_tramite OR es_canje',
+      { type: QueryTypes.SELECT }
+    );
     // TRUNCATE simple (por tabla) falla en Postgres si otra tabla la
     // referencia por FK, sin importar que ya este vacia -- hay que truncar
     // las tres juntas en un solo statement (o con CASCADE).
@@ -267,6 +275,13 @@ async function runBackfill() {
     result = { ok: false, error: err.message };
     console.error('[backfill] Error:', err.message); // eslint-disable-line no-console
   } finally {
+    for (const m of marcasManuales) {
+      try {
+        await Negocio.update({ en_tramite: m.en_tramite, es_canje: m.es_canje }, { where: { referencia: m.referencia } });
+      } catch (err) {
+        console.error('[backfill] No se pudo restaurar la marca de', m.referencia, err.message); // eslint-disable-line no-console
+      }
+    }
     running = false;
   }
 }

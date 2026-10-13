@@ -22,6 +22,8 @@ async function start() {
     console.log(`Cartera AED backend escuchando en http://localhost:${env.PORT}`); // eslint-disable-line no-console
     // Calienta los caches de cartera en segundo plano (ver modules/precalentar.js).
     setTimeout(() => require('./modules/precalentar').precalentarTodo(), 3000).unref();
+    // Sincronizaciones diarias automáticas (ver modules/programador.js).
+    require('./modules/programador').iniciar();
   });
 
   // Windows: nodemon con signal SIGKILL puede tardar unos segundos en
