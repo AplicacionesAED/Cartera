@@ -108,7 +108,9 @@ function isContactField(f) {
 }
 
 function buildFieldsList(fields) {
-  const baseFields = ['Deal_Name', 'Stage', 'Contact_Name', 'Account_Name', 'Amount', 'Fecha_Inicio_Plan_de_Pagos'];
+  // Referencia_de_Recaudo y Fecha_Vinculaci_n_Exitosa son las dos que deciden qué oportunidades se
+  // sincronizan (ver esElegible): hay que pedirlas siempre, aunque el metadato no las clasifique.
+  const baseFields = ['Deal_Name', 'Stage', 'Contact_Name', 'Account_Name', 'Amount', 'Fecha_Inicio_Plan_de_Pagos', CAMPO_REFERENCIA, CAMPO_FECHA_VINCULACION];
   const currencyFields = fields.filter((f) => f.data_type === 'currency').map((f) => f.api_name);
   const inmuebleFields = fields.filter((f) => isInmuebleField(f) && !EXCLUDED_TYPES.includes(f.data_type)).map((f) => f.api_name);
   const cotizacionFields = fields.filter((f) => isCotizacionField(f)).map((f) => f.api_name);
@@ -283,6 +285,20 @@ forma_pago = COALESCE(EXCLUDED.forma_pago, oportunidades.forma_pago),
   );
 }
 
+// Regla de qué oportunidades entran (Jefe Gabriel, 2026-10-14): tienen Referencia de Recaudo O
+// el campo "11, 12BC Fecha Vinculación Exitosa" diligenciado (antes: Pago Separación). Se evalúa
+// sobre el valor del CAMPO, no sobre la etapa.
+const CAMPO_REFERENCIA = 'Referencia_de_Recaudo';
+const CAMPO_FECHA_VINCULACION = 'Fecha_Vinculaci_n_Exitosa';
+const tieneValor = (v) => v !== null && v !== undefined && String(v).trim() !== '';
+const esElegible = (deal, campoReferencia, campoFecha) =>
+  tieneValor(deal[campoReferencia]) || tieneValor(deal[campoFecha]);
+
+// El incremental (If-Modified-Since) solo trae lo modificado desde el último sync: con la regla
+// nueva, oportunidades que ya cumplían y no se han tocado en Zoho nunca llegarían. Si el último
+// sync exitoso es anterior a este cambio, el siguiente es completo (una sola vez).
+const REGLA_NUEVA_DESDE = new Date('2026-10-14T05:00:00Z');
+
 async function syncOportunidadesFromZoho(force = false) {
   const log = await SyncLog.create({ status: 'running' });
 
@@ -294,8 +310,10 @@ async function syncOportunidadesFromZoho(force = false) {
       const name = (f.api_name || '').toLowerCase();
       return (label.includes('pago') && label.includes('separac')) || (name.includes('pago') && name.includes('separac'));
     });
-    if (!pagoSepField) throw new Error('No se encontró el campo Pago Separación en los metadatos de Zoho');
-    console.log(`[sync] Pago Separación field: ${pagoSepField.api_name} (${pagoSepField.field_label})`); // eslint-disable-line no-console
+    const campoReferencia = fields.find((f) => f.api_name === CAMPO_REFERENCIA)?.api_name ?? CAMPO_REFERENCIA;
+    const campoFecha = fields.find((f) => f.api_name === CAMPO_FECHA_VINCULACION)?.api_name;
+    if (!campoFecha) throw new Error('No se encontró el campo Fecha Vinculación Exitosa en los metadatos de Zoho');
+    console.log(`[sync] Regla: ${campoReferencia} o ${campoFecha} con valor`); // eslint-disable-line no-console
 
     const currencyApiNames = fields.filter((f) => f.data_type === 'currency').map((f) => f.api_name);
     const inmuebleApiNames = fields.filter((f) => isInmuebleField(f) && !EXCLUDED_TYPES.includes(f.data_type)).map((f) => f.api_name);
@@ -309,15 +327,13 @@ async function syncOportunidadesFromZoho(force = false) {
     console.log(`[sync] Requesting ${fieldsList.length} fields per deal`); // eslint-disable-line no-console
 
     const lastSuccess = force ? null : await SyncLog.findOne({ where: { status: 'success' }, order: [['finalizado_en', 'DESC']] });
-    const modifiedSince = lastSuccess?.finalizado_en ? new Date(lastSuccess.finalizado_en).toUTCString() : null;
+    const syncPrevioVigente = lastSuccess?.finalizado_en && new Date(lastSuccess.finalizado_en) >= REGLA_NUEVA_DESDE;
+    const modifiedSince = syncPrevioVigente ? new Date(lastSuccess.finalizado_en).toUTCString() : null;
 
     const allDeals = await fetchAllDeals(fieldsList, modifiedSince);
 
-    const deals = allDeals.filter((d) => {
-      const v = d[pagoSepField.api_name];
-      return v !== null && v !== undefined && v !== '';
-    });
-    console.log(`[sync] Fetched ${allDeals.length} deals total, ${deals.length} con Pago Separación`); // eslint-disable-line no-console
+    const deals = allDeals.filter((d) => esElegible(d, campoReferencia, campoFecha));
+    console.log(`[sync] Fetched ${allDeals.length} deals total, ${deals.length} con Referencia de Recaudo o Fecha Vinculación Exitosa`); // eslint-disable-line no-console
 
     const contactApiNames = fields.filter((f) => isContactField(f) && !EXCLUDED_TYPES.includes(f.data_type)).map((f) => f.api_name);
     const fieldMap = { currencyApiNames, inmuebleApiNames, cotizacionApiNames, recaudoField, pagoSepField, contactApiNames };

@@ -68,8 +68,8 @@ function _mapDetalle(row) {
   };
 }
 
-// Muestra solo registros con fecha de Pago Separación -- mismo filtro que el
-// original (el resto son deals de Zoho que no llegaron a esa etapa).
+// Muestra todo lo sincronizado: el sync ya trae solo las oportunidades con Referencia de Recaudo o
+// Fecha Vinculación Exitosa (2026-10-14; antes se filtraba aquí por Pago Separación).
 // Búsqueda SIMPLE por substring: la tolerante (palabras + trigramas, con su
 // orden por similitud) se revirtió el 2026-09-24 por decisión del Jefe Gabriel
 // ("Busco nombres y me salen otros").
@@ -79,7 +79,7 @@ function _mapDetalle(row) {
 // (`inventarioTorres.service.js`) -- Oportunidades tampoco tiene su propio
 // Proyecto/Torre, así que se resuelve indirecto vía `referencia_recaudo`.
 async function list({ stage, search, etapa, frente, torre, sortBy, sortDir, page = 1, limit = 20 }) {
-  const where = { pago_separacion: { [Op.ne]: null } };
+  const where = {};
   if (stage) where.stage = stage;
 
   const valores = await valoresProyectoTorre();
