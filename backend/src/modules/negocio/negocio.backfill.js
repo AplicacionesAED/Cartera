@@ -13,6 +13,9 @@ const { resolverColumnasMovPorPropietario, parseCompradoresCell, extraerDatosMov
 const Negocio = require('./negocio.model');
 const NegocioComprador = require('./negocioComprador.model');
 const NegocioMovimiento = require('./negocioMovimiento.model');
+const { progresoSync } = require('../../utils/progresoSync');
+
+const progreso = progresoSync('negocios');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 
 function cleanStr(v) {
@@ -98,6 +101,7 @@ async function runBackfill() {
   result = null;
   const startedAt = Date.now();
   let marcasManuales = [];
+  progreso.iniciar('Preparando la reconstrucción');
 
   try {
     // Las marcas manuales (en trámite / canje, ver negocio.service.js#updateFlags) no vienen del
@@ -121,7 +125,9 @@ async function runBackfill() {
     // ── Fase 1: hoja "Movimientos" -> Negocio.datos + estado ──────────────
     const hojasFase1 = hojaIds.filter((h) => h.nombre_hoja === 'Movimientos');
     const resumenMap = new Map();
+    progreso.fase('Leyendo los resúmenes de la fiducia', hojasFase1.length);
     for (const hojaRef of hojasFase1) {
+      progreso.avanzar(1);
       const hoja = await HojaFiduciaria.findByPk(hojaRef.id, { attributes: ['columnas', 'filas'] });
       const filas = Array.isArray(hoja.filas) ? hoja.filas : [];
       const storedCols = Array.isArray(hoja.columnas) ? hoja.columnas : [];
@@ -166,7 +172,9 @@ async function runBackfill() {
     }
 
     const resumenEntries = [...resumenMap.entries()];
+    progreso.fase('Creando negocios', resumenEntries.length);
     await runBatched(resumenEntries, 20, async ([referencia, data]) => {
+      progreso.avanzar(1);
       const [negocio] = await Negocio.upsert(
         { referencia, estado: data.estado, datos: data.datos, saldo_actual: data.saldoActual },
         { conflictFields: ['referencia'] }
@@ -188,7 +196,9 @@ async function runBackfill() {
 
     // ── Fase 2: hoja "Mov_Por_Propietario" -> compradores + movimientos ───
     const hojasFase2 = hojaIds.filter((h) => h.nombre_hoja === 'Mov_Por_Propietario');
+    progreso.fase('Cargando compradores y movimientos', hojasFase2.length);
     for (const hojaRef of hojasFase2) {
+      progreso.avanzar(1);
       const hoja = await HojaFiduciaria.findByPk(hojaRef.id, { attributes: ['columnas', 'filas'] });
       const filas = Array.isArray(hoja.filas) ? hoja.filas : [];
       const storedCols = Array.isArray(hoja.columnas) ? hoja.columnas : [];
@@ -275,6 +285,7 @@ async function runBackfill() {
     result = { ok: false, error: err.message };
     console.error('[backfill] Error:', err.message); // eslint-disable-line no-console
   } finally {
+    progreso.terminar();
     for (const m of marcasManuales) {
       try {
         await Negocio.update({ en_tramite: m.en_tramite, es_canje: m.es_canje }, { where: { referencia: m.referencia } });
@@ -294,4 +305,6 @@ function getBackfillResult() {
   return result;
 }
 
-module.exports = { runBackfill, isBackfillRunning, getBackfillResult };
+const getBackfillProgreso = () => progreso.snapshot();
+
+module.exports = { runBackfill, isBackfillRunning, getBackfillResult, getBackfillProgreso };

@@ -7,7 +7,7 @@
 // `torre` como propiedad plana, así que los filtros son directos (Torre,
 // Categoría, Estado, más búsqueda). Conserva "Exportar a Excel" (respeta los
 // filtros aplicados).
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Search, RefreshCw, Building, Download } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
@@ -15,6 +15,8 @@ import { Button } from '../../components/ui/Button.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listInmueblesOliv, iniciarSyncInmueblesOliv, getSyncStatusInmueblesOliv } from '../../api/oliv.js';
 import { formatCOP } from '../../utils/format.js';
@@ -40,12 +42,9 @@ function OlivInventarioLista() {
   const [pagina, setPagina] = usePersistentState('oliv-inventario-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [syncError, setSyncError] = useState(null);
   const [exportando, setExportando] = useState(false);
   const [searchInput, setSearchInput] = useState(filtros.search);
   const debouncedSearch = useDebounce(searchInput);
-  const pollRef = useRef(null);
   const [opciones, setOpciones] = useState({ torres: [], categorias: [], estados: [] });
 
   useEffect(() => {
@@ -74,38 +73,19 @@ function OlivInventarioLista() {
     cargar();
   }, [cargar]);
 
-  useEffect(() => () => clearInterval(pollRef.current), []);
+  const sync = useSyncControl({
+    iniciar: iniciarSyncInmueblesOliv,
+    obtener: getSyncStatusInmueblesOliv,
+    normalizar: normalizarEstadoRunning,
+    alTerminar: (e) => { if (e.ok) cargar(); },
+  });
+  const syncError = sync.errorInicio || (sync.ejecutado && !sync.corriendo ? sync.estado?.error : null);
 
   function actualizarFiltro(campo, valor) {
     setFiltros((prev) => ({ ...prev, [campo]: valor }));
     setPagina(1);
   }
 
-  function handleSync() {
-    setSincronizando(true);
-    setSyncError(null);
-    iniciarSyncInmueblesOliv().catch(() => {});
-    let attempts = 0;
-    pollRef.current = setInterval(async () => {
-      attempts += 1;
-      try {
-        const res = await getSyncStatusInmueblesOliv();
-        if (!res.data.running) {
-          clearInterval(pollRef.current);
-          setSincronizando(false);
-          if (res.data.result?.ok) cargar();
-          else setSyncError(res.data.result?.error || 'La sincronización no terminó correctamente. Intenta de nuevo.');
-        }
-      } catch {
-        // seguir intentando
-      }
-      if (attempts > 120) {
-        clearInterval(pollRef.current);
-        setSincronizando(false);
-        setSyncError('La sincronización tardó demasiado y se canceló. Intenta de nuevo.');
-      }
-    }, 2000);
-  }
 
   async function handleExportar() {
     setExportando(true);
@@ -144,12 +124,16 @@ function OlivInventarioLista() {
               {exportando ? 'Exportando…' : 'Exportar a Excel'}
             </span>
           </Button>
-          <Button variant="secondary" onClick={handleSync} disabled={sincronizando}>
-            <span className={styles.botonInterior}>
-              <RefreshCw size={14} className={sincronizando ? styles.spin : ''} aria-hidden="true" />
-              {sincronizando ? 'Sincronizando…' : 'Sincronizar desde HubSpot'}
-            </span>
-          </Button>
+          {sync.corriendo ? (
+            <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando desde HubSpot…" compacto />
+          ) : (
+            <Button variant="secondary" onClick={sync.ejecutar}>
+              <span className={styles.botonInterior}>
+                <RefreshCw size={14} aria-hidden="true" />
+                Sincronizar desde HubSpot
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 

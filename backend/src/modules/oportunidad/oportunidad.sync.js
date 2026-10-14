@@ -11,6 +11,7 @@ const ZohoFieldMetadata = require('./zohoFieldMetadata.model');
 const SyncLog = require('./syncLog.model');
 const { runSubformsBackfill } = require('./oportunidad.subformsBackfill');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { progresoSync } = require('../../utils/progresoSync');
 
 async function zohoGet(path, params = {}) {
   const token = await getAccessToken();
@@ -140,6 +141,7 @@ async function fetchDealsPage(fieldsList, page, modifiedSince = null) {
 }
 
 async function fetchAllDeals(fieldsList, modifiedSince = null) {
+  const progreso = progresoSync('oportunidades');
   const allDeals = [];
   let page = 1;
   let moreRecords = true;
@@ -148,6 +150,7 @@ async function fetchAllDeals(fieldsList, modifiedSince = null) {
 
   while (moreRecords) {
     console.log(`[sync] Fetching deals page ${page}...`); // eslint-disable-line no-console
+    progreso.fase(`Trayendo oportunidades de Zoho (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
     try {
       const data = await fetchDealsPage(fieldsList, page, modifiedSince);
       if (data.status === 'error' || !data.data) break;
@@ -301,6 +304,8 @@ const REGLA_NUEVA_DESDE = new Date('2026-10-14T05:00:00Z');
 
 async function syncOportunidadesFromZoho(force = false) {
   const log = await SyncLog.create({ status: 'running' });
+  const progreso = progresoSync('oportunidades');
+  progreso.iniciar('Preparando la sincronización');
 
   try {
     const fields = await syncFieldMetadata();
@@ -334,6 +339,7 @@ async function syncOportunidadesFromZoho(force = false) {
 
     const deals = allDeals.filter((d) => esElegible(d, campoReferencia, campoFecha));
     console.log(`[sync] Fetched ${allDeals.length} deals total, ${deals.length} con Referencia de Recaudo o Fecha Vinculación Exitosa`); // eslint-disable-line no-console
+    progreso.fase('Guardando oportunidades', deals.length);
 
     const contactApiNames = fields.filter((f) => isContactField(f) && !EXCLUDED_TYPES.includes(f.data_type)).map((f) => f.api_name);
     const fieldMap = { currencyApiNames, inmuebleApiNames, cotizacionApiNames, recaudoField, pagoSepField, contactApiNames };
@@ -344,6 +350,7 @@ async function syncOportunidadesFromZoho(force = false) {
       const batch = deals.slice(i, i + BATCH_SIZE);
       await Promise.all(batch.map((deal) => upsertOportunidad(mapDeal(deal, fieldMap))));
       saved += batch.length;
+      progreso.establecer(saved);
       if (saved % 500 === 0 || saved === deals.length) {
         console.log(`[sync] Saved ${saved}/${deals.length} records...`); // eslint-disable-line no-console
       }
@@ -352,12 +359,14 @@ async function syncOportunidadesFromZoho(force = false) {
     // Enriquecer contactos: email/telefono de los Contactos vinculados.
     const contactIds = [...new Set(deals.map((d) => (typeof d.Contact_Name === 'object' ? d.Contact_Name?.id : null)).filter(Boolean))];
     console.log(`[sync] Fetching contact details for ${contactIds.length} unique contacts...`); // eslint-disable-line no-console
+    progreso.fase('Trayendo datos de contacto', contactIds.length);
 
     const CONTACT_FIELDS = 'Email,Phone,Mobile';
     const contactMap = {};
     for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
       const batch = contactIds.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map((cid) => zohoGet(`/Contacts/${cid}`, { fields: CONTACT_FIELDS })));
+      progreso.avanzar(batch.length);
       for (const r of results) {
         const c = r.status === 'fulfilled' ? r.value?.data?.[0] : null;
         if (c?.id) contactMap[c.id] = { email: c.Email || null, phone: c.Phone || c.Mobile || null };
@@ -394,8 +403,10 @@ async function syncOportunidadesFromZoho(force = false) {
     // (ver buildFieldsList). No se espera, no debe bloquear la respuesta.
     runSubformsBackfill().catch((err) => console.error('[sync] Error en backfill de subforms automático:', err.message)); // eslint-disable-line no-console
 
+    progreso.terminar();
     return { success: true, recordsSync: saved };
   } catch (err) {
+    progreso.terminar();
     console.error('[sync] Error:', err.message); // eslint-disable-line no-console
     await log.update({ finalizado_en: new Date(), status: 'error', error_msg: err.message });
     return { success: false, error: err.message };

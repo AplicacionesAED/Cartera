@@ -7,7 +7,7 @@
 // Una sola ruta decide cuál mostrar según haya `:id`, para que otras pantallas
 // sigan enlazando directo a `/inventario/${id}`. Reusa los estilos de lista de
 // Negocios (negocios/NegociosPage.module.css).
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Search, RefreshCw, Layers, MapPin, Building } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
@@ -15,6 +15,8 @@ import { Button } from '../../components/ui/Button.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listInventario, iniciarSyncInventario, getSyncStatusInventario } from '../../api/inventario.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
@@ -44,11 +46,8 @@ function InventarioLista() {
   const [pagina, setPagina] = usePersistentState('inventario-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [syncError, setSyncError] = useState(null);
   const [searchInput, setSearchInput] = useState(filtros.search);
   const debouncedSearch = useDebounce(searchInput);
-  const pollRef = useRef(null);
 
   const [opciones, setOpciones] = useState({
     categorias: [], estados: [], etapasDisponibles: [], frentesDisponibles: [], frentesPorEtapa: {}, torresPorFrente: {}, torresPorEtapaFrente: {},
@@ -84,7 +83,13 @@ function InventarioLista() {
     cargar();
   }, [cargar]);
 
-  useEffect(() => () => clearInterval(pollRef.current), []);
+  const sync = useSyncControl({
+    iniciar: iniciarSyncInventario,
+    obtener: getSyncStatusInventario,
+    normalizar: normalizarEstadoRunning,
+    alTerminar: (e) => { if (e.ok) cargar(); },
+  });
+  const syncError = sync.errorInicio || (sync.ejecutado && !sync.corriendo ? sync.estado?.error : null);
 
   function actualizarFiltro(campo, valor) {
     setFiltros((prev) => ({ ...prev, [campo]: valor }));
@@ -111,31 +116,6 @@ function InventarioLista() {
     setPagina(1);
   }
 
-  function handleSync() {
-    setSincronizando(true);
-    setSyncError(null);
-    iniciarSyncInventario().catch(() => {});
-    let attempts = 0;
-    pollRef.current = setInterval(async () => {
-      attempts += 1;
-      try {
-        const res = await getSyncStatusInventario();
-        if (!res.data.running) {
-          clearInterval(pollRef.current);
-          setSincronizando(false);
-          if (res.data.result?.ok) cargar();
-          else setSyncError(res.data.result?.error || 'La sincronización no terminó correctamente. Intenta de nuevo.');
-        }
-      } catch {
-        // seguir intentando
-      }
-      if (attempts > 120) {
-        clearInterval(pollRef.current);
-        setSincronizando(false);
-        setSyncError('La sincronización tardó demasiado y se canceló. Intenta de nuevo.');
-      }
-    }, 2000);
-  }
 
   function limpiarFiltros() {
     setSearchInput('');
@@ -161,12 +141,16 @@ function InventarioLista() {
           <p className={styles.subtitle}>Inventario de Baía Kristal (Zoho){total !== undefined && !sinInventario ? ` · ${total.toLocaleString('es-CO')} resultados` : ''}</p>
         </div>
         <div className={styles.acciones}>
-          <Button variant="secondary" onClick={handleSync} disabled={sincronizando}>
-            <span className={styles.botonInterior}>
-              <RefreshCw size={14} className={sincronizando ? styles.spin : ''} aria-hidden="true" />
-              {sincronizando ? 'Sincronizando…' : 'Sincronizar desde Zoho'}
-            </span>
-          </Button>
+          {sync.corriendo ? (
+            <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando desde Zoho…" compacto />
+          ) : (
+            <Button variant="secondary" onClick={sync.ejecutar}>
+              <span className={styles.botonInterior}>
+                <RefreshCw size={14} aria-hidden="true" />
+                Sincronizar desde Zoho
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 

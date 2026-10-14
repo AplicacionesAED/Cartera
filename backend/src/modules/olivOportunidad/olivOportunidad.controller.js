@@ -4,6 +4,7 @@ const service = require('./olivOportunidad.service');
 const { syncOportunidadesOliv } = require('./olivOportunidad.sync');
 const { syncInmueblesOliv } = require('../olivInmueble/olivInmueble.sync');
 const OlivSyncLog = require('./olivSyncLog.model');
+const { progresoSync } = require('../../utils/progresoSync');
 
 const list = asyncHandler(async (req, res) => {
   const { search, stage, torre, estadoInmueble, sortBy, sortDir, page, limit } = req.query;
@@ -34,7 +35,7 @@ function _mapSyncLog(log) {
 
 const syncStatus = asyncHandler(async (req, res) => {
   const last = await OlivSyncLog.findOne({ order: [['iniciado_en', 'DESC']] });
-  ok(res, last ? _mapSyncLog(last) : { status: 'never' });
+  ok(res, { ...(last ? _mapSyncLog(last) : { status: 'never' }), progreso: progresoSync('oliv-oportunidades').snapshot() });
 });
 
 module.exports = { list, stages, getById, propiedadesMetadata, status, iniciarSync, syncStatus };

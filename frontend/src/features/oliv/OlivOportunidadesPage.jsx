@@ -41,6 +41,8 @@ import {
   getStatusOportunidadesOliv,
 } from '../../api/oliv.js';
 import { formatDateTime } from '../../utils/format.js';
+import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { useSyncControl, normalizarEstadoLog } from '../../hooks/useSyncControl.js';
 import styles from '../oportunidades/OportunidadesListPage.module.css';
 
 function iniciales(texto = '') {
@@ -49,69 +51,47 @@ function iniciales(texto = '') {
 }
 
 function SyncStatusBar() {
-  const [status, setStatus] = useState(null);
   const [hubspotConfigurado, setHubspotConfigurado] = useState(null);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [errorSync, setErrorSync] = useState(null);
-
-  const cargarEstado = useCallback(() => {
-    getSyncStatusOportunidadesOliv().then((res) => setStatus(res.data)).catch(() => {});
-  }, []);
+  const sync = useSyncControl({
+    iniciar: iniciarSyncOportunidadesOliv,
+    obtener: getSyncStatusOportunidadesOliv,
+    normalizar: normalizarEstadoLog,
+  });
+  const status = sync.estado;
+  const errorSync = sync.errorInicio;
 
   useEffect(() => {
     getStatusOportunidadesOliv().then((res) => setHubspotConfigurado(res.data.hubspotConfigurado)).catch(() => {});
-    cargarEstado();
-    const interval = setInterval(cargarEstado, 15000);
-    return () => clearInterval(interval);
-  }, [cargarEstado]);
-
-  async function handleSync() {
-    setSincronizando(true);
-    setErrorSync(null);
-    try {
-      await iniciarSyncOportunidadesOliv();
-    } catch (err) {
-      // Un fallo al iniciar el sync (permiso, red, servidor) se muestra aquí; nunca toca la sesión.
-      setErrorSync(err.message);
-      setSincronizando(false);
-      return;
-    }
-    setTimeout(() => {
-      cargarEstado();
-      setSincronizando(false);
-    }, 3000);
-  }
-
-  const corriendo = status?.status === 'running' || sincronizando;
+  }, []);
 
   return (
     <div className={styles.syncBar}>
-      <div className={styles.syncEstado}>
-        {hubspotConfigurado === false && <span className={styles.syncError}>HubSpot sin configurar (falta HUBSPOT_ACCESS_TOKEN)</span>}
-        {hubspotConfigurado && status?.status === 'never' && 'Sin sincronizaciones'}
-        {hubspotConfigurado && corriendo && (
-          <span className={styles.syncCorriendo}>
-            <span className={styles.syncDot} />
-            Sincronizando…
-          </span>
-        )}
-        {hubspotConfigurado && !corriendo && status?.status === 'success' && (
-          <span>
-            Última sync: <strong>{formatDateTime(status.finalizadoEn)}</strong>{' '}
-            <span className={styles.syncOk}>({status.registrosSync} reg.)</span>
-          </span>
-        )}
-        {errorSync && <span className={styles.syncError}>No se pudo iniciar la sincronización: {errorSync}</span>}
-        {hubspotConfigurado && !corriendo && !errorSync && status?.status === 'error' && (
-          <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 80)}</span>
-        )}
-      </div>
-      <Button variant="secondary" onClick={handleSync} disabled={corriendo || !hubspotConfigurado}>
-        <span className={styles.botonSyncInterior}>
-          <RefreshCw size={14} className={corriendo ? styles.spin : ''} aria-hidden="true" />
-          {corriendo ? 'Sincronizando…' : 'Sincronizar ahora'}
-        </span>
-      </Button>
+      {hubspotConfigurado && sync.corriendo ? (
+        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con HubSpot…" compacto />
+      ) : (
+        <>
+          <div className={styles.syncEstado}>
+            {hubspotConfigurado === false && <span className={styles.syncError}>HubSpot sin configurar (falta HUBSPOT_ACCESS_TOKEN)</span>}
+            {hubspotConfigurado && status?.status === 'never' && 'Sin sincronizaciones'}
+            {hubspotConfigurado && status?.status === 'success' && (
+              <span>
+                Última sync: <strong>{formatDateTime(status.finalizadoEn)}</strong>{' '}
+                <span className={styles.syncOk}>({status.registrosSync} reg.)</span>
+              </span>
+            )}
+            {errorSync && <span className={styles.syncError}>No se pudo iniciar la sincronización: {errorSync}</span>}
+            {hubspotConfigurado && !errorSync && status?.status === 'error' && (
+              <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
+            )}
+          </div>
+          <Button variant="secondary" onClick={sync.ejecutar} disabled={!hubspotConfigurado}>
+            <span className={styles.botonSyncInterior}>
+              <RefreshCw size={14} aria-hidden="true" />
+              Sincronizar ahora
+            </span>
+          </Button>
+        </>
+      )}
     </div>
   );
 }

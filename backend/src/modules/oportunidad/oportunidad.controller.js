@@ -3,8 +3,9 @@ const { ok } = require('../../utils/ApiResponse');
 const service = require('./oportunidad.service');
 const { syncOportunidadesFromZoho } = require('./oportunidad.sync');
 const { syncInventario } = require('../inventario/inventario.sync');
-const { runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult } = require('./oportunidad.subformsBackfill');
+const { runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult, getSubformsBackfillProgreso } = require('./oportunidad.subformsBackfill');
 const SyncLog = require('./syncLog.model');
+const { progresoSync } = require('../../utils/progresoSync');
 
 const list = asyncHandler(async (req, res) => {
   const { stage, search, etapa, frente, torre, sortBy, sortDir, page, limit } = req.query;
@@ -36,7 +37,7 @@ function _mapSyncLog(log) {
 
 const syncStatus = asyncHandler(async (req, res) => {
   const last = await SyncLog.findOne({ order: [['iniciado_en', 'DESC']] });
-  ok(res, last ? _mapSyncLog(last) : { status: 'never' });
+  ok(res, { ...(last ? _mapSyncLog(last) : { status: 'never' }), progreso: progresoSync('oportunidades').snapshot() });
 });
 
 // GET /oportunidades/sync/logs?limit=5 -- historial de sincronizaciones,
@@ -55,6 +56,6 @@ const iniciarBackfill = asyncHandler(async (req, res) => {
   runSubformsBackfill();
 });
 
-const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isSubformsBackfillRunning(), result: getSubformsBackfillResult() }));
+const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isSubformsBackfillRunning(), result: getSubformsBackfillResult(), progreso: getSubformsBackfillProgreso() }));
 
 module.exports = { list, stages, camposMetadata, getById, getSubforms, iniciarSync, syncStatus, syncLogs, iniciarBackfill, backfillStatus };

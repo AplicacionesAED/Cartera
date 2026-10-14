@@ -10,6 +10,9 @@
 const sequelize = require('../../config/db');
 const { buscarObjeto } = require('../../utils/hubspotClient');
 const { invalidarCacheResumenOliv } = require('../olivResumen/olivResumenCache');
+const { progresoSync } = require('../../utils/progresoSync');
+
+const progreso = progresoSync('oliv-inmuebles');
 
 const UNIDADES_OBJECT_ID = '2-51798334';
 const PROYECTO = 'Oliv';
@@ -151,9 +154,11 @@ async function syncInmueblesOliv() {
   syncRunning = true;
   syncResult = null;
   const startedAt = Date.now();
+  progreso.iniciar('Trayendo unidades de HubSpot');
 
   try {
     const unidades = await fetchAllUnidadesOliv();
+    progreso.fase('Guardando unidades', unidades.length);
     console.log(`[oliv-inmuebles-sync] ${unidades.length} unidades traídas de HubSpot`); // eslint-disable-line no-console
 
     const BATCH_SIZE = 50;
@@ -162,6 +167,7 @@ async function syncInmueblesOliv() {
       const batch = unidades.slice(i, i + BATCH_SIZE);
       await Promise.all(batch.map((u) => upsertOlivInmueble(mapUnidad(u))));
       saved += batch.length;
+      progreso.establecer(saved);
     }
 
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -174,12 +180,13 @@ async function syncInmueblesOliv() {
     console.error('[oliv-inmuebles-sync] Error:', err.message); // eslint-disable-line no-console
     syncResult = { ok: false, error: err.message };
   } finally {
+    progreso.terminar();
     syncRunning = false;
   }
 }
 
 function getSyncStatus() {
-  return { running: syncRunning, result: syncResult };
+  return { running: syncRunning, result: syncResult, progreso: progreso.snapshot() };
 }
 
 module.exports = { syncInmueblesOliv, getSyncStatus };

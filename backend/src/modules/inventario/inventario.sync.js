@@ -7,6 +7,9 @@ const { getAccessToken } = require('../../utils/zohoAuth');
 const config = require('../../config/zoho');
 const InventarioItem = require('./inventarioItem.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { progresoSync } = require('../../utils/progresoSync');
+
+const progreso = progresoSync('inventario');
 
 async function fetchAllProducts() {
   const token = await getAccessToken();
@@ -63,9 +66,11 @@ async function syncInventario() {
   syncRunning = true;
   syncResult = null;
   const startedAt = Date.now();
+  progreso.iniciar('Trayendo productos de Zoho');
 
   try {
     const productos = await fetchAllProducts();
+    progreso.fase('Guardando productos', productos.length);
     console.log(`[inventario] ${productos.length} productos traídos de Zoho`); // eslint-disable-line no-console
 
     const BATCH_SIZE = 50;
@@ -79,6 +84,7 @@ async function syncInventario() {
         })
       );
       saved += batch.length;
+      progreso.establecer(saved);
     }
 
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -89,12 +95,13 @@ async function syncInventario() {
     console.error('[inventario] Error:', err.message); // eslint-disable-line no-console
     syncResult = { ok: false, error: err.message };
   } finally {
+    progreso.terminar();
     syncRunning = false;
   }
 }
 
 function getSyncStatus() {
-  return { running: syncRunning, result: syncResult };
+  return { running: syncRunning, result: syncResult, progreso: progreso.snapshot() };
 }
 
 module.exports = { syncInventario, getSyncStatus };

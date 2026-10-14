@@ -33,6 +33,8 @@ import {
   marcarVerificadoOtrosi,
 } from '../../api/otrosies.js';
 import { formatDateTime } from '../../utils/format.js';
+import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { useSyncControl, normalizarEstadoLog } from '../../hooks/useSyncControl.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
 import styles from './OtrosiesPage.module.css';
 
@@ -87,54 +89,38 @@ function BotonVerificado({ row, guardando, onToggle }) {
 // (POST /otrosies/sync, GET /otrosies/sync/status -- mismo shape que sus
 // pares de Oportunidades).
 function SyncStatusBar() {
-  const [status, setStatus] = useState(null);
-  const [sincronizando, setSincronizando] = useState(false);
-
-  const cargarEstado = useCallback(() => {
-    getSyncStatusOtrosies().then((res) => setStatus(res.data)).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    cargarEstado();
-    const interval = setInterval(cargarEstado, 15000);
-    return () => clearInterval(interval);
-  }, [cargarEstado]);
-
-  async function handleSync() {
-    setSincronizando(true);
-    await iniciarSyncOtrosies();
-    setTimeout(() => {
-      cargarEstado();
-      setSincronizando(false);
-    }, 3000);
-  }
-
-  const corriendo = status?.status === 'running' || sincronizando;
+  const sync = useSyncControl({
+    iniciar: iniciarSyncOtrosies,
+    obtener: getSyncStatusOtrosies,
+    normalizar: normalizarEstadoLog,
+  });
+  const status = sync.estado;
 
   return (
     <div className={styles.syncBar}>
-      <div className={styles.syncEstado}>
-        {status?.status === 'never' && 'Sin sincronizaciones'}
-        {corriendo && (
-          <span className={styles.syncCorriendo}>
-            <span className={styles.syncDot} />
-            Sincronizando…
-          </span>
-        )}
-        {!corriendo && status?.status === 'success' && (
-          <span>
-            Última sync: <strong>{formatDateTime(status.finalizadoEn)}</strong>{' '}
-            <span className={styles.syncOk}>({status.registrosSync} reg.)</span>
-          </span>
-        )}
-        {!corriendo && status?.status === 'error' && (
-          <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 50)}</span>
-        )}
-      </div>
-      <button type="button" className={styles.botonSync} onClick={handleSync} disabled={corriendo}>
-        <RefreshCw size={13} className={corriendo ? styles.spin : ''} />
-        {corriendo ? 'Sincronizando…' : 'Sincronizar ahora'}
-      </button>
+      {sync.corriendo ? (
+        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con Zoho…" compacto />
+      ) : (
+        <>
+          <div className={styles.syncEstado}>
+            {status?.status === 'never' && 'Sin sincronizaciones'}
+            {status?.status === 'success' && (
+              <span>
+                Última sync: <strong>{formatDateTime(status.finalizadoEn)}</strong>{' '}
+                <span className={styles.syncOk}>({status.registrosSync} reg.)</span>
+              </span>
+            )}
+            {sync.errorInicio && <span className={styles.syncError}>No se pudo iniciar la sincronización: {sync.errorInicio}</span>}
+            {!sync.errorInicio && status?.status === 'error' && (
+              <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
+            )}
+          </div>
+          <button type="button" className={styles.botonSync} onClick={sync.ejecutar}>
+            <RefreshCw size={13} />
+            Sincronizar ahora
+          </button>
+        </>
+      )}
     </div>
   );
 }

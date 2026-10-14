@@ -20,6 +20,8 @@ import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { getStats } from '../../api/dashboard.js';
 import { listNegocios, iniciarBackfillNegocios, getBackfillStatusNegocios } from '../../api/negocios.js';
+import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { estadoToken } from '../../utils/estados.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
 import { formatCOP } from '../../utils/format.js';
@@ -166,7 +168,6 @@ function NegociosLista() {
   const [resultado, setResultado] = useState(null);
   const [stats, setStats] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [corriendo, setCorriendo] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [searchInput, setSearchInput] = useState(filtros.search);
   const debouncedSearch = useDebounce(searchInput);
@@ -237,19 +238,17 @@ function NegociosLista() {
     setPagina(1);
   }
 
-  async function handleBackfill() {
-    setCorriendo(true);
-    await iniciarBackfillNegocios();
-    const interval = setInterval(async () => {
-      const res = await getBackfillStatusNegocios();
-      if (!res.data.running) {
-        clearInterval(interval);
-        setCorriendo(false);
-        cargar();
-        getStats().then((r) => setStats(r.data)).catch(() => {});
-      }
-    }, 2000);
-  }
+  const sync = useSyncControl({
+    iniciar: iniciarBackfillNegocios,
+    obtener: getBackfillStatusNegocios,
+    normalizar: normalizarEstadoRunning,
+    alTerminar: (e) => {
+      cargar();
+      getStats().then((r) => setStats(r.data)).catch(() => {});
+      return e;
+    },
+  });
+  const syncError = sync.errorInicio || (sync.ejecutado && !sync.corriendo ? sync.estado?.error : null);
 
   async function handleExport(fmt) {
     setExportando(true);
@@ -290,14 +289,20 @@ function NegociosLista() {
         </div>
         <div className={styles.acciones}>
           <ExportMenu onExport={handleExport} disabled={exportando || cargando} />
-          <Button variant="secondary" onClick={handleBackfill} disabled={corriendo}>
-            <span className={styles.botonInterior}>
-              <RefreshCw size={14} className={corriendo ? styles.spin : ''} aria-hidden="true" />
-              {corriendo ? 'Reconstruyendo…' : 'Reconstruir desde Fiducia'}
-            </span>
-          </Button>
+          {sync.corriendo ? (
+            <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Reconstruyendo negocios…" compacto />
+          ) : (
+            <Button variant="secondary" onClick={sync.ejecutar}>
+              <span className={styles.botonInterior}>
+                <RefreshCw size={14} aria-hidden="true" />
+                Reconstruir desde Fiducia
+              </span>
+            </Button>
+          )}
         </div>
       </div>
+
+      {syncError && <p className={styles.syncError}>{syncError}</p>}
 
       <Resumen stats={stats} />
 

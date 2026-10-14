@@ -2,7 +2,7 @@ const asyncHandler = require('../../utils/asyncHandler');
 const { ok } = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
 const service = require('./negocio.service');
-const { runBackfill, isBackfillRunning, getBackfillResult } = require('./negocio.backfill');
+const { runBackfill, isBackfillRunning, getBackfillResult, getBackfillProgreso } = require('./negocio.backfill');
 
 const list = asyncHandler(async (req, res) => {
   const { search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, page, limit } = req.query;
@@ -44,6 +44,6 @@ const iniciarBackfill = asyncHandler(async (req, res) => {
   runBackfill();
 });
 
-const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isBackfillRunning(), result: getBackfillResult() }));
+const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isBackfillRunning(), result: getBackfillResult(), progreso: getBackfillProgreso() }));
 
 module.exports = { list, getById, getMovimientos, listMovimientos, exportMovimientos, updateFlags, iniciarBackfill, backfillStatus };

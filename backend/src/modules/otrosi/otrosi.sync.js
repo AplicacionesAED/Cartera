@@ -23,6 +23,9 @@ const zohoConfig = require('../../config/zoho');
 const sequelize = require('../../config/db');
 const ZohoFieldMetadata = require('../oportunidad/zohoFieldMetadata.model');
 const Otrosi = require('./otrosi.model');
+const { progresoSync } = require('../../utils/progresoSync');
+
+const progreso = progresoSync('otrosies');
 
 let running = false;
 let result = null;
@@ -171,6 +174,7 @@ async function syncOtrosiesFromZoho() {
   result = null;
   iniciadoEn = new Date();
   const startedAt = Date.now();
+  progreso.iniciar('Descubriendo etapas en Zoho');
   let registros = 0;
   let errores = 0;
 
@@ -181,6 +185,7 @@ async function syncOtrosiesFromZoho() {
     const recaudoApi = await resolverApiNameReferenciaRecaudo();
     const camposSync = recaudoApi ? `${CAMPOS_BASE},${recaudoApi}` : CAMPOS_BASE;
 
+    progreso.fase('Sincronizando por etapa', tramos.length + 1);
     console.log(`[otrosiSync] ${etapas.length} valores de Etapa descubiertos (${etapas.length} tramos) + barrido completo de sin-Etapa`); // eslint-disable-line no-console
 
     const idsSincronizados = new Set();
@@ -206,6 +211,7 @@ async function syncOtrosiesFromZoho() {
       const filas = await traerTramo(criteria, camposSync);
       totalPendientes += filas.length;
       await guardarLote(filas);
+      progreso.avanzar(1);
       console.log(`[otrosiSync] Tramo ${criteria} -> ${filas.length} (acumulado ${registros})`); // eslint-disable-line no-console
       await sleep(GAP_MS);
     }
@@ -217,6 +223,7 @@ async function syncOtrosiesFromZoho() {
     // /search en esta misma cuenta (34 páginas, 200 en todas, 0 duplicados,
     // 6663 exactos), así que paginar el criterio base completo es seguro y
     // garantiza los 6663. Upsert-if-missing: no pisa lo ya sincronizado.
+    progreso.fase('Barrido completo (cierre de cobertura)');
     const sobrantes = await traerTramo(`(${PROYECTO_CRITERIA})`, camposSync);
     const sobrantesNuevos = sobrantes.filter((d) => !idsSincronizados.has(String(d.id)));
     if (sobrantesNuevos.length) {
@@ -261,6 +268,7 @@ async function syncOtrosiesFromZoho() {
     result = { ok: false, error: err.message };
     ultimoSync = { status: 'error', iniciadoEn, finalizadoEn: new Date(), registrosSync: registros, errorMsg: err.message };
   } finally {
+    progreso.terminar();
     running = false;
   }
 
@@ -276,7 +284,7 @@ function getOtrosiSyncResult() {
 }
 
 function getOtrosiSyncStatus() {
-  if (running) return { status: 'running', iniciadoEn };
+  if (running) return { status: 'running', iniciadoEn, progreso: progreso.snapshot() };
   if (!ultimoSync) return { status: 'never' };
   return { ...ultimoSync };
 }

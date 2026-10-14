@@ -10,6 +10,9 @@ const { getAccessToken } = require('../../utils/zohoAuth');
 const zohoConfig = require('../../config/zoho');
 const Oportunidad = require('./oportunidad.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { progresoSync } = require('../../utils/progresoSync');
+
+const progreso = progresoSync('subforms');
 
 let running = false;
 let result = null;
@@ -24,6 +27,7 @@ async function runSubformsBackfill() {
   if (running) return;
   running = true;
   result = null;
+  progreso.iniciar('Buscando oportunidades sin plan de pagos');
   const startedAt = Date.now();
   let procesadas = 0;
   let actualizadas = 0;
@@ -44,6 +48,7 @@ async function runSubformsBackfill() {
       attributes: ['id', 'zoho_id'],
     });
 
+    progreso.fase('Trayendo planes de pago', pendientes.length);
     reportarProgreso(pendientes.length);
 
     for (const opp of pendientes) {
@@ -65,6 +70,7 @@ async function runSubformsBackfill() {
       }
 
       procesadas++;
+      progreso.establecer(procesadas);
       reportarProgreso(pendientes.length);
       if (procesadas % 50 === 0 || procesadas === pendientes.length) {
         console.log(`[subformsBackfill] Progreso: ${procesadas}/${pendientes.length} (${actualizadas} ok, ${errores} errores)`); // eslint-disable-line no-console
@@ -79,6 +85,7 @@ async function runSubformsBackfill() {
     result = { ok: false, error: err.message };
     console.error('[subformsBackfill] Error fatal:', err.message); // eslint-disable-line no-console
   } finally {
+    progreso.terminar();
     running = false;
   }
 }
@@ -91,4 +98,6 @@ function getSubformsBackfillResult() {
   return result;
 }
 
-module.exports = { runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult };
+const getSubformsBackfillProgreso = () => progreso.snapshot();
+
+module.exports = { runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult, getSubformsBackfillProgreso };

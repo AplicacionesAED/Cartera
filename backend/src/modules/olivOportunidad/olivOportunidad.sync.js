@@ -17,6 +17,9 @@ const { invalidarCacheResumenOliv } = require('../olivResumen/olivResumenCache')
 const { ETAPA_MINIMA_ORDER } = require('../../utils/olivHelpers');
 const OlivPropiedadMetadata = require('./olivPropiedadMetadata.model');
 const OlivSyncLog = require('./olivSyncLog.model');
+const { progresoSync } = require('../../utils/progresoSync');
+
+const progreso = progresoSync('oliv-oportunidades');
 
 const PROYECTO = 'Oliv';
 // Objeto personalizado "Unidades" de HubSpot -- mismo id que usa
@@ -83,6 +86,7 @@ async function fetchAllDealsOliv(propertyNames, dealstageIds) {
 
   do {
     console.log(`[oliv-sync] Fetching deals page ${page}...`); // eslint-disable-line no-console
+    progreso.fase(`Trayendo oportunidades de HubSpot (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
     const data = await buscarDeals({ properties: propertyNames, limit: 100, after, filterGroups });
     const results = data.results || [];
     allDeals.push(...results);
@@ -194,6 +198,7 @@ async function limpiarOportunidadesObsoletas(hubspotIdsVigentes) {
 
 async function syncOportunidadesOliv() {
   const log = await OlivSyncLog.create({ status: 'running' });
+  progreso.iniciar('Preparando la sincronización');
 
   try {
     const propiedades = await syncPropiedadesMetadata();
@@ -214,6 +219,7 @@ async function syncOportunidadesOliv() {
     const deals = await fetchAllDealsOliv(propertyNames, dealstageIds);
     console.log(`[oliv-sync] Fetched ${deals.length} deals de proyecto="${PROYECTO}" en etapa >= ${ETAPA_MINIMA_ORDER}`); // eslint-disable-line no-console
 
+    progreso.fase('Guardando oportunidades', deals.length);
     const BATCH_SIZE = 50;
     let saved = 0;
     for (let i = 0; i < deals.length; i += BATCH_SIZE) {
@@ -226,6 +232,7 @@ async function syncOportunidadesOliv() {
         })
       );
       saved += batch.length;
+      progreso.establecer(saved);
       if (saved % 500 === 0 || saved === deals.length) {
         console.log(`[oliv-sync] Saved ${saved}/${deals.length} records...`); // eslint-disable-line no-console
       }
@@ -245,8 +252,10 @@ async function syncOportunidadesOliv() {
     // cache global, se reconstruye solo en el próximo request).
     invalidarCacheResumenOliv();
 
+    progreso.terminar();
     return { success: true, recordsSync: saved };
   } catch (err) {
+    progreso.terminar();
     console.error('[oliv-sync] Error:', err.message); // eslint-disable-line no-console
     await log.update({ finalizado_en: new Date(), status: 'error', error_msg: err.message });
     return { success: false, error: err.message };

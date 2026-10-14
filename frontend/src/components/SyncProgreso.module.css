@@ -1,0 +1,96 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(340px, 100%);
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.compacto {
+  padding: 8px 12px;
+  gap: 4px;
+}
+
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.titulo {
+  font-size: var(--text-data-size);
+}
+
+.tiempo {
+  margin-left: auto;
+  font-size: var(--text-label-size);
+  font-weight: 400;
+  color: var(--color-ink-muted);
+}
+
+.fase {
+  font-size: var(--text-label-size);
+  color: var(--color-ink-secondary);
+}
+
+.pista {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+  border-radius: 999px;
+}
+
+.relleno {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+.indeterminado {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  animation: deslizar 1.4s ease-in-out infinite;
+}
+
+.detalle {
+  font-size: var(--text-label-size);
+  color: var(--color-ink-muted);
+}
+
+.giro {
+  animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes deslizar {
+  0% {
+    left: -35%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .giro,
+  .indeterminado {
+    animation: none;
+  }
+}
