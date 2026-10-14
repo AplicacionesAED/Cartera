@@ -153,7 +153,12 @@ async function fetchAllDeals(fieldsList, modifiedSince = null) {
     progreso.fase(`Trayendo oportunidades de Zoho (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
     try {
       const data = await fetchDealsPage(fieldsList, page, modifiedSince);
-      if (data.status === 'error' || !data.data) break;
+      if (data.status === 'error' || !data.data) {
+        // Un sync COMPLETO que no recibe nada en la primera página no es 'sin cambios': es una respuesta
+        // anómala de Zoho, y marcarlo exitoso dejaría el siguiente sync en modo incremental sobre una base vacía.
+        if (!modifiedSince && page === 1) throw new Error('Zoho no devolvió oportunidades en el sync completo');
+        break;
+      }
       const deals = data.data || [];
       allDeals.push(...deals);
       moreRecords = data.info?.more_records === true;
@@ -300,7 +305,9 @@ const esElegible = (deal, campoReferencia, campoFecha) =>
 // El incremental (If-Modified-Since) solo trae lo modificado desde el último sync: con la regla
 // nueva, oportunidades que ya cumplían y no se han tocado en Zoho nunca llegarían. Si el último
 // sync exitoso es anterior a este cambio, el siguiente es completo (una sola vez).
-const REGLA_NUEVA_DESDE = new Date('2026-10-14T05:00:00Z');
+// La fecha va DESPUÉS del último sync hecho con la regla vieja (el del programador de las 12:30 y varios
+// incrementales de ese día): un 2026-10-14T05:00Z anterior dejaba pasar esos syncs como 'vigentes'.
+const REGLA_NUEVA_DESDE = new Date('2026-10-14T21:10:00Z');
 
 async function syncOportunidadesFromZoho(force = false) {
   const log = await SyncLog.create({ status: 'running' });
