@@ -50,12 +50,13 @@ function iniciales(texto = '') {
   return `${partes[0]?.[0] ?? ''}${partes.length > 1 ? partes[1][0] : ''}`.toUpperCase() || '?';
 }
 
-function SyncStatusBar() {
+function SyncStatusBar({ onTerminado }) {
   const [hubspotConfigurado, setHubspotConfigurado] = useState(null);
   const sync = useSyncControl({
     iniciar: iniciarSyncOportunidadesOliv,
     obtener: getSyncStatusOportunidadesOliv,
     normalizar: normalizarEstadoLog,
+    alTerminar: (e) => { if (e.ok) onTerminado?.(); },
   });
   const status = sync.estado;
   const errorSync = sync.errorInicio;
@@ -168,7 +169,12 @@ export function OlivOportunidadesPage() {
             Oliv · CRM HubSpot{meta.pagination ? ` · ${meta.pagination.total.toLocaleString('es-CO')} oportunidades` : ''}
           </p>
         </div>
-        <SyncStatusBar />
+        <SyncStatusBar
+          onTerminado={() => {
+            cargar();
+            listStagesOportunidadesOliv().then((res) => setStages(res.data)).catch(() => {});
+          }}
+        />
       </div>
 
       <div className={styles.row}>

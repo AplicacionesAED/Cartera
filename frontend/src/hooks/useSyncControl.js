@@ -14,8 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const INTERVALO_MS = 2000;
-// Entre el clic y que el servidor marque "en ejecución" puede pasar un instante (la tarea arranca
-// después de responder): mientras tanto se sigue considerando iniciada.
+// Tope de espera si el servidor nunca marca la tarea como iniciada ni registra una corrida nueva.
 const GRACIA_INICIO_MS = 15000;
 
 // Forma A: { status: running | success | error | never, finalizadoEn, registrosSync, errorMsg, progreso }
@@ -28,6 +27,9 @@ export function normalizarEstadoLog(data) {
     ok: data.status === 'success' ? true : data.status === 'error' ? false : null,
     error: data.status === 'error' ? data.errorMsg || 'La sincronización falló.' : null,
     progreso: data.progreso ?? null,
+    // Identifica la corrida: cambia cuando termina (o arranca) una distinta. Sirve para saber que la NUESTRA
+    // terminó aunque haya sido tan rápida que nunca se vio 'en ejecución' (un incremental sin cambios dura ~1 s).
+    huella: `${data.iniciadoEn}|${data.finalizadoEn}|${data.status}`,
   };
 }
 
@@ -42,6 +44,7 @@ export function normalizarEstadoRunning(data) {
     ok: terminado ? result.ok === true : null,
     error: terminado && result.ok === false ? result.error || 'La sincronización falló.' : null,
     progreso: data.progreso ?? null,
+    huella: `${data.progreso?.iniciadoEn}|${JSON.stringify(result)}`,
   };
 }
 
@@ -54,6 +57,8 @@ export function useSyncControl({ iniciar, obtener, normalizar, alTerminar }) {
   const timerRef = useRef(null);
   const inicioRef = useRef(0);
   const vistoCorriendoRef = useRef(false);
+  const huellaAntesRef = useRef(null);
+  const estadoRef = useRef(null);
   const alTerminarRef = useRef(alTerminar);
   alTerminarRef.current = alTerminar;
 
@@ -66,21 +71,25 @@ export function useSyncControl({ iniciar, obtener, normalizar, alTerminar }) {
     try {
       const res = await obtener();
       const nuevo = normalizar(res.data);
+      estadoRef.current = nuevo;
       setEstado(nuevo);
       setRecibidoEn(Date.now());
       if (nuevo.corriendo) {
         vistoCorriendoRef.current = true;
         return nuevo;
       }
-      const dentroDeGracia = !vistoCorriendoRef.current && Date.now() - inicioRef.current < GRACIA_INICIO_MS;
-      if (inicioRef.current && !dentroDeGracia) {
-        // Terminó (o nunca llegó a arrancar): se libera el botón y se avisa una sola vez.
+      // Terminó la nuestra si se vio en ejecución, o si la corrida registrada cambió desde que se pulsó
+      // (terminó antes del primer sondeo). Si no pasa ninguna de las dos, se espera un rato a que arranque.
+      const cambio = nuevo.huella != null && nuevo.huella !== huellaAntesRef.current;
+      const terminoLaNuestra = vistoCorriendoRef.current || cambio;
+      const graciaVencida = Date.now() - inicioRef.current >= GRACIA_INICIO_MS;
+      if (inicioRef.current && (terminoLaNuestra || graciaVencida)) {
+        // Se libera el botón y se avisa una sola vez.
         detener();
         setIniciando(false);
-        const eraNuestra = vistoCorriendoRef.current;
         inicioRef.current = 0;
         vistoCorriendoRef.current = false;
-        if (eraNuestra) alTerminarRef.current?.(nuevo);
+        if (terminoLaNuestra) alTerminarRef.current?.(nuevo);
       } else if (!inicioRef.current) {
         detener();
       }
@@ -102,6 +111,7 @@ export function useSyncControl({ iniciar, obtener, normalizar, alTerminar }) {
       .then((res) => {
         if (!vivo) return;
         const nuevo = normalizar(res.data);
+        estadoRef.current = nuevo;
         setEstado(nuevo);
         setRecibidoEn(Date.now());
         if (nuevo.corriendo) {
@@ -126,6 +136,7 @@ export function useSyncControl({ iniciar, obtener, normalizar, alTerminar }) {
     setIniciando(true);
     inicioRef.current = Date.now();
     vistoCorriendoRef.current = false;
+    huellaAntesRef.current = estadoRef.current?.huella ?? null;
     try {
       await iniciar();
     } catch (err) {

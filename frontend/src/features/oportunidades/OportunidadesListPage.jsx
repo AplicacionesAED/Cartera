@@ -30,11 +30,12 @@ function iniciales(texto = '') {
   return `${partes[0]?.[0] ?? ''}${partes.length > 1 ? partes[1][0] : ''}`.toUpperCase() || '?';
 }
 
-function SyncStatusBar() {
+function SyncStatusBar({ onTerminado }) {
   const sync = useSyncControl({
     iniciar: () => iniciarSyncOportunidades(false),
     obtener: getSyncStatusOportunidades,
     normalizar: normalizarEstadoLog,
+    alTerminar: (e) => { if (e.ok) onTerminado?.(); },
   });
   const status = sync.estado;
   const errorSync = sync.errorInicio;
@@ -187,7 +188,12 @@ export function OportunidadesListPage() {
             CRM Zoho{meta.pagination ? ` · ${meta.pagination.total.toLocaleString('es-CO')} oportunidades` : ''}
           </p>
         </div>
-        <SyncStatusBar />
+        <SyncStatusBar
+          onTerminado={() => {
+            cargar();
+            listStages().then((res) => setStages(res.data)).catch(() => {});
+          }}
+        />
       </div>
 
       <div className={styles.row}>

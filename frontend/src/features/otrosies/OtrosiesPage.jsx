@@ -88,11 +88,12 @@ function BotonVerificado({ row, guardando, onToggle }) {
 // cada 15s) pero con los endpoints propios que Carlos está agregando
 // (POST /otrosies/sync, GET /otrosies/sync/status -- mismo shape que sus
 // pares de Oportunidades).
-function SyncStatusBar() {
+function SyncStatusBar({ onTerminado }) {
   const sync = useSyncControl({
     iniciar: iniciarSyncOtrosies,
     obtener: getSyncStatusOtrosies,
     normalizar: normalizarEstadoLog,
+    alTerminar: (e) => { if (e.ok) onTerminado?.(); },
   });
   const status = sync.estado;
 
@@ -285,7 +286,12 @@ export function OtrosiesPage() {
           <h1 className={styles.title}>Otrosíes</h1>
           <span className={styles.subtitle}>Baía Kristal · Contrato de Fiducia · Solo lectura</span>
         </div>
-        <SyncStatusBar />
+        <SyncStatusBar
+          onTerminado={() => {
+            cargar();
+            listStagesOtrosi().then((res) => setStages(res.data)).catch(() => {});
+          }}
+        />
       </div>
 
       <div className={styles.toolbarCard}>
