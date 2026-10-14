@@ -377,6 +377,15 @@ async function syncOportunidadesFromZoho(force = false) {
     }
     console.log(`[sync] Enriched ${enriched} records with contact email/phone`); // eslint-disable-line no-console
 
+    // Limpieza (solo en sync COMPLETO, que es el único que ve todas las oportunidades de Zoho): lo guardado
+    // que ya no cumple la regla (p. ej. las que entraron solo por Pago Separación) se elimina. Guarda de
+    // seguridad: no se borra nada si Zoho devolvió muy pocas oportunidades (respuesta truncada o con error).
+    if (!modifiedSince && allDeals.length >= 1000 && deals.length > 0) {
+      const vigentes = deals.map((d) => String(d.id));
+      const [, resultado] = await sequelize.query('DELETE FROM oportunidades WHERE NOT (zoho_id = ANY($1::text[]))', { bind: [vigentes] });
+      console.log(`[sync] Limpieza: ${resultado?.rowCount ?? 0} oportunidades eliminadas por no cumplir la regla`); // eslint-disable-line no-console
+    }
+
     await log.update({ finalizado_en: new Date(), status: 'success', registros_sync: saved });
     console.log(`[sync] Done. ${saved} records synced.`); // eslint-disable-line no-console
     invalidarCacheDashboard();
