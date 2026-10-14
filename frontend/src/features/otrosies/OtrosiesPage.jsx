@@ -99,7 +99,7 @@ function SyncStatusBar() {
   return (
     <div className={styles.syncBar}>
       {sync.corriendo ? (
-        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con Zoho…" compacto />
+        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con Zoho…" compacto embebido />
       ) : (
         <>
           <div className={styles.syncEstado}>

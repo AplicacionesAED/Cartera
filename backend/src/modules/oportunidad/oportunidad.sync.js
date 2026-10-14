@@ -140,8 +140,15 @@ async function fetchDealsPage(fieldsList, page, modifiedSince = null) {
   return response.data;
 }
 
+// Zoho no dice cuántas oportunidades hay en total mientras se pagina. En un sync COMPLETO se usa como
+// referencia lo que trajo el anterior (en memoria; 32.500 al arrancar el servidor, medido el 2026-10-14)
+// para que la barra avance desde 0 y calcule el tiempo restante. Si se supera, la barra queda en ~99%.
+let ultimoTotalDeals = 32500;
+
 async function fetchAllDeals(fieldsList, modifiedSince = null) {
   const progreso = progresoSync('oportunidades');
+  const estimado = modifiedSince ? null : ultimoTotalDeals;
+  progreso.fase('Trayendo oportunidades de Zoho', estimado);
   const allDeals = [];
   let page = 1;
   let moreRecords = true;
@@ -150,7 +157,7 @@ async function fetchAllDeals(fieldsList, modifiedSince = null) {
 
   while (moreRecords) {
     console.log(`[sync] Fetching deals page ${page}...`); // eslint-disable-line no-console
-    progreso.fase(`Trayendo oportunidades de Zoho (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
+    progreso.etiqueta(`Trayendo oportunidades de Zoho (página ${page})`);
     try {
       const data = await fetchDealsPage(fieldsList, page, modifiedSince);
       if (data.status === 'error' || !data.data) {
@@ -161,6 +168,8 @@ async function fetchAllDeals(fieldsList, modifiedSince = null) {
       }
       const deals = data.data || [];
       allDeals.push(...deals);
+      if (estimado) progreso.establecer(allDeals.length, Math.max(estimado, allDeals.length + 200));
+      else progreso.establecer(allDeals.length, null);
       moreRecords = data.info?.more_records === true;
       page += 1;
     } catch (err) {
@@ -172,6 +181,7 @@ async function fetchAllDeals(fieldsList, modifiedSince = null) {
     }
   }
 
+  if (!modifiedSince && allDeals.length > 0) ultimoTotalDeals = allDeals.length;
   return allDeals;
 }
 

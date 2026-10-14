@@ -17,7 +17,9 @@ export function formatearDuracion(segundos) {
   return `${h} h ${m % 60} min`;
 }
 
-export function SyncProgreso({ progreso, recibidoEn, titulo = 'Sincronizando…', compacto = false }) {
+// `embebido`: se muestra dentro de otro contenedor con borde (la barra de sincronización de las listas), así que
+// no dibuja su propia caja.
+export function SyncProgreso({ progreso, recibidoEn, titulo = 'Sincronizando…', compacto = false, embebido = false }) {
   const [ahora, setAhora] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 1000);
@@ -42,7 +44,7 @@ export function SyncProgreso({ progreso, recibidoEn, titulo = 'Sincronizando…'
   }
 
   return (
-    <div className={`${styles.panel} ${compacto ? styles.compacto : ''}`} role="status" aria-live="polite">
+    <div className={`${styles.panel} ${compacto ? styles.compacto : ''} ${embebido ? styles.embebido : ''}`} role="status" aria-live="polite">
       <div className={styles.cabecera}>
         <RefreshCw size={14} className={styles.giro} aria-hidden="true" />
         <span className={styles.titulo}>{titulo}</span>
@@ -60,7 +62,7 @@ export function SyncProgreso({ progreso, recibidoEn, titulo = 'Sincronizando…'
             {restante != null && restante >= 0 ? `faltan ~${formatearDuracion(restante)}` : 'calculando el tiempo restante…'}
           </>
         ) : (
-          'Calculando el tiempo restante…'
+          'Esperando respuesta… el tiempo restante se calcula al empezar a guardar'
         )}
       </div>
     </div>

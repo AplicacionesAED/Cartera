@@ -67,7 +67,7 @@ function SyncStatusBar() {
   return (
     <div className={styles.syncBar}>
       {hubspotConfigurado && sync.corriendo ? (
-        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con HubSpot…" compacto />
+        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con HubSpot…" compacto embebido />
       ) : (
         <>
           <div className={styles.syncEstado}>

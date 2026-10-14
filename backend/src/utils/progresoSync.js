@@ -24,6 +24,8 @@ function progresoSync(clave) {
     fase(fase, total = null) {
       Object.assign(estado, { fase, procesados: 0, total, faseIniciadaEn: ahora(), actualizadoEn: ahora() });
     },
+    // Cambia solo el texto de la fase (p. ej. el número de página) sin reiniciar el contador ni el reloj de la fase.
+    etiqueta(fase) { estado.fase = fase; estado.actualizadoEn = ahora(); },
     total(total) { estado.total = total; estado.actualizadoEn = ahora(); },
     avanzar(n = 1) { estado.procesados += n; estado.actualizadoEn = ahora(); },
     establecer(procesados, total = estado.total) { estado.procesados = procesados; estado.total = total; estado.actualizadoEn = ahora(); },

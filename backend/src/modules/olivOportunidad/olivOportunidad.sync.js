@@ -86,7 +86,7 @@ async function fetchAllDealsOliv(propertyNames, dealstageIds) {
 
   do {
     console.log(`[oliv-sync] Fetching deals page ${page}...`); // eslint-disable-line no-console
-    progreso.fase(`Trayendo oportunidades de HubSpot (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
+    progreso.etiqueta(`Trayendo oportunidades de HubSpot (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
     const data = await buscarDeals({ properties: propertyNames, limit: 100, after, filterGroups });
     const results = data.results || [];
     allDeals.push(...results);
