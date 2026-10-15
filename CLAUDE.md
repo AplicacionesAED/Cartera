@@ -1074,3 +1074,8 @@ Pedido del usuario: el manejador de errores debe ser **idéntico y profesional**
 - **`notFoundHandler`** (nuevo donde faltaba: Solicitudes, Cartera, Bases): una ruta que no existe responde 404 en JSON con el mismo contrato, no el HTML de Express. Va en `app.js` justo antes de `errorHandler`.
 - **Cambios visibles respecto a antes** (todos inocuos): la validación zod del HRMS pasó de 400 a **422** (igual que los otros tres; ningún frontend miraba el código); los mensajes de Unique/FK/Validation unificados; `details` ausente en vez de `null` en Bases; el 404 de Bases ahora dice `Ruta no encontrada: GET /api/v1/x`.
 - **Verificado:** el manejador aislado con 19 casos (todos los tipos de error, sin fuga en producción, `headersSent`), y en los cuatro proyectos con su `app` real (sin correr `server.js`): ruta inexistente → 404 JSON, JSON mal formado → 400, body vacío → 422 con `fieldErrors`, sin sesión → 401. Solicitudes además con login real correcto/incorrecto y listado con sesión.
+
+## Alineación con las reglas 11 y 12 (2026-10-15)
+
+- **Conexión a la base con un solo enlace:** ya la tenía (`config/env.js` expande `DATABASE_URL` a `PG*`); sin cambios.
+- **CORS expone `Content-Disposition`** (`exposedHeaders`): sin eso el navegador no puede leer el nombre real de un archivo descargado cuando frontend y backend están en orígenes distintos. Verificado con la cabecera `Access-Control-Expose-Headers` en una respuesta real.
