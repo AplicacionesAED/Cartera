@@ -1056,3 +1056,11 @@ n8n debe apuntar a `https://<dominio-gateway>/cartera/api/fiducia/upload` (multi
 ## Tipografía más compacta (2026-10-13)
 
 Pedido del usuario: las fuentes se veían muy grandes. Se redujo la escala en `frontend/src/tokens.css` (y se documentó en `DESIGN.md`): Display `clamp(1.375rem, 1.1rem + 0.8vw, 1.75rem)`, Headline 1.125rem, Title 1rem, Body 0.9375rem, Data 0.8125rem; Label queda en 0.75rem. Es el mismo cambio en Solicitudes, Cartera y HRMS (comparten el bloque tipográfico). Todo lo que usa los tokens se ajusta solo; los tamaños escritos a mano en px/rem en algunos CSS no cambian.
+
+## Auditoría de reglas de backend contra la plantilla (2026-10-15)
+
+Se auditó el backend contra las reglas duras de `AED-REGLAS.md`. Hallazgos de Cartera:
+
+- **Corregido:** `otrosi.controller.js#archivo` armaba a mano `res.status(502).json({ success: false, message })` (el `message` fuera de `error`, formato distinto al contrato). Ahora, si el stream de Zoho falla antes de enviar nada, pasa `next(new ApiError(502, ...))` y lo formatea el `errorHandler`.
+- **Revisado y NO cambiado, a propósito:** `negocio_movimientos.fecha_contable` (48.318 filas) y `oportunidades.fecha_inicio_plan_pagos` (2.168 filas) son `DataTypes.DATE` (`timestamptz`) pero guardan solo fechas a medianoche UTC, que el código ya trata como "solo fecha UTC" de forma deliberada (`planDePagos.js`, `formatFechaUTC`). Convertirlas a `DATEONLY` tocaría una tabla grande, SQL crudo, la sincronización con Zoho (`new Date(...)` asignado a un `DATEONLY` se formatea en zona local, el gotcha de la regla 5) y los consumidores del frontend: cambio aparte, con su propia verificación. `close_date` (OLIV) y `email_fecha` guardan hora real y están bien como `DATE`.
+- **Tolerado:** 28 de 49 migraciones tienen `down` (nunca se corre; la guía ahora dice que no se borran).
