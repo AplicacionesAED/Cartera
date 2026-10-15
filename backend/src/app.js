@@ -15,7 +15,8 @@ const app = express();
 // y la IP de la red local). `credentials: true` es obligatorio para que las
 // cookies de sesion viajen en cada request.
 const corsOrigins = env.CORS_ORIGIN.split(',').map((origin) => origin.trim());
-app.use(cors({ origin: corsOrigins, credentials: true }));
+// exposedHeaders: sin esto el navegador no deja leer Content-Disposition desde JS entre origenes distintos.
+app.use(cors({ origin: corsOrigins, credentials: true, exposedHeaders: ['Content-Disposition'] }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(requestLogger);
