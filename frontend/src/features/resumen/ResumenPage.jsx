@@ -20,6 +20,7 @@
 // GET /oportunidades/sync/logs.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
+import { exportarConsolidadoPdf } from './consolidadoPdf.js';
 import { Maximize2, Minimize2, Layers, MapPin, Building, X, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Building2, Wallet, AlertTriangle, Hourglass, Target, KeyRound } from 'lucide-react';
 import { Field, Select } from '../../components/ui/Field.jsx';
 import { Button } from '../../components/ui/Button.jsx';
@@ -252,6 +253,7 @@ export function ResumenPage() {
   const [error, setError] = useState(null);
   const [cerrando, setCerrando] = useState(false);
   const [exportandoConsolidado, setExportandoConsolidado] = useState(false);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   // KPIs + tendencia (mismo backend que Dashboard Plan vs. Recaudo)
   const [planRecaudo, setPlanRecaudo] = useState(null);
@@ -450,6 +452,19 @@ export function ResumenPage() {
       setError(err.message);
     } finally {
       setCerrando(false);
+    }
+  }
+
+  // PDF horizontal del consolidado del mes que se está viendo (nombre: mes del consolidado + fecha de exportación).
+  async function handleExportConsolidadoPdf() {
+    if (!datos) return;
+    setExportandoPdf(true);
+    try {
+      await exportarConsolidadoPdf({ datos, columnas: COLUMNAS, grupos: GRUPOS, tonos: TONOS_EXCEL, etiquetaEtapa });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExportandoPdf(false);
     }
   }
 
@@ -730,6 +745,9 @@ export function ResumenPage() {
           {datos?.enVivo && <Badge variant="info">En vivo</Badge>}
           <Button variant="secondary" className={styles.exportarConsolidado} onClick={handleExportConsolidado} disabled={!datos || exportandoConsolidado}>
             {exportandoConsolidado ? 'Exportando…' : 'Exportar Consolidado (Excel)'}
+          </Button>
+          <Button variant="secondary" onClick={handleExportConsolidadoPdf} disabled={!datos || exportandoPdf}>
+            {exportandoPdf ? 'Exportando…' : 'Exportar Consolidado (PDF)'}
           </Button>
         </div>
         <ConsolidadoCarteraEtapa data={datos} />
