@@ -1,4 +1,5 @@
 const asyncHandler = require('../../utils/asyncHandler');
+const ApiError = require('../../utils/ApiError');
 const { ok } = require('../../utils/ApiResponse');
 const service = require('./otrosi.service');
 const { syncOtrosiesFromZoho, getOtrosiSyncStatus } = require('./otrosi.sync');
@@ -46,7 +47,7 @@ const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isOtr
 // (que es justo lo que pasaba antes: se reenviaba el header de Zoho tal cual y
 // el navegador descargaba el archivo). Se corta el stream de Zoho si el
 // cliente aborta (res close).
-const archivo = asyncHandler(async (req, res) => {
+const archivo = asyncHandler(async (req, res, next) => {
   const { stream, contentType, contentLength, fileName } = await service.getArchivo(req.params.id);
 
   res.setHeader('Content-Type', contentType);
@@ -58,7 +59,10 @@ const archivo = asyncHandler(async (req, res) => {
     if (!res.writableEnded) stream.destroy();
   });
   stream.on('error', () => {
-    if (!res.headersSent) res.status(502).json({ success: false, message: 'Error al transmitir el archivo desde Zoho' });
+    // Antes se armaba { success:false, message } a mano (el mensaje fuera de `error`): rompia el
+    // contrato. Si aun no se mando nada, el errorHandler formatea el 502 estandar; si ya se mando
+    // parte del PDF no hay respuesta que formatear, solo cortar la conexion.
+    if (!res.headersSent) return next(new ApiError(502, 'Error al transmitir el archivo desde Zoho'));
     res.destroy();
   });
   stream.pipe(res);
