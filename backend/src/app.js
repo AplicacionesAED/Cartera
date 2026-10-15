@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const env = require('./config/env');
 const routes = require('./routes/index');
 const errorHandler = require('./middlewares/errorHandler');
+const notFoundHandler = require('./middlewares/notFoundHandler');
 const requestLogger = require('./middlewares/requestLogger');
 
 const app = express();
@@ -37,6 +38,7 @@ if (fs.existsSync(FRONTEND_DIST)) {
   });
 }
 
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 module.exports = app;

@@ -1,13 +1,14 @@
+// Va en backend/src/middlewares/validate.js.
 const ApiError = require('../utils/ApiError');
 
-// Valida req[source] (body|params|query) contra un schema zod -- capa
-// independiente de las validaciones de columna de Sequelize (esas protegen
-// la BD, no reemplazan la validacion de forma/tipo del request).
+// Valida req[source] (body/params/query) contra un schema zod, y REEMPLAZA
+// req[source] por el resultado parseado (aplica los defaults/transforms del
+// schema en vez de dejar el objeto crudo del request).
 function validate(schema, source = 'body') {
   return (req, res, next) => {
     const result = schema.safeParse(req[source]);
     if (!result.success) {
-      return next(new ApiError(422, 'Datos invalidos', result.error.flatten()));
+      return next(new ApiError(422, 'Datos inválidos', result.error.flatten()));
     }
     req[source] = result.data;
     next();
