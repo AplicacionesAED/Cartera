@@ -54,13 +54,26 @@ async function resolverNegociosYOportunidades(inmuebles) {
     if (!negocioPorNomenclatura.has(clave)) negocioPorNomenclatura.set(clave, n);
   }
 
+  // Dos pasadas: primero el cruce exacto por Referencia de Recaudo; después, solo para los inmuebles que
+  // quedaron sin negocio, el cruce de respaldo por código de inmueble <-> Nomenclatura. El respaldo NO puede
+  // tomar un negocio que ya pertenece a otro inmueble por referencia exacta: 'Vela Village 210A' (código 210,
+  // Disponible en Zoho, sin referencia) se llevaba el negocio de 'The Plaza 210' y se contaba como vendido
+  // (Jefe Gabriel, 2026-10-15: la app daba 222/223 disponibles y el consolidado manual 225).
   const negocioPorInmuebleId = new Map();
+  const negociosReclamados = new Set();
   for (const inv of inmuebles) {
-    let negocio = inv.referencia_recaudo ? negocioPorReferencia.get(inv.referencia_recaudo) : null;
-    if (!negocio && inv.datos?.C_digo_inmueble != null) {
-      negocio = negocioPorNomenclatura.get(String(inv.datos.C_digo_inmueble)) ?? null;
+    const negocio = inv.referencia_recaudo ? negocioPorReferencia.get(inv.referencia_recaudo) : null;
+    if (negocio) {
+      negocioPorInmuebleId.set(inv.id, negocio);
+      negociosReclamados.add(negocio.id);
     }
-    if (negocio) negocioPorInmuebleId.set(inv.id, negocio);
+  }
+  for (const inv of inmuebles) {
+    if (negocioPorInmuebleId.has(inv.id) || inv.datos?.C_digo_inmueble == null) continue;
+    const negocio = negocioPorNomenclatura.get(String(inv.datos.C_digo_inmueble)) ?? null;
+    if (!negocio || negociosReclamados.has(negocio.id)) continue;
+    negocioPorInmuebleId.set(inv.id, negocio);
+    negociosReclamados.add(negocio.id);
   }
 
   const referenciasNegocio = [...new Set([...negocioPorInmuebleId.values()].map((n) => n.referencia).filter(Boolean))];
