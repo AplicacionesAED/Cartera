@@ -65,7 +65,6 @@ export async function exportarConsolidadoPdf({ datos, columnas, grupos, tonos, e
   doc.setTextColor(100, 116, 139);
   doc.text(`Consolidado de ${datos.etiqueta}${datos.enVivo ? ' (en vivo)' : ' (cierre de mes)'}`, xTitulo, 15.5);
   doc.text(`Exportado el ${fechaLargaBogota(ahora)}`, ancho - margen, 10.5, { align: 'right' });
-  doc.text('Cifras en miles de millones de pesos', ancho - margen, 15.5, { align: 'right' });
 
   // Encabezados de dos niveles: grupos (con su color) y nombre de cada columna
   const colorGrupo = (g) => hexARgb(tonos[g.tono].bg);

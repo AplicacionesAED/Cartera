@@ -202,7 +202,6 @@ function ConsolidadoCarteraEtapa({ data }) {
   return (
     <div>
       <p className={styles.consolidadoNota}>
-        Cifras en miles de millones de pesos (misma convención del Excel "CONSOLIDADO DE CARTERA"), calculadas en vivo sobre la conciliación real.
         Las columnas con ⓘ usan un criterio aproximado o recién confirmado.
       </p>
       <div className={styles.consolidadoWrap}>

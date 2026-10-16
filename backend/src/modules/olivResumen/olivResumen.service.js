@@ -551,11 +551,12 @@ const CAMPOS_SUMABLES_TOTAL = [
 ];
 
 // "Consolidado de Cartera por Torre" -- equivalente Oliv de
-// `dashboard.service.js#obtenerResumenPorEtapa`. Una Oportunidad "vendida"
-// (para efectos financieros) es la que tiene un negocio calificado
-// (`negocioId != null`) -- Oliv no distingue estado-CRM vs estado-fiducia
-// como Baía Kristal, así que no hay `uniVendidasFidu`/`uniVendidasCRM`
-// separados, solo `uniVendidas`.
+// `dashboard.service.js#obtenerResumenPorEtapa`. Una unidad "vendida" es la que tiene una
+// Oportunidad asociada: `construirFilasCompletas` solo trae las de Etapa 8 en adelante
+// (`ETAPA_MINIMA_ORDER`), y todo lo que está en Etapa 8+ es venta (Jefe Gabriel, 2026-10-16).
+// Antes se contaba por `f.negocioId`, un campo que las filas NUNCA traen: ninguna torre tenía
+// vendidas. Oliv no distingue estado-CRM vs estado-fiducia como Baía Kristal, así que no hay
+// `uniVendidasFidu`/`uniVendidasCRM` separados, solo `uniVendidas`.
 async function obtenerResumenPorTorre() {
   const { filas } = await obtenerCache();
   const porTorre = new Map();
@@ -565,7 +566,7 @@ async function obtenerResumenPorTorre() {
     if (!porTorre.has(f.torre)) porTorre.set(f.torre, acumuladoTorreVacio());
     const t = porTorre.get(f.torre);
     t.uniTotales += 1;
-    const tieneNegocio = f.negocioId != null;
+    const tieneNegocio = f.oportunidadId != null;
     if (tieneNegocio) t.uniVendidas += 1;
 
     if (tieneNegocio) {
