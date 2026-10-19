@@ -20,7 +20,8 @@ import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncCont
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listInmueblesOliv, iniciarSyncInmueblesOliv, getSyncStatusInmueblesOliv } from '../../api/oliv.js';
 import { formatCOP } from '../../utils/format.js';
-import { exportarInmueblesOliv } from './exportarInmueblesOliv.js';
+import { ExportarColumnasPanel } from '../../components/ExportarColumnasPanel.jsx';
+import { cargarInmueblesOliv, construirGruposOliv, exportarInmueblesOliv } from './exportarInmueblesOliv.js';
 import { OlivInventarioDetalleContenido } from './OlivInventarioDetalleContenido.jsx';
 import styles from '../negocios/NegociosPage.module.css';
 
@@ -42,7 +43,7 @@ function OlivInventarioLista() {
   const [pagina, setPagina] = usePersistentState('oliv-inventario-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [exportando, setExportando] = useState(false);
+  const [panelExportar, setPanelExportar] = useState(false);
   const [searchInput, setSearchInput] = useState(filtros.search);
   const debouncedSearch = useDebounce(searchInput);
   const [opciones, setOpciones] = useState({ torres: [], categorias: [], estados: [] });
@@ -87,17 +88,6 @@ function OlivInventarioLista() {
   }
 
 
-  async function handleExportar() {
-    setExportando(true);
-    try {
-      await exportarInmueblesOliv(filtros);
-    } catch (err) {
-      window.alert(`No se pudo exportar: ${err.message}`);
-    } finally {
-      setExportando(false);
-    }
-  }
-
   function limpiarFiltros() {
     setSearchInput('');
     setFiltros(FILTROS_VACIOS);
@@ -118,10 +108,10 @@ function OlivInventarioLista() {
           <p className={styles.subtitle}>Unidades de Oliv (HubSpot){total !== undefined && !sinInventario ? ` · ${total.toLocaleString('es-CO')} resultados` : ''}</p>
         </div>
         <div className={styles.acciones}>
-          <Button variant="secondary" onClick={handleExportar} disabled={exportando}>
+          <Button variant="secondary" onClick={() => setPanelExportar(true)} disabled={sinInventario}>
             <span className={styles.botonInterior}>
               <Download size={14} aria-hidden="true" />
-              {exportando ? 'Exportando…' : 'Exportar a Excel'}
+              Exportar a Excel
             </span>
           </Button>
           {sync.corriendo ? (
@@ -138,6 +128,17 @@ function OlivInventarioLista() {
       </div>
 
       {syncError && <p className={styles.syncError}>{syncError}</p>}
+
+      <ExportarColumnasPanel
+        open={panelExportar}
+        onClose={() => setPanelExportar(false)}
+        titulo="Exportar inmuebles a Excel"
+        descripcion={(n) => `Elige las columnas que quieres en el Excel. Se exportarán ${n.toLocaleString('es-CO')} inmuebles${hayFiltros ? ' (con los filtros activos)' : ''}.`}
+        cargarDatos={() => cargarInmueblesOliv(filtros)}
+        construirGrupos={construirGruposOliv}
+        seleccionInicial={['nomenclaturaCompleta']}
+        onExportar={exportarInmueblesOliv}
+      />
 
       {opciones.estados.length > 0 && (
         <div className={styles.chips} role="group" aria-label="Filtrar por estado">
