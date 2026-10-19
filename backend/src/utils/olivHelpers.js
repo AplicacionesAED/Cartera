@@ -13,6 +13,12 @@
 // requisitos"), olivOportunidad.service.js y olivNegocio.service.js.
 const ETAPA_MINIMA_ORDER = 7; // Etapa 8 (0-indexado: Etapa 1 = 0)
 
+// Id de HubSpot de la etapa "Etapa 8 - Vinculación exitosa" del pipeline de deals de Oliv. HubSpot guarda la
+// fecha en que cada deal ENTRÓ a una etapa en la propiedad `hs_v2_date_entered_<idEtapa>`; se usa como
+// "fecha de contrato" (Jefe Gabriel, 2026-10-19: "la fecha que entró en etapa 8"). Verificado el mismo día:
+// los 19 deals de Etapa 8+ la traen.
+const ETAPA_8_STAGE_ID = '1282912352';
+
 function _escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -121,6 +127,7 @@ function esRendimientoBruto(datos) {
 module.exports = {
   limpiarNombreContacto,
   ETAPA_MINIMA_ORDER,
+  ETAPA_8_STAGE_ID,
   parseValorFiducia,
   buscarCampo,
   buscarClave,

@@ -30,10 +30,11 @@ import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { getCarteraMoraOliv } from '../../api/olivResumen.js';
 import { formatCOP, formatDate } from '../../utils/format.js';
 import { StatTile } from '../dashboard/StatTile.jsx';
-import { CeldaDoble, ChipDias, BarraMora, ValorVencido } from '../cartera-mora/CarteraCeldas.jsx';
+import { CeldaDoble, ChipDias, ValorVencido } from '../cartera-mora/CarteraCeldas.jsx';
 import dashStyles from '../dashboard/Dashboard.module.css';
 import styles from '../cartera-mora/CarteraMoraPage.module.css';
 import { rutaApp } from '../../utils/rutas.js';
+import { descargarInformeCarteraOliv } from './informeCarteraOliv.js';
 
 // Misma paleta que dashboard/OlivDashboardPage.jsx#COLOR_EXCEL -- mismo
 // lenguaje visual para cualquier .xlsx que exporte este dashboard, Cartera
@@ -52,17 +53,6 @@ const COLOR_EXCEL = {
 // fiel de lo que ya se ve en pantalla (mismas columnas, mismo color por tono
 // que `tonoWarning`/`tonoDanger` en la tabla), sin Etapa/Frente (Oliv es un
 // solo proyecto, solo Torre).
-const EXCEL_COLUMNAS_INICIAL = [
-  { key: 'torre', header: 'TORRE', width: 14, align: 'left', render: (f) => f.torre ?? '—' },
-  { key: 'unidad', header: 'UNIDAD', width: 16, align: 'left', render: (f) => f.unidad ?? '—' },
-  { key: 'comprador', header: 'COMPRADOR', width: 32, align: 'left', render: (f) => f.comprador ?? '—' },
-  { key: 'referencia', header: 'REFERENCIA', width: 16, align: 'left', render: (f) => f.referenciaRecaudo ?? '' },
-  { key: 'valorInmueble', header: 'VALOR APARTAMENTO', width: 20, numFmt: '#,##0', render: (f) => f.valorInmueble ?? 0 },
-  { key: 'cuotasEnMora', header: 'CUOTAS MORA', width: 14, numFmt: '#,##0', render: (f) => f.cuotasEnMora ?? 0 },
-  { key: 'maxDiasAtraso', header: 'DÍAS ATRASO', width: 14, numFmt: '#,##0', tono: 'warning', render: (f) => f.maxDiasAtraso ?? 0 },
-  { key: 'montoEnMora', header: 'VALOR VENCIDO', width: 20, numFmt: '#,##0', tono: 'danger', render: (f) => f.montoEnMora ?? 0 },
-  { key: 'pctEnMora', header: '% EN MORA', width: 13, numFmt: '0.0"%"', tono: 'danger', render: (f) => f.pctEnMora ?? 0 },
-];
 const EXCEL_COLUMNAS_CONTRAENTREGA = [
   { key: 'torre', header: 'TORRE', width: 14, align: 'left', render: (f) => f.torre ?? '—' },
   { key: 'unidad', header: 'UNIDAD', width: 16, align: 'left', render: (f) => f.unidad ?? '—' },
@@ -236,9 +226,14 @@ export function OlivCarteraMoraPage() {
         limit: 9999,
       });
       const filas = res.data.data;
-      const columnas = filtros.vista === 'contraentrega' ? EXCEL_COLUMNAS_CONTRAENTREGA : EXCEL_COLUMNAS_INICIAL;
-      const wb = construirLibroCarteraMora(filas, columnas, 'Cartera en Gestión');
-      await descargarLibroCarteraMora(wb, `oliv-cartera-en-gestion-${filtros.vista}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const fecha = new Date().toISOString().slice(0, 10);
+      if (filtros.vista === 'contraentrega') {
+        const wb = construirLibroCarteraMora(filas, EXCEL_COLUMNAS_CONTRAENTREGA, 'Cartera en Gestión');
+        await descargarLibroCarteraMora(wb, `oliv-cartera-en-gestion-${filtros.vista}-${fecha}.xlsx`);
+      } else {
+        // Vista inicial: formato de la plantilla "Informe de Cartera" (con fórmulas de Excel).
+        await descargarInformeCarteraOliv(filas, `oliv-informe-de-cartera-${fecha}.xlsx`);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -400,21 +395,28 @@ export function OlivCarteraMoraPage() {
                         </tr>
                       ) : (
                         <tr>
-                          <th aria-sort={ariaSort(sort, 'torre')}><SortHeader label="Torre" sortKey="torre" sort={sort} onSort={toggleSort} /></th>
                           <th aria-sort={ariaSort(sort, 'unidad')}><SortHeader label="Nomenclatura" sortKey="unidad" sort={sort} onSort={toggleSort} /></th>
-                          <th aria-sort={ariaSort(sort, 'comprador')}><SortHeader label="Comprador" sortKey="comprador" sort={sort} onSort={toggleSort} /></th>
-                          <th aria-sort={ariaSort(sort, 'referenciaRecaudo')}><SortHeader label="Referencia" sortKey="referenciaRecaudo" sort={sort} onSort={toggleSort} /></th>
-                          <th aria-sort={ariaSort(sort, 'valorInmueble')}><SortHeader label="Valor apartamento" sortKey="valorInmueble" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'vista')}><SortHeader label="Vista" sortKey="vista" sort={sort} onSort={toggleSort} /></th>
+                          <th aria-sort={ariaSort(sort, 'referenciaRecaudo')}><SortHeader label="Encargo" sortKey="referenciaRecaudo" sort={sort} onSort={toggleSort} /></th>
+                          <th aria-sort={ariaSort(sort, 'area')}><SortHeader label="Área (m²)" sortKey="area" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'comprador')}><SortHeader label="Propietarios" sortKey="comprador" sort={sort} onSort={toggleSort} /></th>
+                          <th aria-sort={ariaSort(sort, 'fechaContrato')}><SortHeader label="Fecha contrato" sortKey="fechaContrato" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'fechaSaldoContraentrega')}><SortHeader label="Fecha últ. pago" sortKey="fechaSaldoContraentrega" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'valorInmueble')}><SortHeader label="Valor venta" sortKey="valorInmueble" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'valorM2')}><SortHeader label="Valor m²" sortKey="valorM2" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'valorCuotaInicial')}><SortHeader label="Cuota inicial" sortKey="valorCuotaInicial" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'credito')}><SortHeader label="Crédito" sortKey="credito" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'totalAbonado')}><SortHeader label="Valor abonado" sortKey="totalAbonado" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'pctRecaudo')}><SortHeader label="% de recaudo" sortKey="pctRecaudo" sort={sort} onSort={toggleSort} align="center" /></th>
                           <th aria-sort={ariaSort(sort, 'cuotasEnMora')}><SortHeader label="Cuotas mora" sortKey="cuotasEnMora" sort={sort} onSort={toggleSort} align="center" /></th>
-                          <th aria-sort={ariaSort(sort, 'maxDiasAtraso')}><SortHeader label="Días atraso" sortKey="maxDiasAtraso" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'maxDiasAtraso')}><SortHeader label="Días mora" sortKey="maxDiasAtraso" sort={sort} onSort={toggleSort} align="center" /></th>
                           <th aria-sort={ariaSort(sort, 'montoEnMora')}><SortHeader label="Valor vencido" sortKey="montoEnMora" sort={sort} onSort={toggleSort} align="center" /></th>
-                          <th aria-sort={ariaSort(sort, 'pctEnMora')}><SortHeader label="% en mora" sortKey="pctEnMora" sort={sort} onSort={toggleSort} align="center" /></th>
                         </tr>
                       )}
                     </thead>
                     <tbody>
                       {(meta.data ?? []).length === 0 ? (
-                        <tr><td colSpan={esContraentrega ? 6 : 9} className={styles.sinResultados}>Sin resultados.</td></tr>
+                        <tr><td colSpan={esContraentrega ? 6 : 16} className={styles.sinResultados}>Sin resultados.</td></tr>
                       ) : esContraentrega ? (
                         meta.data.map((f) => (
                           <tr key={f.id} onClick={(e) => abrirFila(e, f)} onContextMenu={(e) => abrirMenuContextual(e, f)} className={styles.filaCtxMenu}>
@@ -429,15 +431,22 @@ export function OlivCarteraMoraPage() {
                       ) : (
                         meta.data.map((f) => (
                           <tr key={f.id} onClick={(e) => abrirFila(e, f)} onContextMenu={(e) => abrirMenuContextual(e, f)} className={styles.filaCtxMenu}>
-                            <td><CeldaDoble arriba="Oliv" abajo={f.torre ?? null} /></td>
                             <td><Link to={`/oliv/negocios/${f.id}`}>{f.unidad ?? f.id}</Link></td>
-                            <td className={styles.truncar} title={f.comprador ?? ''}>{f.comprador ?? '—'}</td>
+                            <td>{f.vista ?? '—'}</td>
                             <td>{f.referenciaRecaudo ?? ''}</td>
+                            <td className={styles.numCellCentro}>{f.area != null ? f.area.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                            <td className={styles.truncar} title={f.comprador ?? ''}>{f.comprador ?? '—'}</td>
+                            <td className={styles.numCellCentro}>{formatDate(f.fechaContrato)}</td>
+                            <td className={styles.numCellCentro}>{formatDate(f.fechaSaldoContraentrega)}</td>
                             <td className={styles.numCellCentro}>{f.valorInmueble != null ? formatCOP(f.valorInmueble) : '—'}</td>
+                            <td className={styles.numCellCentro}>{f.valorM2 != null ? formatCOP(f.valorM2) : '—'}</td>
+                            <td className={styles.numCellCentro}>{f.valorCuotaInicial != null ? formatCOP(f.valorCuotaInicial) : '—'}</td>
+                            <td className={styles.numCellCentro}>{f.credito != null ? formatCOP(f.credito) : '—'}</td>
+                            <td className={styles.numCellCentro}>{formatCOP(f.totalAbonado ?? 0)}</td>
+                            <td className={styles.numCellCentro}>{fmtPct(f.pctRecaudo)}</td>
                             <td className={styles.numCellCentro}>{f.cuotasEnMora}</td>
                             <td className={styles.numCellCentro}><ChipDias dias={f.maxDiasAtraso} /></td>
                             <td className={styles.numCellCentro}><ValorVencido valor={f.montoEnMora} /></td>
-                            <td><BarraMora pct={f.pctEnMora} /></td>
                           </tr>
                         ))
                       )}

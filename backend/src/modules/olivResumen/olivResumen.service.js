@@ -37,12 +37,20 @@
 const { Op } = require('sequelize');
 const { conciliar, mesKey, diaKey, periodoVacio, acumularPorPeriodo } = require('../dashboard/conciliacion');
 const centroAplicacionesDb = require('../../utils/centroAplicacionesDb');
-const { limpiarNombreContacto, ETAPA_MINIMA_ORDER } = require('../../utils/olivHelpers');
+const { limpiarNombreContacto, ETAPA_MINIMA_ORDER, ETAPA_8_STAGE_ID } = require('../../utils/olivHelpers');
 const { resumenFiduciarioTodos, conciliacionAproximada } = require('../olivNegocio/olivFiducia.service');
 const olivOportunidad = require('../olivOportunidad/olivOportunidad.model');
 const OlivInmueble = require('../olivInmueble/olivInmueble.model');
 const OlivResumenMensual = require('./olivResumenMensual.model');
 const { getCache, getEnConstruccion, setCache, setEnConstruccion, invalidarCacheResumenOliv } = require('./olivResumenCache');
+
+// 'AAAA-MM-DD' del instante dado en hora de Bogotá (null si no hay fecha válida).
+function diaBogota(valor) {
+  if (!valor) return null;
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
 
 async function construirFilasCompletas() {
   const [inmuebles, oportunidades, fiduciaPorReferencia] = await Promise.all([
@@ -189,6 +197,11 @@ async function construirFilasCompletas() {
       comprador: oportunidad ? limpiarNombreContacto(oportunidad.nombre_contacto, oportunidad.proyecto) : null,
       estado: oportunidad?.stage ?? null,
       estadoInventario: inmueble?.estado ?? null,
+      // Informe de Cartera (Cartera en Gestión): vista y área privada del inmueble, y la fecha de contrato =
+      // fecha en que la oportunidad entró a Etapa 8 (como día calendario de Bogotá, 'AAAA-MM-DD').
+      vista: inmueble?.tipo_vista ?? null,
+      area: inmueble?.area_privada != null && !Number.isNaN(Number(inmueble.area_privada)) ? Number(inmueble.area_privada) : null,
+      fechaContrato: diaBogota(oportunidad?.propiedades?.[`hs_v2_date_entered_${ETAPA_8_STAGE_ID}`]),
       _tieneMovimientos: tieneMovimientos,
       porMes,
       porMesInicial,
@@ -408,8 +421,13 @@ const CAMPOS_ORDENABLES_MORA = new Set([
   'torre', 'unidad', 'referencia', 'referenciaRecaudo', 'comprador', 'estado',
   'valorInmueble', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora',
   'fechaSaldoContraentrega',
+  // Informe de Cartera
+  'vista', 'area', 'fechaContrato', 'valorM2', 'valorCuotaInicial', 'credito', 'totalAbonado', 'pctRecaudo',
 ]);
-const CAMPOS_NUMERICOS_MORA = new Set(['valorInmueble', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora']);
+const CAMPOS_NUMERICOS_MORA = new Set([
+  'valorInmueble', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora',
+  'area', 'valorM2', 'valorCuotaInicial', 'credito', 'totalAbonado', 'pctRecaudo',
+]);
 
 function ordenarCarteraMora(filas, sortBy, sortDir) {
   if (!CAMPOS_ORDENABLES_MORA.has(sortBy) || (sortDir !== 'asc' && sortDir !== 'desc')) {
@@ -422,7 +440,7 @@ function ordenarCarteraMora(filas, sortBy, sortDir) {
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
-    if (sortBy === 'fechaSaldoContraentrega') return dir * (new Date(va) - new Date(vb));
+    if (sortBy === 'fechaSaldoContraentrega' || sortBy === 'fechaContrato') return dir * (new Date(va) - new Date(vb));
     if (CAMPOS_NUMERICOS_MORA.has(sortBy)) return dir * (va - vb);
     return dir * String(va).localeCompare(String(vb), 'es', { numeric: true, sensitivity: 'base' });
   });
@@ -481,7 +499,15 @@ async function obtenerCarteraMora({ search, torre, estadoInmueble, rango, vista,
   const totalEsperadoAFecha = filas.reduce((s, f) => s + (f.esperadoAFecha ?? 0), 0);
   const pctMoraPortafolio = totalEsperadoAFecha > 0 ? (totalMontoEnMora / totalEsperadoAFecha) * 100 : null;
 
-  filas = filas.map((f) => ({ ...f, pctEnMora: f.esperadoAFecha > 0 ? (f.montoEnMora / f.esperadoAFecha) * 100 : null }));
+  // Derivados del Informe de Cartera (mismas fórmulas de la plantilla): valor m² = venta / área, crédito = venta -
+  // cuota inicial, % de recaudo = abonado / venta (en puntos porcentuales, como `pctEnMora`).
+  filas = filas.map((f) => ({
+    ...f,
+    pctEnMora: f.esperadoAFecha > 0 ? (f.montoEnMora / f.esperadoAFecha) * 100 : null,
+    valorM2: f.valorInmueble != null && f.area > 0 ? f.valorInmueble / f.area : null,
+    credito: f.valorInmueble != null && f.valorCuotaInicial != null ? f.valorInmueble - f.valorCuotaInicial : null,
+    pctRecaudo: f.valorInmueble > 0 && f.totalAbonado != null ? (f.totalAbonado / f.valorInmueble) * 100 : null,
+  }));
   filas = ordenarCarteraMora(filas, sortBy, sortDir);
 
   const total = filas.length;
