@@ -16,8 +16,6 @@ import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
-import { ExportarColumnasPanel } from '../../components/ExportarColumnasPanel.jsx';
-import { cargarInmueblesBK, construirGruposBK, exportarInmueblesBK } from './exportarInmuebles.js';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listInventario, iniciarSyncInventario, getSyncStatusInventario } from '../../api/inventario.js';
@@ -48,7 +46,6 @@ function InventarioLista() {
   const [pagina, setPagina] = usePersistentState('inventario-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [panelExportar, setPanelExportar] = useState(false);
   const [searchInput, setSearchInput] = useState(filtros.search);
   const debouncedSearch = useDebounce(searchInput);
 
@@ -144,7 +141,7 @@ function InventarioLista() {
           <p className={styles.subtitle}>Inventario de Baía Kristal (Zoho){total !== undefined && !sinInventario ? ` · ${total.toLocaleString('es-CO')} resultados` : ''}</p>
         </div>
         <div className={styles.acciones}>
-          <Button variant="secondary" onClick={() => setPanelExportar(true)} disabled={sinInventario}>
+          <Button variant="secondary" onClick={() => navigate('/inventario/exportar')} disabled={sinInventario}>
             <span className={styles.botonInterior}>
               <Download size={14} aria-hidden="true" />
               Exportar a Excel
@@ -164,17 +161,6 @@ function InventarioLista() {
       </div>
 
       {syncError && <p className={styles.syncError}>{syncError}</p>}
-
-      <ExportarColumnasPanel
-        open={panelExportar}
-        onClose={() => setPanelExportar(false)}
-        titulo="Exportar inmuebles a Excel"
-        descripcion={(n) => `Elige las columnas que quieres en el Excel. Se exportarán ${n.toLocaleString('es-CO')} inmuebles${hayFiltros ? ' (con los filtros activos)' : ''}.`}
-        cargarDatos={() => cargarInmueblesBK(filtros)}
-        construirGrupos={construirGruposBK}
-        seleccionInicial={['nomenclaturaCompleta']}
-        onExportar={exportarInmueblesBK}
-      />
 
       {opciones.estados.length > 0 && (
         <div className={styles.chips} role="group" aria-label="Filtrar por estado">

@@ -1,5 +1,5 @@
-// Exportar a Excel el listado de Inmuebles de Baía Kristal (Zoho). El usuario elige las columnas en el panel
-// (components/ExportarColumnasPanel.jsx); por defecto solo la "Nomenclatura completa". Las columnas son las
+// Exportar a Excel el listado de Inmuebles de Baía Kristal (Zoho). El usuario elige las columnas en la pantalla de exportación
+// (features/inventario/ExportarInmueblesPage.jsx); por defecto solo la "Nomenclatura completa". Las columnas son las
 // básicas del inmueble + TODAS las variables del Product de Zoho que existen en los inmuebles exportados
 // (agrupadas por las mismas secciones del detalle; los campos de sistema que el detalle oculta no se ofrecen).
 import { listInventario } from '../../api/inventario.js';

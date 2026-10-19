@@ -1,5 +1,5 @@
-// Exportar a Excel el listado de Inmuebles de Oliv. El usuario elige las columnas en el panel
-// (components/ExportarColumnasPanel.jsx); por defecto solo la "Nomenclatura completa". Recorre TODAS las
+// Exportar a Excel el listado de Inmuebles de Oliv. El usuario elige las columnas en la pantalla de exportación
+// (features/inventario/ExportarInmueblesPage.jsx); por defecto solo la "Nomenclatura completa". Recorre TODAS las
 // páginas del listado respetando los filtros activos del panel -- sin filtros son todos los inmuebles.
 import { listInmueblesOliv } from '../../api/oliv.js';
 import { descargarExcelColumnas, traerTodasLasPaginas } from '../../utils/exportarExcelColumnas.js';

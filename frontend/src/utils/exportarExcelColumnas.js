@@ -1,5 +1,5 @@
 // Escribe y descarga un .xlsx a partir de una lista de columnas YA elegidas (ver
-// components/ExportarColumnasPanel.jsx). Misma paleta que los demás Excel de la app: encabezado azul de
+// features/inventario/ExportarInmueblesPage.jsx). Misma paleta que los demás Excel de la app: encabezado azul de
 // marca, filas alternadas, Estado coloreado igual que `EstadoInventarioBadge`, fila de totales al final.
 //
 // Cada columna: { header, width, align?, numFmt?, bold?, estado?, enlace?, valor: (item) => any }

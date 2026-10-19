@@ -31,6 +31,7 @@ const SincronizacionPage = lazyNamed(() => import('./features/accesos/Sincroniza
 // Layout maestro-detalle (sidebar + panel derecho) -- una sola pagina para
 // "inventario" y "inventario/:id", mismo patron que NegociosPage.jsx.
 const InventarioPage = lazyNamed(() => import('./features/inventario/InventarioPage.jsx'), 'InventarioPage');
+const ExportarInmueblesBKPage = lazyNamed(() => import('./features/inventario/ExportarInmueblesBKPage.jsx'), 'ExportarInmueblesBKPage');
 const OportunidadesListPage = lazyNamed(() => import('./features/oportunidades/OportunidadesListPage.jsx'), 'OportunidadesListPage');
 const OportunidadDetallePage = lazyNamed(() => import('./features/oportunidades/OportunidadDetallePage.jsx'), 'OportunidadDetallePage');
 const EncargosListPage = lazyNamed(() => import('./features/fiducia/EncargosListPage.jsx'), 'EncargosListPage');
@@ -62,6 +63,7 @@ const OlivOportunidadDetallePage = lazyNamed(() => import('./features/oliv/OlivO
 // Layout maestro-detalle (sidebar + panel derecho) -- una sola pagina para
 // "oliv/inmuebles" y "oliv/inmuebles/:id", mismo patron que InventarioPage.jsx.
 const OlivInventarioPage = lazyNamed(() => import('./features/oliv/OlivInventarioPage.jsx'), 'OlivInventarioPage');
+const ExportarInmueblesOlivPage = lazyNamed(() => import('./features/oliv/ExportarInmueblesOlivPage.jsx'), 'ExportarInmueblesOlivPage');
 // Vista compuesta (Oportunidad + Inmueble + cotización aceptada), mismo
 // patron maestro-detalle que NegociosPage.jsx.
 const OlivNegociosPage = lazyNamed(() => import('./features/oliv/OlivNegociosPage.jsx'), 'OlivNegociosPage');
@@ -114,6 +116,7 @@ export default function App() {
               <Route path="accesos/sincronizacion" element={<SincronizacionPage />} />
             </Route>
             <Route path="inventario" element={<InventarioPage />} />
+            <Route path="inventario/exportar" element={<ExportarInmueblesBKPage />} />
             <Route path="inventario/:id" element={<InventarioPage />} />
             <Route path="oportunidades" element={<OportunidadesListPage />} />
             <Route path="oportunidades/:id" element={<OportunidadDetallePage />} />
@@ -132,6 +135,7 @@ export default function App() {
             <Route path="oliv/oportunidades" element={<OlivOportunidadesPage />} />
             <Route path="oliv/oportunidades/:id" element={<OlivOportunidadDetallePage />} />
             <Route path="oliv/inmuebles" element={<OlivInventarioPage />} />
+            <Route path="oliv/inmuebles/exportar" element={<ExportarInmueblesOlivPage />} />
             <Route path="oliv/inmuebles/:id" element={<OlivInventarioPage />} />
             <Route path="oliv/negocios" element={<OlivNegociosPage />} />
             <Route path="oliv/negocios/:id" element={<OlivNegociosPage />} />

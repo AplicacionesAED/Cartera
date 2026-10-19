@@ -1,0 +1,93 @@
+/* Pantalla "Exportar inmuebles": reutiliza el lenguaje del detalle (InventarioDetallePage.module.css: banner,
+   cifras, tarjeta y secciones) y agrega solo lo propio: casillas por sección y la barra de acciones. */
+
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-left: auto;
+}
+
+.enlace {
+  padding: 4px 2px;
+  font: inherit;
+  font-size: var(--text-data-size);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.enlace:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.enlace:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Título de sección con su casilla "marcar toda la sección" y el conteo a la derecha. */
+.tituloSeccion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.conteoSeccion {
+  font-family: var(--font-body, inherit);
+  font-size: var(--text-label-size);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+
+.columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0 var(--space-xl);
+  padding-left: var(--space-sm);
+}
+
+.columna {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  min-width: 0;
+}
+
+/* Barra de acciones fija al pie: siempre a la vista aunque la lista de columnas sea larga. */
+.barra {
+  position: sticky;
+  bottom: var(--space-md);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 12px 20px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-brand-deep) 14%, transparent);
+}
+
+.barraTexto {
+  margin-right: auto;
+  font-size: var(--text-data-size);
+  color: var(--color-ink-secondary);
+}
+
+.botonInterior {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
