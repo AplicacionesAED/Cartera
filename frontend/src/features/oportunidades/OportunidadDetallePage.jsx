@@ -1,6 +1,6 @@
 // Adaptado de zoho-payment-tracker/frontend/src/pages/OpportunityDetail.jsx --
 // mismo layout de 2 columnas (Información general + Inmueble a la
-// izquierda; Plan de Pagos + Cotización + Forma/Propuesta de Pago a la
+// izquierda; Plan de Pagos + Forma/Propuesta de Pago a la
 // derecha), traducción de nombres crudos de campo de Zoho a etiquetas en
 // español vía /oportunidades/campos/metadata, y el acordeón de subforms con
 // carga diferida (solo pide Forma/Propuesta de Pago -- que puede caer a un
@@ -246,7 +246,6 @@ export function OportunidadDetallePage() {
         tabs={[
           { key: 'resumen', label: 'Resumen' },
           { key: 'pagos', label: 'Plan de pagos' },
-          ...(op.seccionCotizacion && Object.keys(op.seccionCotizacion).length > 0 ? [{ key: 'cotizacion', label: 'Cotización' }] : []),
         ]}
       />
 
@@ -297,13 +296,6 @@ export function OportunidadDetallePage() {
           <Accordion collapsible={false} title="Forma y Propuesta de Pago">
             <SubformsSection oportunidadId={id} fechaInicioPlanPagos={op.fechaInicioPlanPagos} />
           </Accordion>
-        </div>
-      )}
-
-      {tab === 'cotizacion' && op.seccionCotizacion && Object.keys(op.seccionCotizacion).length > 0 && (
-        <div className={styles.card}>
-          <p className={styles.subtitulo}>Cotización</p>
-          <FieldGrid data={op.seccionCotizacion} fieldMap={fieldMap} />
         </div>
       )}
     </div>
