@@ -40,7 +40,7 @@ function exportarExcel(vinculos, duplicadas) {
     Resultado: ESTADOS[v.estado]?.etiqueta ?? v.estado,
     Oportunidad: v.oportunidadNombre ?? '',
     'Etapa de la oportunidad': v.oportunidadEtapa ?? '',
-    'Inmueble según la oportunidad': v.oportunidadInmueble ? `${v.oportunidadInmueble}${v.oportunidadTorre ? ` (${v.oportunidadTorre})` : ''}` : '',
+    'Inmueble según la oportunidad': v.oportunidadInmueble ? `${v.oportunidadInmueble}${v.oportunidadTorre ? ` (${v.oportunidadTorre})` : ''}` : v.oportunidadPiso ? `${v.oportunidadPiso} (sin unidad)` : '',
     'Inmueble sugerido': v.sugerido ?? '',
     'Proyecto / Torre (sugerido)': v.sugeridoProyectoTorre ?? '',
     'Referencia que tiene hoy ese inmueble en Zoho': v.sugeridoReferencia ?? '',
@@ -170,6 +170,8 @@ export function VinculosRevisionPage() {
                   <td>
                     {v.oportunidadInmueble ? (
                       <Corto ancho={180}>{`${v.oportunidadInmueble}${v.oportunidadTorre ? ` · ${v.oportunidadTorre}` : ''}`}</Corto>
+                    ) : v.oportunidadPiso ? (
+                      <Corto ancho={180} titulo="La oportunidad solo declara piso, no la unidad"><span className={styles.muted}>{v.oportunidadPiso} (sin unidad)</span></Corto>
                     ) : <span className={styles.muted}>—</span>}
                   </td>
                   <td>

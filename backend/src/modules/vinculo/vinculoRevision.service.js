@@ -25,7 +25,7 @@ async function listar({ estado, search, soloRevision = 'true' } = {}) {
             inv.id AS "inventarioId", inv.nombre AS "inmueble", inv.datos->>'Proyecto_Torre' AS "proyectoTorre", inv.referencia_recaudo AS "referenciaInmueble",
             sug.id AS "sugeridoId", sug.nombre AS "sugerido", sug.datos->>'Proyecto_Torre' AS "sugeridoProyectoTorre", sug.referencia_recaudo AS "sugeridoReferencia",
             opp.id AS "oportunidadId", opp.deal_name AS "oportunidadNombre", opp.stage AS "oportunidadEtapa",
-            COALESCE(NULLIF(opp.seccion_inmueble->'Inmueble'->>'name', ''), NULLIF(opp.seccion_inmueble->>'Nomenclatura_Inmueble', '')) AS "oportunidadInmueble", opp.seccion_inmueble->>'Torre' AS "oportunidadTorre"
+            COALESCE(NULLIF(opp.seccion_inmueble->'Inmueble'->>'name', ''), NULLIF(opp.seccion_inmueble->>'Nomenclatura_Inmueble', '')) AS "oportunidadInmueble", opp.seccion_inmueble->>'Torre' AS "oportunidadTorre", NULLIF(opp.seccion_inmueble->>'Piso_Lista', '') AS "oportunidadPiso"
      FROM vinculos_negocio_inmueble v
      JOIN negocios n ON n.referencia = v.referencia
      LEFT JOIN inventario_items inv ON inv.id = v.inventario_id
