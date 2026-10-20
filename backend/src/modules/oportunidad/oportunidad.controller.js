@@ -55,7 +55,7 @@ const iniciarBackfill = asyncHandler(async (req, res) => {
     return ok(res, { message: 'Backfill de planes de pago ya en ejecución', running: true });
   }
   ok(res, { message: 'Backfill de planes de pago iniciado en segundo plano', running: true });
-  runSubformsBackfill();
+  runSubformsBackfill(req.query.todos === 'true');
 });
 
 const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isSubformsBackfillRunning(), result: getSubformsBackfillResult(), progreso: getSubformsBackfillProgreso() }));

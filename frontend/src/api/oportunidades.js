@@ -46,8 +46,8 @@ export function getSyncLogsOportunidades(limit = 5) {
   return client.get(`/oportunidades/sync/logs?limit=${limit}`);
 }
 
-export function iniciarBackfillSubforms() {
-  return client.post('/oportunidades/backfill-subforms');
+export function iniciarBackfillSubforms(todos = false) {
+  return client.post(`/oportunidades/backfill-subforms${todos ? '?todos=true' : ''}`);
 }
 
 export function getBackfillSubformsStatus() {

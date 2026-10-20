@@ -17,28 +17,42 @@ import shared from './Usuarios.module.css';
 // oportunidad.subformsBackfill.js). Seguro de correr varias veces: solo
 // procesa lo pendiente.
 function BackfillSubformsCard() {
-  const sync = useSyncControl({
-    iniciar: iniciarBackfillSubforms,
+  const syncFaltantes = useSyncControl({
+    iniciar: () => iniciarBackfillSubforms(false),
     obtener: getBackfillSubformsStatus,
     normalizar: normalizarEstadoRunning,
   });
+  const syncTodos = useSyncControl({
+    iniciar: () => iniciarBackfillSubforms(true),
+    obtener: getBackfillSubformsStatus,
+    normalizar: normalizarEstadoRunning,
+  });
+  // Los dos botones leen el mismo estado del servidor: se muestra el de la corrida que esté activa.
+  const sync = syncTodos.corriendo || syncTodos.errorInicio ? syncTodos : syncFaltantes;
   const result = sync.estado?.result;
-  const enCurso = sync.corriendo;
+  const enCurso = syncFaltantes.corriendo || syncTodos.corriendo;
 
   return (
     <section className={shared.sectionCard}>
       <div>
         <h2 className={shared.sectionTitle}>Plan de pagos desde Zoho</h2>
-        <p className={shared.sectionHint}>Trae el plan de pagos (Forma de Pago / Propuesta de Pago) de Zoho para las oportunidades que todavía no lo tengan guardado -- necesario para que Dashboard muestre datos completos.</p>
+        <p className={shared.sectionHint}>
+          "Traer los que faltan" trae el plan de pagos (Forma de Pago / Propuesta de Pago) de las oportunidades que todavía no lo tienen guardado. Si ya están todos, no hace nada.
+          "Releer todos" vuelve a leer de Zoho el plan de todas las oportunidades y reemplaza lo guardado: úsalo cuando se cambió un plan en Zoho y no se refleja (tarda varios minutos).
+        </p>
       </div>
 
       {enCurso ? (
-        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Trayendo planes de pago…" />
+        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo={syncTodos.corriendo ? 'Releyendo todos los planes de pago…' : 'Trayendo planes de pago…'} />
       ) : (
-        <div>
-          <Button variant="secondary" onClick={sync.ejecutar}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Button variant="secondary" onClick={syncFaltantes.ejecutar}>
             <RefreshCw size={13} />
-            Sincronizar planes de pago
+            Traer los que faltan
+          </Button>
+          <Button variant="secondary" onClick={syncTodos.ejecutar}>
+            <RefreshCw size={13} />
+            Releer todos
           </Button>
         </div>
       )}
@@ -53,7 +67,7 @@ function BackfillSubformsCard() {
       {!enCurso && result?.ok === true && (
         <div className={styles.statusOk}>
           <Check size={14} />
-          <span>Listo: {result.actualizadas} de {result.total} oportunidades actualizadas en {result.elapsed}{result.errores > 0 && ` (${result.errores} errores)`}</span>
+          <span>{result.total === 0 ? 'No había planes pendientes por traer. Para refrescar los ya guardados usa "Releer todos".' : `Listo: ${result.actualizadas} de ${result.total} oportunidades actualizadas en ${result.elapsed}${result.errores > 0 ? ` (${result.errores} errores)` : ''}`}</span>
         </div>
       )}
 
