@@ -471,10 +471,10 @@ function claveRangoMora(dias) {
 
 const CAMPOS_ORDENABLES_MORA = new Set([
   'etapa', 'frente', 'torre', 'unidad', 'referencia', 'comprador', 'estado',
-  'valorInmueble', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora',
+  'valorInmueble', 'totalAbonado', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora',
   'fechaSaldoContraentrega',
 ]);
-const CAMPOS_NUMERICOS_MORA = new Set(['valorInmueble', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora']);
+const CAMPOS_NUMERICOS_MORA = new Set(['valorInmueble', 'totalAbonado', 'cuotasEnMora', 'maxDiasAtraso', 'montoEnMora', 'pctEnMora']);
 
 function ordenarCarteraMora(filas, sortBy, sortDir) {
   if (!CAMPOS_ORDENABLES_MORA.has(sortBy) || (sortDir !== 'asc' && sortDir !== 'desc')) {

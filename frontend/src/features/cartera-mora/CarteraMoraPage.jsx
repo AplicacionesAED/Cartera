@@ -52,6 +52,7 @@ const EXCEL_COLUMNAS_INICIAL = [
   { key: 'comprador', header: 'COMPRADOR', width: 32, align: 'left', render: (f) => f.comprador ?? '—' },
   { key: 'referencia', header: 'REFERENCIA', width: 16, align: 'left', render: (f) => f.referencia ?? '—' },
   { key: 'valorInmueble', header: 'VALOR APARTAMENTO', width: 20, numFmt: '#,##0', render: (f) => f.valorInmueble ?? 0 },
+  { key: 'totalAbonado', header: 'VALOR ABONADO (CONCILIACIÓN)', width: 24, numFmt: '#,##0', render: (f) => f.totalAbonado ?? 0 },
   { key: 'cuotasEnMora', header: 'CUOTAS MORA', width: 14, numFmt: '#,##0', render: (f) => f.cuotasEnMora ?? 0 },
   { key: 'maxDiasAtraso', header: 'DÍAS ATRASO', width: 14, numFmt: '#,##0', tono: 'warning', render: (f) => f.maxDiasAtraso ?? 0 },
   { key: 'montoEnMora', header: 'VALOR VENCIDO', width: 20, numFmt: '#,##0', tono: 'danger', render: (f) => f.montoEnMora ?? 0 },
@@ -514,6 +515,7 @@ export function CarteraMoraPage() {
                           <th aria-sort={ariaSort(sort, 'comprador')}><SortHeader label="Comprador" sortKey="comprador" sort={sort} onSort={toggleSort} /></th>
                           <th aria-sort={ariaSort(sort, 'referencia')}><SortHeader label="Referencia" sortKey="referencia" sort={sort} onSort={toggleSort} /></th>
                           <th aria-sort={ariaSort(sort, 'valorInmueble')}><SortHeader label="Valor apartamento" sortKey="valorInmueble" sort={sort} onSort={toggleSort} align="center" /></th>
+                          <th aria-sort={ariaSort(sort, 'totalAbonado')}><SortHeader label="Valor abonado" sortKey="totalAbonado" sort={sort} onSort={toggleSort} align="center" /></th>
                           <th aria-sort={ariaSort(sort, 'cuotasEnMora')}><SortHeader label="Cuotas mora" sortKey="cuotasEnMora" sort={sort} onSort={toggleSort} align="center" /></th>
                           <th aria-sort={ariaSort(sort, 'maxDiasAtraso')}><SortHeader label="Días atraso" sortKey="maxDiasAtraso" sort={sort} onSort={toggleSort} align="center" /></th>
                           <th aria-sort={ariaSort(sort, 'montoEnMora')}><SortHeader label="Valor vencido" sortKey="montoEnMora" sort={sort} onSort={toggleSort} align="center" /></th>
@@ -523,7 +525,7 @@ export function CarteraMoraPage() {
                     </thead>
                     <tbody>
                       {(meta.data ?? []).length === 0 ? (
-                        <tr><td colSpan={esContraentrega ? 7 : 10} className={styles.sinResultados}>Sin resultados.</td></tr>
+                        <tr><td colSpan={esContraentrega ? 7 : 11} className={styles.sinResultados}>Sin resultados.</td></tr>
                       ) : esContraentrega ? (
                         meta.data.map((f) => (
                           <tr key={f.id} onClick={(e) => abrirFila(e, f)} onContextMenu={(e) => abrirMenuContextual(e, f)} className={styles.filaCtxMenu}>
@@ -545,6 +547,7 @@ export function CarteraMoraPage() {
                             <td className={styles.truncar} title={f.comprador ?? ''}>{f.comprador ?? '—'}</td>
                             <td>{f.referencia ?? '—'}</td>
                             <td className={styles.numCellCentro}>{f.valorInmueble != null ? formatCOP(f.valorInmueble) : '—'}</td>
+                            <td className={styles.numCellCentro}>{f.totalAbonado != null ? formatCOP(f.totalAbonado) : '—'}</td>
                             <td className={styles.numCellCentro}>{f.cuotasEnMora}</td>
                             <td className={styles.numCellCentro}><ChipDias dias={f.maxDiasAtraso} /></td>
                             <td className={styles.numCellCentro}><ValorVencido valor={f.montoEnMora} /></td>
