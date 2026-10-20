@@ -28,6 +28,9 @@ function exportarExcel(vinculos, duplicadas) {
     'Referencia del negocio': v.referencia,
     'Estado del negocio': v.negocioEstado ?? '',
     Resultado: ESTADOS[v.estado]?.etiqueta ?? v.estado,
+    Oportunidad: v.oportunidadNombre ?? '',
+    'Etapa de la oportunidad': v.oportunidadEtapa ?? '',
+    'Inmueble según la oportunidad': v.oportunidadInmueble ? `${v.oportunidadInmueble}${v.oportunidadTorre ? ` (${v.oportunidadTorre})` : ''}` : '',
     'Inmueble sugerido': v.sugerido ?? '',
     'Proyecto / Torre (sugerido)': v.sugeridoProyectoTorre ?? '',
     'Referencia que tiene hoy ese inmueble en Zoho': v.sugeridoReferencia ?? '',
@@ -126,6 +129,8 @@ export function VinculosRevisionPage() {
               <tr>
                 <th>Negocio</th>
                 <th>Resultado</th>
+                <th>Oportunidad</th>
+                <th>Inmueble según la oportunidad</th>
                 <th>Inmueble sugerido</th>
                 <th>Qué pasó</th>
                 <th>Qué hacer</th>
@@ -133,7 +138,7 @@ export function VinculosRevisionPage() {
             </thead>
             <tbody>
               {vinculos.length === 0 && (
-                <tr><td colSpan={5} className={styles.muted}>No hay vínculos por revisar con estos filtros.</td></tr>
+                <tr><td colSpan={7} className={styles.muted}>No hay vínculos por revisar con estos filtros.</td></tr>
               )}
               {vinculos.map((v) => (
                 <tr key={v.referencia}>
@@ -146,6 +151,15 @@ export function VinculosRevisionPage() {
                     </div>
                   </td>
                   <td><Badge variant={ESTADOS[v.estado]?.variante ?? 'neutral'}>{ESTADOS[v.estado]?.etiqueta ?? v.estado}</Badge></td>
+                  <td>
+                    {v.oportunidadId ? (
+                      <div className={styles.celdaTitulo}>
+                        <Link to={`/oportunidades/${v.oportunidadId}`} className={styles.nombre}>{v.oportunidadNombre}</Link>
+                        <span className={styles.detalleSec}>{v.oportunidadEtapa}</span>
+                      </div>
+                    ) : <span className={styles.muted}>Sin oportunidad</span>}
+                  </td>
+                  <td>{v.oportunidadInmueble ? `${v.oportunidadInmueble}${v.oportunidadTorre ? ` · ${v.oportunidadTorre}` : ''}` : <span className={styles.muted}>—</span>}</td>
                   <td>
                     {v.sugerido ? (
                       <div className={styles.celdaTitulo}>

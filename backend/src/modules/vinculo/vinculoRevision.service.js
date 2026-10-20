@@ -23,10 +23,17 @@ async function listar({ estado, search, soloRevision = 'true' } = {}) {
     `SELECT v.referencia, v.estado, v.metodo, v.negocio_estado AS "negocioEstado", v.requiere_revision AS "requiereRevision", v.detalle, v.observaciones,
             n.id AS "negocioId", n.datos->>'Nomenclatura' AS nomenclatura, n.datos->>'Fideicomiso' AS fideicomiso,
             inv.id AS "inventarioId", inv.nombre AS "inmueble", inv.datos->>'Proyecto_Torre' AS "proyectoTorre", inv.referencia_recaudo AS "referenciaInmueble",
-            sug.id AS "sugeridoId", sug.nombre AS "sugerido", sug.datos->>'Proyecto_Torre' AS "sugeridoProyectoTorre", sug.referencia_recaudo AS "sugeridoReferencia"
+            sug.id AS "sugeridoId", sug.nombre AS "sugerido", sug.datos->>'Proyecto_Torre' AS "sugeridoProyectoTorre", sug.referencia_recaudo AS "sugeridoReferencia",
+            opp.id AS "oportunidadId", opp.deal_name AS "oportunidadNombre", opp.stage AS "oportunidadEtapa",
+            opp.seccion_inmueble->'Inmueble'->>'name' AS "oportunidadInmueble", opp.seccion_inmueble->>'Torre' AS "oportunidadTorre"
      FROM vinculos_negocio_inmueble v
      JOIN negocios n ON n.referencia = v.referencia
      LEFT JOIN inventario_items inv ON inv.id = v.inventario_id
+     LEFT JOIN LATERAL (
+       SELECT o.id, o.deal_name, o.stage, o.seccion_inmueble FROM oportunidades o
+       WHERE o.referencia_recaudo = v.referencia
+       ORDER BY (o.stage IN ('DESISTIDO','BACKOUT','PREPARACION CARTA DESISTIMIENTO','NO INTERESADO','DESISTIDO EN APROBACION GERENCIA','CARTA DESISTIMIENTO FIRMADA POR CLIENTE','CARTA DESISTIMIENTO RADICADA')) ASC, o.id ASC LIMIT 1
+     ) opp ON true
      LEFT JOIN inventario_items sug ON sug.id = NULLIF(v.senales->>'sugerido', '')::int
      ${cond.length ? `WHERE ${cond.join(' AND ')}` : ''}
      ORDER BY CASE v.negocio_estado WHEN 'VENDIDO' THEN 0 WHEN 'ESCRITURA_AUTORIZADA' THEN 0 WHEN 'PROMETIDO' THEN 1 WHEN 'OPCIONADO' THEN 1 WHEN 'EN_RETIRO' THEN 2 ELSE 3 END, v.estado, v.referencia`,
