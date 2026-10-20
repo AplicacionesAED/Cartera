@@ -5,11 +5,8 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 
 const ACCION_SUGERIDA = {
-  CORREGIDO: 'Actualizar en Zoho la referencia de recaudo del inmueble vinculado.',
-  CONFLICTO: 'Revisar a mano: las señales apuntan a inmuebles distintos (código mal puesto en Zoho o en el Excel de la fiducia).',
-  AMBIGUO: 'Revisar a mano: hay varios inmuebles posibles. Poner la referencia de recaudo en el inmueble correcto de Zoho.',
-  SIN_VINCULO: 'El inmueble no existe en Zoho o no tiene la referencia. Crearlo/completarlo en Zoho.',
-  CONFIRMADO: 'Revisar las observaciones.',
+  AMBIGUO: 'Dejar la referencia de recaudo en un solo inmueble de Zoho (quitarla de los demás).',
+  SIN_VINCULO: 'Poner esta referencia de recaudo en el inmueble correcto de Zoho (ver la sugerencia).',
 };
 
 async function listar({ estado, search, soloRevision = 'true' } = {}) {
@@ -24,10 +21,12 @@ async function listar({ estado, search, soloRevision = 'true' } = {}) {
   const filas = await sequelize.query(
     `SELECT v.referencia, v.estado, v.metodo, v.negocio_estado AS "negocioEstado", v.requiere_revision AS "requiereRevision", v.detalle, v.observaciones,
             n.id AS "negocioId", n.datos->>'Nomenclatura' AS nomenclatura, n.datos->>'Fideicomiso' AS fideicomiso,
-            inv.id AS "inventarioId", inv.nombre AS "inmueble", inv.datos->>'Proyecto_Torre' AS "proyectoTorre", inv.referencia_recaudo AS "referenciaInmueble"
+            inv.id AS "inventarioId", inv.nombre AS "inmueble", inv.datos->>'Proyecto_Torre' AS "proyectoTorre", inv.referencia_recaudo AS "referenciaInmueble",
+            sug.id AS "sugeridoId", sug.nombre AS "sugerido", sug.datos->>'Proyecto_Torre' AS "sugeridoProyectoTorre", sug.referencia_recaudo AS "sugeridoReferencia"
      FROM vinculos_negocio_inmueble v
      JOIN negocios n ON n.referencia = v.referencia
      LEFT JOIN inventario_items inv ON inv.id = v.inventario_id
+     LEFT JOIN inventario_items sug ON sug.id = NULLIF(v.senales->>'sugerido', '')::int
      ${cond.length ? `WHERE ${cond.join(' AND ')}` : ''}
      ORDER BY CASE v.negocio_estado WHEN 'VENDIDO' THEN 0 WHEN 'ESCRITURA_AUTORIZADA' THEN 0 WHEN 'PROMETIDO' THEN 1 WHEN 'OPCIONADO' THEN 1 WHEN 'EN_RETIRO' THEN 2 ELSE 3 END, v.estado, v.referencia`,
     { bind, type: QueryTypes.SELECT }

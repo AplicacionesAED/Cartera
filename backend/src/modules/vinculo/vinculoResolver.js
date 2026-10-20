@@ -1,23 +1,18 @@
-// Resolvedor del vínculo Negocio (fiducia) <-> Inmueble (Zoho), Baía Kristal.
+// Vínculo Negocio (fiducia) <-> Inmueble (Zoho), Baía Kristal.
 //
-// Por qué existe: la referencia de recaudo del inmueble en Zoho muchas veces está desactualizada (quedó la de un
-// negocio anterior, o la de otra oportunidad), y entonces el negocio queda sin inmueble o se cruza con otro.
-// En vez de confiar en UNA fuente, cada negocio se decide con TRES señales independientes:
-//
-//   A. Referencia:     el inmueble de Zoho que tiene la referencia del negocio (`inventario_items.referencia_recaudo`).
-//   B. Oportunidad:    el inmueble que la oportunidad del negocio (misma referencia) tiene en su propio campo Inmueble.
-//   C. Nomenclatura:   la nomenclatura que trae el Excel de la fiducia, en tres niveles de precisión:
-//                        1) código completo = `C_digo_inmueble` (único; Kaliza, Isla, Kala, Vela...)
-//                        2) nombre de la unidad + proyecto del fideicomiso (Plaza, Vela C2...)
-//                        3) si hay varios, se desempata por el área (Kabo, Privé: la fiducia trae "6C" sin torre)
-//
-// Gana el inmueble que apoyan al menos DOS señales. Cada señal solo "vota" si apunta a UN inmueble. Así, una
-// señal equivocada (p. ej. un código mal puesto en Zoho: `210A` con código `210`) pierde contra las otras dos.
-// El resultado se guarda en `vinculos_negocio_inmueble` (una fila por negocio, con el porqué) y lo leen
-// todos los módulos -- ver `recalcularVinculos`.
+// REGLA: la fuente de verdad es el CRM. Un negocio se vincula al inmueble de Zoho que tiene SU MISMA referencia de
+// recaudo (`negocio.referencia = inventario_items.referencia_recaudo`), nada más. La app no corrige ni decide:
+//   - una sola coincidencia  -> CONFIRMADO (vinculado)
+//   - varios inmuebles con esa referencia -> AMBIGUO (no se vincula: el CRM debe dejar uno)
+//   - ninguna coincidencia   -> SIN_VINCULO (no se vincula)
+// En los dos últimos casos el negocio entra a "Vínculos por revisar" con una SUGERENCIA para el CRM, calculada con
+// la oportunidad (su campo Inmueble) y la nomenclatura de la fiducia. La sugerencia es solo una pista: no vincula
+// nada ni afecta ningún total hasta que el CRM corrija la referencia en Zoho. El resultado se guarda en
+// `vinculos_negocio_inmueble` (una fila por negocio) y lo leen todos los módulos -- ver `recalcularVinculos`.
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 const { PROYECTO_TORRE_EXCLUIDOS } = require('../inventario/inventarioTorres.service');
+const { ESTADOS_DESISTIDOS } = require('../../config/estadosOportunidad');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const VinculoNegocioInmueble = require('./vinculoNegocioInmueble.model');
 
@@ -53,8 +48,9 @@ async function cargarDatos() {
     ),
     sequelize.query(
       `SELECT referencia_recaudo AS ref, seccion_inmueble->'Inmueble'->>'id' AS inv_zoho_id
-       FROM oportunidades WHERE referencia_recaudo IS NOT NULL AND seccion_inmueble->'Inmueble'->>'id' IS NOT NULL`,
-      { type: QueryTypes.SELECT }
+       FROM oportunidades WHERE referencia_recaudo IS NOT NULL AND seccion_inmueble->'Inmueble'->>'id' IS NOT NULL
+         AND NOT (stage = ANY($1::text[]))`,
+      { bind: [[...ESTADOS_DESISTIDOS]], type: QueryTypes.SELECT }
     ),
   ]);
   return { inmuebles, negocios, oportunidades };
@@ -80,99 +76,59 @@ function porNomenclatura(n, inmuebles) {
   return { nivel: 0, ids: [] };
 }
 
-// Decide el inmueble de UN negocio con las tres señales. `ctx` trae los índices precalculados.
+// Decide el inmueble de UN negocio: solo por referencia. Sin coincidencia exacta calcula una sugerencia para el CRM.
 function resolverNegocio(n, ctx) {
   const { porId, porRef, porZoho, oppsPorRef, inmuebles } = ctx;
   const A = (porRef.get(n.referencia) ?? []).map((i) => i.id);
+  const esLibre = n.estado === 'LIBRE';
+
+  if (A.length === 1) {
+    return {
+      referencia: n.referencia, inventario_id: A[0], estado: 'CONFIRMADO', metodo: 'referencia', negocio_estado: n.estado,
+      requiere_revision: false, detalle: null, observaciones: null, senales: { referencia: A },
+    };
+  }
+
+  // Sugerencia (solo pista): inmueble de la oportunidad y/o nomenclatura de la fiducia.
   const B = [...new Set((oppsPorRef.get(n.referencia) ?? []).map((z) => porZoho.get(z)?.id).filter((x) => x != null))];
   const c = porNomenclatura(n, inmuebles);
-  const senales = [
-    { nombre: 'referencia', ids: A },
-    { nombre: 'oportunidad', ids: B },
-    { nombre: 'nomenclatura', ids: c.ids, nivel: c.nivel },
-  ];
+  let sugerido = null;
+  let origen = null;
+  if (B.length === 1) { sugerido = B[0]; origen = 'la oportunidad'; }
+  else if (c.ids.length === 1) { sugerido = c.ids[0]; origen = 'la nomenclatura de la fiducia'; }
+  const u = sugerido != null ? porId.get(sugerido) : null;
+  const confirmaOtra = B.length === 1 && c.ids.length === 1 && B[0] === c.ids[0] ? ' (la oportunidad y la nomenclatura coinciden)' : '';
 
-  // Cada señal con exactamente UN inmueble vota por él.
-  const votos = new Map();
-  const votar = (id, quien) => votos.set(id, [...(votos.get(id) ?? []), quien]);
-  for (const s of senales) if (s.ids.length === 1) votar(s.ids[0], s.nombre);
-  // Una señal con varios candidatos refuerza al que ya tiene el voto de otra señal.
-  for (const s of senales) {
-    if (s.ids.length > 1) for (const id of s.ids) if (votos.has(id) && !votos.get(id).includes(s.nombre)) votar(id, s.nombre);
-  }
-  const ranking = [...votos.entries()].sort((x, y) => y[1].length - x[1].length);
-
-  let ganador = null;
   let estado;
-  let metodo = null;
-  const unaSola = senales.filter((s) => s.ids.length > 0);
-
-  if (ranking.length && ranking[0][1].length >= 2 && !(ranking[1] && ranking[1][1].length === ranking[0][1].length)) {
-    ganador = ranking[0][0];
-    metodo = ranking[0][1].join('+');
-    estado = A.includes(ganador) ? 'CONFIRMADO' : 'CORREGIDO';
-  } else if (ranking.length === 1 && unaSola.length === 1 && unaSola[0].ids.length === 1) {
-    ganador = ranking[0][0];
-    metodo = ranking[0][1][0];
-    estado = 'UNA_SENAL';
-  } else if (ranking.length >= 1) {
-    // Señales que se contradicen sin mayoría: se conserva la de mayor jerarquía (referencia > oportunidad > nomenclatura).
-    const orden = ['referencia', 'oportunidad', 'nomenclatura'];
-    const elegida = ranking.map(([id, q]) => ({ id, q })).sort((x, y) => Math.min(...x.q.map((s) => orden.indexOf(s))) - Math.min(...y.q.map((s) => orden.indexOf(s))))[0];
-    ganador = elegida.id;
-    metodo = elegida.q.join('+');
-    estado = 'CONFLICTO';
-  } else if (unaSola.length) {
+  let detalle;
+  const observaciones = [];
+  if (A.length > 1) {
     estado = 'AMBIGUO';
+    detalle = `${A.length} inmuebles de Zoho tienen la referencia ${n.referencia}: ${A.map((id) => etiqueta(porId.get(id))).join(', ')}. Debe quedar en uno solo.`;
   } else {
     estado = 'SIN_VINCULO';
+    detalle = `Ningún inmueble de Zoho tiene la referencia ${n.referencia}.`;
   }
-
-  const u = ganador != null ? porId.get(ganador) : null;
-  const observaciones = [];
-  let detalle = null;
-
-  if (ganador != null) {
-    // Señales que apuntan a otro inmueble (aunque hayan perdido el voto).
-    for (const s of senales) {
-      if (s.ids.length === 1 && s.ids[0] !== ganador) {
-        const otro = porId.get(s.ids[0]);
-        const texto = s.nombre === 'referencia' ? 'la referencia' : s.nombre === 'oportunidad' ? 'la oportunidad' : 'la nomenclatura de la fiducia';
-        if (otro) observaciones.push(`${texto[0].toUpperCase()}${texto.slice(1)} apunta a ${etiqueta(otro)}, que no es el inmueble elegido.`);
-      }
-    }
-    if (A.length === 0 && estado !== 'UNA_SENAL') observaciones.push(`Ningún inmueble de Zoho tiene la referencia ${n.referencia}.`);
-    if (A.length > 1) observaciones.push(`${A.length} inmuebles de Zoho comparten la referencia ${n.referencia}: ${A.map((id) => etiqueta(porId.get(id))).join(', ')}.`);
+  if (u) {
+    observaciones.push(
+      u.ref
+        ? `Sugerencia (según ${origen}${confirmaOtra}): ${etiqueta(u)}, que hoy tiene la referencia ${u.ref} en Zoho.`
+        : `Sugerencia (según ${origen}${confirmaOtra}): ${etiqueta(u)}, que no tiene referencia de recaudo en Zoho.`
+    );
+  } else if (c.ids.length > 1) {
+    observaciones.push(`La nomenclatura "${n.nom}" coincide con varios inmuebles: ${c.ids.slice(0, 5).map((id) => etiqueta(porId.get(id))).join(', ')}${c.ids.length > 5 ? '…' : ''}.`);
   }
-
-  if (estado === 'CORREGIDO') {
-    detalle = u.ref
-      ? `El inmueble ${etiqueta(u)} tiene en Zoho la referencia ${u.ref} y no la del negocio (${n.referencia}). Se vinculó por ${metodo.replace('+', ' y ')}.`
-      : `El inmueble ${etiqueta(u)} no tiene referencia de recaudo en Zoho (debería ser ${n.referencia}). Se vinculó por ${metodo.replace('+', ' y ')}.`;
-  } else if (estado === 'CONFLICTO') {
-    detalle = `Las señales no coinciden: ${senales.filter((s) => s.ids.length).map((s) => `${s.nombre} → ${s.ids.map((id) => etiqueta(porId.get(id))).join(' / ')}`).join('; ')}.`;
-  } else if (estado === 'AMBIGUO') {
-    const cand = senales.find((s) => s.ids.length > 1);
-    detalle = `Hay ${cand?.ids.length ?? 'varios'} inmuebles posibles para la nomenclatura "${n.nom}": ${(cand?.ids ?? []).slice(0, 6).map((id) => etiqueta(porId.get(id))).join(', ')}${(cand?.ids.length ?? 0) > 6 ? '…' : ''}.`;
-  } else if (estado === 'SIN_VINCULO') {
-    detalle = `No se encontró ningún inmueble para la referencia ${n.referencia} ni para la nomenclatura "${n.nom ?? '—'}".`;
-  } else if (estado === 'UNA_SENAL') {
-    detalle = `Solo coincide ${metodo}; las otras señales no tienen información.`;
-  }
-
-  const esLibre = n.estado === 'LIBRE';
-  const requiereRevision = !esLibre && (['CORREGIDO', 'CONFLICTO', 'AMBIGUO', 'SIN_VINCULO'].includes(estado) || (estado === 'CONFIRMADO' && observaciones.length > 0));
 
   return {
     referencia: n.referencia,
-    inventario_id: ganador,
+    inventario_id: null,
     estado,
-    metodo,
+    metodo: null,
     negocio_estado: n.estado,
-    requiere_revision: requiereRevision,
+    requiere_revision: !esLibre,
     detalle,
     observaciones: observaciones.length ? observaciones : null,
-    senales: { referencia: A, oportunidad: B, nomenclatura: { nivel: c.nivel, ids: c.ids } },
+    senales: { referencia: A, sugerido },
   };
 }
 

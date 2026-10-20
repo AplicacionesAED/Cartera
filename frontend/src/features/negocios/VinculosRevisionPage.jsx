@@ -15,12 +15,9 @@ import { estadoToken } from '../../utils/estados.js';
 import styles from './NegociosPage.module.css';
 
 const ESTADOS = {
-  CORREGIDO: { etiqueta: 'Corregido', variante: 'warning' },
-  CONFLICTO: { etiqueta: 'Conflicto', variante: 'danger' },
-  AMBIGUO: { etiqueta: 'Ambiguo', variante: 'danger' },
-  SIN_VINCULO: { etiqueta: 'Sin inmueble', variante: 'danger' },
-  UNA_SENAL: { etiqueta: 'Una sola señal', variante: 'neutral' },
-  CONFIRMADO: { etiqueta: 'Confirmado', variante: 'success' },
+  SIN_VINCULO: { etiqueta: 'Sin vínculo', variante: 'danger' },
+  AMBIGUO: { etiqueta: 'Referencia repetida', variante: 'warning' },
+  CONFIRMADO: { etiqueta: 'Vinculado', variante: 'success' },
 };
 
 const textoDetalle = (v) => [v.detalle, ...(v.observaciones ?? [])].filter(Boolean).join(' ');
@@ -30,9 +27,9 @@ function exportarExcel(vinculos, duplicadas) {
     'Referencia del negocio': v.referencia,
     'Estado del negocio': v.negocioEstado ?? '',
     Resultado: ESTADOS[v.estado]?.etiqueta ?? v.estado,
-    'Inmueble vinculado': v.inmueble ?? '',
-    'Proyecto / Torre': v.proyectoTorre ?? '',
-    'Referencia que tiene el inmueble en Zoho': v.referenciaInmueble ?? '',
+    'Inmueble sugerido': v.sugerido ?? '',
+    'Proyecto / Torre (sugerido)': v.sugeridoProyectoTorre ?? '',
+    'Referencia que tiene hoy ese inmueble en Zoho': v.sugeridoReferencia ?? '',
     'Nomenclatura (fiducia)': v.nomenclatura ?? '',
     Fideicomiso: v.fideicomiso ?? '',
     'Qué pasó': textoDetalle(v),
@@ -85,7 +82,7 @@ export function VinculosRevisionPage() {
         <div>
           <h1 className={styles.title}>Vínculos por revisar</h1>
           <p className={styles.subtitle}>
-            Negocios cuyo inmueble no coincide con lo que dice Zoho. La app ya usa el vínculo resuelto; esto es lo que el equipo del CRM debe corregir.
+            Negocios cuya referencia de recaudo no está en ningún inmueble de Zoho (o está en varios). La app no los vincula hasta que el CRM lo corrija; la sugerencia es solo una pista.
             {datos ? ` · ${datos.resumen.pendientes.toLocaleString('es-CO')} por revisar` : ''}
           </p>
         </div>
@@ -115,7 +112,7 @@ export function VinculosRevisionPage() {
             </Select>
           )}
         </Field>
-        <Checkbox label="Incluir los que no requieren revisión" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
+        <Checkbox label="Incluir los vinculados y los LIBRE" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
       </div>
 
       {error && <p className={styles.mensaje}>{error}</p>}
@@ -128,7 +125,7 @@ export function VinculosRevisionPage() {
               <tr>
                 <th>Negocio</th>
                 <th>Resultado</th>
-                <th>Inmueble vinculado</th>
+                <th>Inmueble sugerido</th>
                 <th>Qué pasó</th>
                 <th>Qué hacer</th>
               </tr>
@@ -149,10 +146,10 @@ export function VinculosRevisionPage() {
                   </td>
                   <td><Badge variant={ESTADOS[v.estado]?.variante ?? 'neutral'}>{ESTADOS[v.estado]?.etiqueta ?? v.estado}</Badge></td>
                   <td>
-                    {v.inmueble ? (
+                    {v.sugerido ? (
                       <div className={styles.celdaTitulo}>
-                        <Link to={`/negocios/inv-${v.inventarioId}`} className={styles.nombre}>{v.inmueble}</Link>
-                        <span className={styles.detalleSec}>{v.proyectoTorre ?? ''}</span>
+                        <Link to={`/negocios/inv-${v.sugeridoId}`} className={styles.nombre}>{v.sugerido}</Link>
+                        <span className={styles.detalleSec}>{v.sugeridoProyectoTorre ?? ''}</span>
                       </div>
                     ) : <span className={styles.muted}>—</span>}
                   </td>
