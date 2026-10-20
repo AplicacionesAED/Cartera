@@ -48,7 +48,6 @@ const MovimientosPage = lazyNamed(() => import('./features/fiducia/MovimientosPa
 // "negocios" y "negocios/:id" (el id, si existe, decide que se muestra en
 // el panel derecho; ver el comentario de cabecera de NegociosPage.jsx).
 const NegociosPage = lazyNamed(() => import('./features/negocios/NegociosPage.jsx'), 'NegociosPage');
-const VinculosRevisionPage = lazyNamed(() => import('./features/negocios/VinculosRevisionPage.jsx'), 'VinculosRevisionPage');
 const DashboardPage = lazyNamed(() => import('./features/dashboard/DashboardPage.jsx'), 'DashboardPage');
 const CarteraMoraPage = lazyNamed(() => import('./features/cartera-mora/CarteraMoraPage.jsx'), 'CarteraMoraPage');
 const ResumenPage = lazyNamed(() => import('./features/resumen/ResumenPage.jsx'), 'ResumenPage');
@@ -128,7 +127,6 @@ export default function App() {
             <Route path="fiducia/:id/hojas/:hojaId" element={<HojaViewerPage />} />
             <Route path="fiducia/:id/apartamento/:referencia" element={<ApartamentoDetallePage />} />
             <Route path="negocios" element={<NegociosPage />} />
-            <Route path="negocios/vinculos" element={<VinculosRevisionPage />} />
             <Route path="negocios/:id" element={<NegociosPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="cartera-mora" element={<CarteraMoraPage />} />

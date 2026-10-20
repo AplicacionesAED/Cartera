@@ -288,7 +288,6 @@ function NegociosLista() {
           </p>
         </div>
         <div className={styles.acciones}>
-          <Button variant="secondary" onClick={() => navigate('/negocios/vinculos')}>Vínculos por revisar</Button>
           <ExportMenu onExport={handleExport} disabled={exportando || cargando} />
           {sync.corriendo ? (
             <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Reconstruyendo negocios…" compacto />

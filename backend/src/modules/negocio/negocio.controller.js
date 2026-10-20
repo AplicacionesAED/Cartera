@@ -36,11 +36,6 @@ const exportMovimientos = asyncHandler(async (req, res) => {
   ok(res, await service.exportMovimientos({ search, fideicomiso, estado, tipoMovimiento, fechaDesde, fechaHasta }));
 });
 
-const vinculosRevision = asyncHandler(async (req, res) => {
-  const { estado, search, soloRevision } = req.query;
-  ok(res, await require('../vinculo/vinculoRevision.service').obtener({ estado, search, soloRevision }));
-});
-
 const updateFlags = asyncHandler(async (req, res) => ok(res, await service.updateFlags(req.params.negocioId, req.body)));
 
 const iniciarBackfill = asyncHandler(async (req, res) => {
@@ -51,4 +46,4 @@ const iniciarBackfill = asyncHandler(async (req, res) => {
 
 const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isBackfillRunning(), result: getBackfillResult(), progreso: getBackfillProgreso() }));
 
-module.exports = { list, getById, getMovimientos, listMovimientos, exportMovimientos, updateFlags, iniciarBackfill, backfillStatus, vinculosRevision };
+module.exports = { list, getById, getMovimientos, listMovimientos, exportMovimientos, updateFlags, iniciarBackfill, backfillStatus };

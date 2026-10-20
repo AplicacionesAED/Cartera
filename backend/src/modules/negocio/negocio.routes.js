@@ -15,7 +15,6 @@ router.get('/backfill/status', requireAuth, requireModulo('negocios'), controlle
 router.get('/', requireAuth, requireModulo('negocios'), controller.list);
 // Rutas estaticas de un solo segmento -- deben ir ANTES de "/:id", si no
 // Express las matchea contra el catch-all (mismo motivo que /backfill arriba).
-router.get('/vinculos/revision', requireAuth, requireModulo('negocios'), controller.vinculosRevision);
 router.get('/movimientos', requireAuth, requireModulo('movimientos'), controller.listMovimientos);
 router.get('/movimientos/export', requireAuth, requireModulo('movimientos'), controller.exportMovimientos);
 router.patch('/:negocioId/flags', requireAuth, requireModulo('cartera-mora'), controller.updateFlags);
