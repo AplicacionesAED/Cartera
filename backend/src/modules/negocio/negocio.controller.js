@@ -5,8 +5,8 @@ const service = require('./negocio.service');
 const { runBackfill, isBackfillRunning, getBackfillResult, getBackfillProgreso } = require('./negocio.backfill');
 
 const list = asyncHandler(async (req, res) => {
-  const { search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, page, limit } = req.query;
-  ok(res, await service.list({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, page, limit }));
+  const { search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, page, limit } = req.query;
+  ok(res, await service.list({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, page, limit }));
 });
 
 const getById = asyncHandler(async (req, res) => {

@@ -9,7 +9,7 @@
 // Dashboard y Cartera en Gestión siguen enlazando directo a `/negocios/${id}`.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, CircleDot, Layers, MapPin, Building, Download, RefreshCw } from 'lucide-react';
+import { Search, CircleDot, Layers, MapPin, Building, Download, RefreshCw, Link2 } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
@@ -30,7 +30,7 @@ import { NegocioDetalleContenido } from './NegocioDetalleContenido.jsx';
 import styles from './NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', estado: '', etapa: '', frente: '', torre: '', saldoPendiente: false, conMovimientos: false };
+const FILTROS_VACIOS = { search: '', estado: '', etapa: '', frente: '', torre: '', vinculacion: '', saldoPendiente: false, conMovimientos: false };
 
 function formatMoney(v) {
   if (v == null || v === 0) return '—';
@@ -338,6 +338,24 @@ function NegociosLista() {
             )}
           </Field>
         )}
+        <Field
+          label={
+            <span className={styles.labelConIcono}>
+              <Link2 size={13} />
+              Vinculación
+              <InfoTooltip text="De qué forma quedó vinculado el negocio con su inmueble: por nomenclatura y categoría (lo que trae la fiducia), por referencia de recaudo, o sin inmueble vinculado." />
+            </span>
+          }
+        >
+          {(p) => (
+            <Select {...p} value={filtros.vinculacion ?? ''} onChange={(e) => actualizarFiltro('vinculacion', e.target.value)}>
+              <option value="">Todas</option>
+              <option value="nomenclatura">Por nomenclatura y categoría</option>
+              <option value="referencia">Por referencia de recaudo</option>
+              <option value="sin">Sin inmueble vinculado</option>
+            </Select>
+          )}
+        </Field>
         {opciones.etapasDisponibles.length > 0 && (
           <Field
             label={

@@ -36,12 +36,13 @@ WITH inmuebles AS (
     neg.referencia AS referencia,
     neg.estado AS estado,
     neg.saldo_actual AS saldo_actual,
-    neg.datos AS negocio_datos
+    neg.datos AS negocio_datos,
+    neg.v_metodo AS vinculo_metodo
   FROM inventario_items inv
   LEFT JOIN LATERAL (
     -- El negocio de cada inmueble lo decide vinculoResolver.js (tres señales) y queda en vinculos_negocio_inmueble;
     -- si una unidad tiene varios negocios, cuenta el vigente.
-    SELECT n.* FROM vinculos_negocio_inmueble v
+    SELECT n.*, v.metodo AS v_metodo FROM vinculos_negocio_inmueble v
     JOIN negocios n ON n.referencia = v.referencia
     WHERE v.inventario_id = inv.id
     ORDER BY ${PRIORIDAD_ESTADO_SQL}, n.id ASC
@@ -60,7 +61,8 @@ huerfanos AS (
     n.referencia AS referencia,
     n.estado AS estado,
     n.saldo_actual AS saldo_actual,
-    n.datos AS negocio_datos
+    n.datos AS negocio_datos,
+    NULL::text AS vinculo_metodo
   FROM negocios n
   WHERE NOT EXISTS (SELECT 1 FROM inmuebles i WHERE i.negocio_id = n.id)
 ),
@@ -76,9 +78,14 @@ combinado AS (
 // Arma las condiciones dinámicas del WHERE del CTE combinado. `bind` ya
 // trae los 2 parámetros base de BASE_CTE ($1 excluidos, $2 patrón nombre) --
 // esta función sigue numerando desde ahí.
-async function construirFiltroCombinado({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, valores, bind }) {
+async function construirFiltroCombinado({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, valores, bind }) {
   const condiciones = [];
   let idx = bind.length + 1;
+
+  // Forma en que el negocio quedó vinculado a su inmueble (ver vinculoResolver.js).
+  if (vinculacion === 'nomenclatura') condiciones.push(`c.vinculo_metodo = 'nomenclatura'`);
+  else if (vinculacion === 'referencia') condiciones.push(`c.vinculo_metodo = 'referencia'`);
+  else if (vinculacion === 'sin') condiciones.push(`c.negocio_id IS NOT NULL AND c.inventario_datos IS NULL`);
 
   if (estado) {
     condiciones.push(`c.estado ILIKE $${idx++}`);
@@ -128,11 +135,11 @@ async function construirFiltroCombinado({ search, estado, etapa, frente, torre, 
   return { whereSQL: condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '', idx };
 }
 
-async function list({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, page = 1, limit = 50 }) {
+async function list({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, page = 1, limit = 50 }) {
   const valores = await valoresProyectoTorre();
   const bind = [[...PROYECTO_TORRE_EXCLUIDOS], PATRON_NOMBRE_EXCLUIDO];
-  const { whereSQL, idx } = await construirFiltroCombinado({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, valores, bind });
-  const noFilters = !search && !estado && !etapa && !frente && !torre;
+  const { whereSQL, idx } = await construirFiltroCombinado({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, valores, bind });
+  const noFilters = !search && !estado && !etapa && !frente && !torre && !vinculacion;
 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(9999, Math.max(1, Number(limit) || 50));
