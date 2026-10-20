@@ -52,8 +52,9 @@ async function cargarDatos() {
       { type: QueryTypes.SELECT }
     ),
     sequelize.query(
-      `SELECT referencia_recaudo AS ref, seccion_inmueble->'Inmueble'->>'id' AS inv_zoho_id
-       FROM oportunidades WHERE referencia_recaudo IS NOT NULL AND seccion_inmueble->'Inmueble'->>'id' IS NOT NULL
+      `SELECT referencia_recaudo AS ref, seccion_inmueble->'Inmueble'->>'id' AS inv_zoho_id,
+              seccion_inmueble->>'Torre' AS torre, seccion_inmueble->>'Nomenclatura_Inmueble' AS nom
+       FROM oportunidades WHERE referencia_recaudo IS NOT NULL
          AND NOT (stage = ANY($1::text[]))`,
       { bind: [[...ESTADOS_DESISTIDOS]], type: QueryTypes.SELECT }
     ),
@@ -109,14 +110,20 @@ function resolverNegocio(n, ctx) {
   }
 
   // Sugerencia (solo pista): inmueble de la oportunidad y/o nomenclatura de la fiducia.
-  const B = [...new Set((oppsPorRef.get(n.referencia) ?? []).map((z) => porZoho.get(z)?.id).filter((x) => x != null))];
+  const opps = oppsPorRef.get(n.referencia) ?? [];
+  // La oportunidad declara su inmueble de dos formas: el campo Inmueble (id de Zoho) o, si ese está vacío, la torre
+  // y la nomenclatura que escribe en su sección Inmueble (se acepta solo si coincide con un único inmueble).
+  const B = [...new Set(opps.map((o) => o.inv_zoho_id && porZoho.get(o.inv_zoho_id)?.id).filter((x) => x != null))];
+  const B2 = [...new Set(opps.flatMap((o) => (o.nom && o.torre ? ctx.porTorreNom.get(`${norm(o.torre)}|${norm(o.nom)}`) ?? [] : [])))];
   const c = porNomenclatura(n, inmuebles);
   let sugerido = null;
   let origen = null;
   if (B.length === 1) { sugerido = B[0]; origen = 'la oportunidad'; }
+  else if (B.length === 0 && B2.length === 1) { sugerido = B2[0]; origen = 'la torre y nomenclatura que declara la oportunidad'; }
   else if (c.ids.length === 1) { sugerido = c.ids[0]; origen = 'la nomenclatura de la fiducia'; }
   const u = sugerido != null ? porId.get(sugerido) : null;
-  const confirmaOtra = B.length === 1 && c.ids.length === 1 && B[0] === c.ids[0] ? ' (la oportunidad y la nomenclatura coinciden)' : '';
+  const unoOpp = B.length === 1 ? B[0] : B.length === 0 && B2.length === 1 ? B2[0] : null;
+  const confirmaOtra = unoOpp != null && c.ids.length === 1 && unoOpp === c.ids[0] ? ' (la oportunidad y la nomenclatura coinciden)' : '';
 
   let estado;
   let detalle;
@@ -163,12 +170,18 @@ function construirContexto({ inmuebles, oportunidades, negocios }) {
   const oppsPorRef = new Map();
   for (const o of oportunidades) {
     if (!oppsPorRef.has(o.ref)) oppsPorRef.set(o.ref, []);
-    oppsPorRef.get(o.ref).push(o.inv_zoho_id);
+    oppsPorRef.get(o.ref).push(o);
   }
   // Inmuebles que ya pertenecen (por referencia) a algún negocio: el respaldo por código no puede tomarlos.
+  const porTorreNom = new Map();
+  for (const i of inmuebles) {
+    const k = `${norm(i.pt)}|${norm(i.nombre)}`;
+    if (!porTorreNom.has(k)) porTorreNom.set(k, []);
+    porTorreNom.get(k).push(i.id);
+  }
   const refsNegocio = new Set(negocios.map((n) => n.referencia));
   const reclamados = new Set(inmuebles.filter((i) => i.ref && refsNegocio.has(i.ref)).map((i) => i.id));
-  return { porId, porZoho, porRef, oppsPorRef, inmuebles, reclamados };
+  return { porId, porZoho, porRef, oppsPorRef, inmuebles, reclamados, porTorreNom };
 }
 
 // Calcula (sin guardar) el vínculo de todos los negocios.
