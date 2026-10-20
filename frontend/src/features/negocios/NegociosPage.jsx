@@ -122,40 +122,10 @@ function Resumen({ stats }) {
           <p className={styles.kpiValor}>{stats.totalNegocios}</p>
         </div>
         <div className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Con abonos</p>
-          <p className={`${styles.kpiValor} ${styles.exito}`}>{stats.conSaldo}</p>
-        </div>
-        <div className={styles.kpiCard}>
           <p className={styles.kpiLabel}>Total abonado</p>
           <p className={`${styles.kpiValorSm} ${styles.exito}`}>{stats.saldoTotal > 0 ? formatMoney(stats.saldoTotal) : '—'}</p>
         </div>
       </div>
-
-      <details className={styles.desglose}>
-        <summary>Ver desglose por estado, etapa y frente</summary>
-        <div className={styles.desgloseGrid}>
-          {[
-            ['Por estado', stats.porEstado, (e) => e.estado, (e) => e.estado],
-            ['Por etapa', stats.porEtapa, (e) => e.etapa, (e) => etiquetaEtapa(e.etapa)],
-            ['Por frente', stats.porFrente, (f) => f.frente, (f) => f.frente],
-          ].map(([titulo, filas, clave, etiqueta]) => (
-            <div key={titulo}>
-              <p className={styles.desgloseTitulo}>{titulo}</p>
-              <div className={styles.desgloseLista}>
-                {filas.map((fila) => (
-                  <div key={clave(fila)} className={styles.desgloseFila}>
-                    <span className={styles.desgloseEtiqueta}>{etiqueta(fila)}</span>
-                    <span className={styles.desgloseValores}>
-                      <span className={styles.desgloseCount}>{fila.count}</span>
-                      {fila.saldo > 0 && <span className={styles.desgloseSaldo}>{formatMoney(fila.saldo)}</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </details>
     </>
   );
 }
