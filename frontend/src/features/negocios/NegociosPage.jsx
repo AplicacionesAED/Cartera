@@ -13,7 +13,6 @@ import { Search, CircleDot, Layers, MapPin, Building, Download, RefreshCw, Link2
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
-import { Checkbox } from '../../components/ui/Checkbox.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
@@ -30,7 +29,7 @@ import { NegocioDetalleContenido } from './NegocioDetalleContenido.jsx';
 import styles from './NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', estado: '', etapa: '', frente: '', torre: '', vinculacion: '', saldoPendiente: false, conMovimientos: false };
+const FILTROS_VACIOS = { search: '', estado: '', etapa: '', frente: '', torre: '', vinculacion: '' };
 
 function formatMoney(v) {
   if (v == null || v === 0) return '—';
@@ -410,10 +409,6 @@ function NegociosLista() {
             )}
           </Field>
         )}
-        <div className={styles.filtrosToggles}>
-          <Checkbox label="Solo con abonos" checked={filtros.saldoPendiente} onChange={(e) => actualizarFiltro('saldoPendiente', e.target.checked)} />
-          <Checkbox label="Solo con movimientos" checked={filtros.conMovimientos} onChange={(e) => actualizarFiltro('conMovimientos', e.target.checked)} />
-        </div>
         {hayFiltros && (
           <button type="button" className={styles.limpiar} onClick={limpiarFiltros}>
             Limpiar filtros

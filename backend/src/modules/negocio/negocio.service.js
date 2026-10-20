@@ -78,7 +78,7 @@ combinado AS (
 // Arma las condiciones dinámicas del WHERE del CTE combinado. `bind` ya
 // trae los 2 parámetros base de BASE_CTE ($1 excluidos, $2 patrón nombre) --
 // esta función sigue numerando desde ahí.
-async function construirFiltroCombinado({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, valores, bind }) {
+async function construirFiltroCombinado({ search, estado, etapa, frente, torre, vinculacion, valores, bind }) {
   const condiciones = [];
   let idx = bind.length + 1;
 
@@ -90,12 +90,6 @@ async function construirFiltroCombinado({ search, estado, etapa, frente, torre, 
   if (estado) {
     condiciones.push(`c.estado ILIKE $${idx++}`);
     bind.push(`%${estado}%`);
-  }
-  if (saldoPendiente === 'true') {
-    condiciones.push(`c.saldo_actual > 0`);
-  }
-  if (conMovimientos === 'true') {
-    condiciones.push(`EXISTS (SELECT 1 FROM negocio_movimientos m WHERE m.negocio_id = c.negocio_id)`);
   }
   if (search) {
     condiciones.push(`(
@@ -135,10 +129,10 @@ async function construirFiltroCombinado({ search, estado, etapa, frente, torre, 
   return { whereSQL: condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '', idx };
 }
 
-async function list({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, page = 1, limit = 50 }) {
+async function list({ search, estado, etapa, frente, torre, vinculacion, page = 1, limit = 50 }) {
   const valores = await valoresProyectoTorre();
   const bind = [[...PROYECTO_TORRE_EXCLUIDOS], PATRON_NOMBRE_EXCLUIDO];
-  const { whereSQL, idx } = await construirFiltroCombinado({ search, estado, etapa, frente, torre, saldoPendiente, conMovimientos, vinculacion, valores, bind });
+  const { whereSQL, idx } = await construirFiltroCombinado({ search, estado, etapa, frente, torre, vinculacion, valores, bind });
   const noFilters = !search && !estado && !etapa && !frente && !torre && !vinculacion;
 
   const pageNum = Math.max(1, Number(page) || 1);
