@@ -35,19 +35,13 @@ const MODULOS = {
 // ── Baía Kristal ─────────────────────────────────────────────────────────
 
 async function inmuebleDeNegocio(negocio) {
-  if (negocio.referencia) {
-    const porReferencia = await InventarioItem.findOne({ where: { referencia_recaudo: negocio.referencia }, order: [['id', 'ASC']] });
-    if (porReferencia) return porReferencia;
-  }
-  const nomenclatura = negocio.datos?.Nomenclatura;
-  if (nomenclatura != null) {
-    const rows = await sequelize.query("SELECT id FROM inventario_items WHERE datos->>'C_digo_inmueble' = $1 ORDER BY id ASC LIMIT 1", {
-      bind: [String(nomenclatura)],
-      type: QueryTypes.SELECT,
-    });
-    if (rows[0]) return InventarioItem.findByPk(rows[0].id);
-  }
-  return null;
+  // El inmueble del negocio lo decide vinculoResolver.js (tabla vinculos_negocio_inmueble).
+  if (!negocio.referencia) return null;
+  const rows = await sequelize.query('SELECT inventario_id FROM vinculos_negocio_inmueble WHERE referencia = $1', {
+    bind: [negocio.referencia],
+    type: QueryTypes.SELECT,
+  });
+  return rows[0]?.inventario_id ? InventarioItem.findByPk(rows[0].inventario_id) : null;
 }
 
 async function resolverBaia(tipo, id) {
@@ -62,7 +56,7 @@ async function resolverBaia(tipo, id) {
     const referencia = opp.referencia_recaudo;
     if (referencia) {
       negocio = await Negocio.findOne({ where: { referencia } });
-      inmueble = await InventarioItem.findOne({ where: { referencia_recaudo: referencia }, order: [['id', 'ASC']] });
+      inmueble = (negocio ? await inmuebleDeNegocio(negocio) : null) ?? (await InventarioItem.findOne({ where: { referencia_recaudo: referencia }, order: [['id', 'ASC']] }));
     }
   } else if (tipo === 'inmueble') {
     inmueble = await InventarioItem.findByPk(id);

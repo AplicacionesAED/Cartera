@@ -164,6 +164,17 @@ async function valoresProyectoTorre() {
 async function inmueblesPorReferencia(referencias) {
   const refs = [...new Set((referencias || []).filter(Boolean))];
   if (!refs.length) return new Map();
+  // 1) El inmueble que decidió el resolvedor de vínculos (corrige referencias desactualizadas en Zoho).
+  const vinculados = await sequelize.query(
+    `SELECT v.referencia AS referencia_recaudo, i.datos->>'Proyecto_Torre' AS proyecto_torre, i.datos->>'Product_Name' AS product_name
+     FROM vinculos_negocio_inmueble v JOIN inventario_items i ON i.id = v.inventario_id
+     WHERE v.referencia IN (:referencias)`,
+    { replacements: { referencias: refs }, type: QueryTypes.SELECT }
+  );
+  const porRef = new Map(vinculados.map((r) => [r.referencia_recaudo, r]));
+  // 2) Sin vínculo: el primer inmueble que tenga esa referencia.
+  const faltan = refs.filter((r) => !porRef.has(r));
+  if (!faltan.length) return porRef;
   const rows = await sequelize.query(
     `SELECT DISTINCT ON (referencia_recaudo)
        referencia_recaudo,
@@ -172,9 +183,10 @@ async function inmueblesPorReferencia(referencias) {
      FROM inventario_items
      WHERE referencia_recaudo IN (:referencias)
      ORDER BY referencia_recaudo ASC, id ASC`,
-    { replacements: { referencias: refs }, type: QueryTypes.SELECT }
+    { replacements: { referencias: faltan }, type: QueryTypes.SELECT }
   );
-  return new Map(rows.map((r) => [r.referencia_recaudo, r]));
+  for (const r of rows) porRef.set(r.referencia_recaudo, r);
+  return porRef;
 }
 
 function mapInmueble(item) {

@@ -1,0 +1,200 @@
+// "Vínculos por revisar": negocios cuyo inmueble no se pudo confirmar con seguridad y referencias de recaudo
+// repetidas en Zoho. La app ya usa el vínculo resuelto (ver backend vinculoResolver.js); esta lista es lo que el
+// equipo del CRM debe corregir en Zoho. Se puede exportar a Excel para enviársela.
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { BackLink } from '../../components/ui/BackLink.jsx';
+import { Badge } from '../../components/ui/Badge.jsx';
+import { Button } from '../../components/ui/Button.jsx';
+import { Checkbox } from '../../components/ui/Checkbox.jsx';
+import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { getVinculosRevision } from '../../api/negocios.js';
+import { estadoToken } from '../../utils/estados.js';
+import styles from './NegociosPage.module.css';
+
+const ESTADOS = {
+  CORREGIDO: { etiqueta: 'Corregido', variante: 'warning' },
+  CONFLICTO: { etiqueta: 'Conflicto', variante: 'danger' },
+  AMBIGUO: { etiqueta: 'Ambiguo', variante: 'danger' },
+  SIN_VINCULO: { etiqueta: 'Sin inmueble', variante: 'danger' },
+  UNA_SENAL: { etiqueta: 'Una sola señal', variante: 'neutral' },
+  CONFIRMADO: { etiqueta: 'Confirmado', variante: 'success' },
+};
+
+const textoDetalle = (v) => [v.detalle, ...(v.observaciones ?? [])].filter(Boolean).join(' ');
+
+function exportarExcel(vinculos, duplicadas) {
+  const hoja1 = vinculos.map((v) => ({
+    'Referencia del negocio': v.referencia,
+    'Estado del negocio': v.negocioEstado ?? '',
+    Resultado: ESTADOS[v.estado]?.etiqueta ?? v.estado,
+    'Inmueble vinculado': v.inmueble ?? '',
+    'Proyecto / Torre': v.proyectoTorre ?? '',
+    'Referencia que tiene el inmueble en Zoho': v.referenciaInmueble ?? '',
+    'Nomenclatura (fiducia)': v.nomenclatura ?? '',
+    Fideicomiso: v.fideicomiso ?? '',
+    'Qué pasó': textoDetalle(v),
+    'Qué hacer': v.accionSugerida ?? '',
+  }));
+  const hoja2 = duplicadas.flatMap((d) =>
+    d.inmuebles.map((i) => ({
+      'Referencia repetida': d.referencia,
+      'Inmuebles con esa referencia': d.cantidad,
+      Inmueble: i.nombre,
+      'Proyecto / Torre': i.proyectoTorre ?? '',
+      'Estado en Zoho': i.estado ?? '',
+    }))
+  );
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hoja1), 'Negocios por revisar');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hoja2), 'Referencias repetidas');
+  XLSX.writeFile(wb, `vinculos-por-revisar-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export function VinculosRevisionPage() {
+  const [datos, setDatos] = useState(null);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [estado, setEstado] = useState('');
+  const [todos, setTodos] = useState(false);
+
+  const cargar = useCallback(async () => {
+    try {
+      const res = await getVinculosRevision({ search: search || undefined, estado: estado || undefined, soloRevision: todos ? 'false' : 'true' });
+      setDatos(res.data);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar');
+    }
+  }, [search, estado, todos]);
+
+  useEffect(() => {
+    const t = setTimeout(cargar, 250);
+    return () => clearTimeout(t);
+  }, [cargar]);
+
+  const vinculos = datos?.vinculos ?? [];
+  const duplicadas = datos?.duplicadas ?? [];
+
+  return (
+    <div className={styles.page}>
+      <BackLink to="/negocios">Negocios</BackLink>
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.title}>Vínculos por revisar</h1>
+          <p className={styles.subtitle}>
+            Negocios cuyo inmueble no coincide con lo que dice Zoho. La app ya usa el vínculo resuelto; esto es lo que el equipo del CRM debe corregir.
+            {datos ? ` · ${datos.resumen.pendientes.toLocaleString('es-CO')} por revisar` : ''}
+          </p>
+        </div>
+        <div className={styles.acciones}>
+          <Button variant="secondary" onClick={() => exportarExcel(vinculos, duplicadas)} disabled={!datos}>
+            <span className={styles.botonInterior}>
+              <Download size={14} aria-hidden="true" />
+              Exportar a Excel
+            </span>
+          </Button>
+        </div>
+      </div>
+
+      <div className={styles.filtros}>
+        <div className={styles.filtroBusqueda}>
+          <Field label="Buscar">
+            {(p) => <TextInput {...p} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Referencia, nomenclatura, inmueble…" />}
+          </Field>
+        </div>
+        <Field label="Resultado">
+          {(p) => (
+            <Select {...p} value={estado} onChange={(e) => setEstado(e.target.value)}>
+              <option value="">Todos</option>
+              {Object.entries(ESTADOS).map(([k, e]) => (
+                <option key={k} value={k}>{e.etiqueta}</option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Checkbox label="Incluir los que no requieren revisión" checked={todos} onChange={(e) => setTodos(e.target.checked)} />
+      </div>
+
+      {error && <p className={styles.mensaje}>{error}</p>}
+      {!datos && !error && <p className={styles.mensaje}>Cargando…</p>}
+
+      {datos && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Negocio</th>
+                <th>Resultado</th>
+                <th>Inmueble vinculado</th>
+                <th>Qué pasó</th>
+                <th>Qué hacer</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vinculos.length === 0 && (
+                <tr><td colSpan={5} className={styles.muted}>No hay vínculos por revisar con estos filtros.</td></tr>
+              )}
+              {vinculos.map((v) => (
+                <tr key={v.referencia}>
+                  <td>
+                    <div className={styles.celdaTitulo}>
+                      <Link to={`/negocios/neg-${v.negocioId}`} className={styles.nombre}>{v.referencia}</Link>
+                      <span className={styles.detalleSec}>
+                        {v.nomenclatura ? `Nomenclatura ${v.nomenclatura}` : '—'} · <Badge variant={estadoToken(v.negocioEstado)}>{v.negocioEstado ?? '—'}</Badge>
+                      </span>
+                    </div>
+                  </td>
+                  <td><Badge variant={ESTADOS[v.estado]?.variante ?? 'neutral'}>{ESTADOS[v.estado]?.etiqueta ?? v.estado}</Badge></td>
+                  <td>
+                    {v.inmueble ? (
+                      <div className={styles.celdaTitulo}>
+                        <Link to={`/negocios/inv-${v.inventarioId}`} className={styles.nombre}>{v.inmueble}</Link>
+                        <span className={styles.detalleSec}>{v.proyectoTorre ?? ''}</span>
+                      </div>
+                    ) : <span className={styles.muted}>—</span>}
+                  </td>
+                  <td>{textoDetalle(v) || '—'}</td>
+                  <td>{v.accionSugerida ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {datos && duplicadas.length > 0 && (
+        <>
+          <div>
+            <h2 className={styles.title}>Referencias de recaudo repetidas en Zoho</h2>
+            <p className={styles.subtitle}>Más de un inmueble tiene la misma referencia: es lo que cruza negocios con el inmueble equivocado.</p>
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr><th>Referencia</th><th>Inmuebles que la tienen</th></tr>
+              </thead>
+              <tbody>
+                {duplicadas.map((d) => (
+                  <tr key={d.referencia}>
+                    <td>{d.referencia}</td>
+                    <td>
+                      {d.inmuebles.map((i) => (
+                        <div key={i.id}>
+                          <Link to={`/negocios/inv-${i.id}`}>{i.nombre}</Link>
+                          <span className={styles.detalleSec}> · {i.proyectoTorre ?? 's/proyecto'} · {i.estado ?? '—'}</span>
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

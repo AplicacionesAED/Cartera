@@ -42,3 +42,8 @@ export function iniciarBackfillNegocios() {
 export function getBackfillStatusNegocios() {
   return client.get('/negocios/backfill/status');
 }
+
+// Negocios cuyo inmueble no se pudo confirmar + referencias de recaudo repetidas en Zoho (ver vinculoResolver.js).
+export function getVinculosRevision(params) {
+  return client.get(`/negocios/vinculos/revision${toQuery(params)}`);
+}

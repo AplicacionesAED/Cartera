@@ -21,6 +21,8 @@ async function start() {
   const server = app.listen(env.PORT, () => {
     console.log(`Cartera AED backend escuchando en http://localhost:${env.PORT}`); // eslint-disable-line no-console
     // Calienta los caches de cartera en segundo plano (ver modules/precalentar.js).
+    // Primer arranque tras la migración de vínculos Negocio <-> Inmueble: si la tabla está vacía, se llena.
+    require('./modules/vinculo/vinculoResolver').asegurarVinculos().catch((e) => console.error('[vinculos] Error al inicializar:', e.message)); // eslint-disable-line no-console
     setTimeout(() => require('./modules/precalentar').precalentarTodo(), 3000).unref();
     // Sincronizaciones diarias automáticas (ver modules/programador.js).
     require('./modules/programador').iniciar();

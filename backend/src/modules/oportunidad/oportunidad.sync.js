@@ -11,6 +11,7 @@ const ZohoFieldMetadata = require('./zohoFieldMetadata.model');
 const SyncLog = require('./syncLog.model');
 const { runSubformsBackfill } = require('./oportunidad.subformsBackfill');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 const { progresoSync } = require('../../utils/progresoSync');
 
 async function zohoGet(path, params = {}) {
@@ -414,6 +415,7 @@ async function syncOportunidadesFromZoho(force = false) {
 
     await log.update({ finalizado_en: new Date(), status: 'success', registros_sync: saved });
     console.log(`[sync] Done. ${saved} records synced.`); // eslint-disable-line no-console
+    await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
     invalidarCacheDashboard();
 
     // Backfill de subforms en segundo plano -- el sync masivo nunca los trae

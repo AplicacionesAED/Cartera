@@ -18,6 +18,8 @@ const { PROYECTO_TORRE_EXCLUIDOS, valoresProyectoTorre, compararEtapas, esFrente
 const { elegirOportunidadVigente } = require('../../config/estadosOportunidad');
 const Oportunidad = require('../oportunidad/oportunidad.model');
 
+const { PRIORIDAD_ESTADO_SQL } = require('../vinculo/vinculoResolver');
+
 const SIN_PROYECTO = 'Sin proyecto';
 const PATRON_NOMBRE_EXCLUIDO = '*%';
 
@@ -37,10 +39,12 @@ WITH inmuebles AS (
     neg.datos AS negocio_datos
   FROM inventario_items inv
   LEFT JOIN LATERAL (
-    SELECT n.* FROM negocios n
-    WHERE n.referencia = inv.referencia_recaudo
-       OR (n.datos->>'Nomenclatura') = (inv.datos->>'C_digo_inmueble')
-    ORDER BY (n.referencia = inv.referencia_recaudo) DESC, n.id ASC
+    -- El negocio de cada inmueble lo decide vinculoResolver.js (tres señales) y queda en vinculos_negocio_inmueble;
+    -- si una unidad tiene varios negocios, cuenta el vigente.
+    SELECT n.* FROM vinculos_negocio_inmueble v
+    JOIN negocios n ON n.referencia = v.referencia
+    WHERE v.inventario_id = inv.id
+    ORDER BY ${PRIORIDAD_ESTADO_SQL}, n.id ASC
     LIMIT 1
   ) neg ON true
 ),
@@ -208,18 +212,13 @@ async function findOportunidadByReferencia(referencia) {
 }
 
 async function resolverNegocioIdDesdeInmueble(inmueble) {
-  if (inmueble.referencia_recaudo) {
-    const negocio = await Negocio.findOne({ where: { referencia: inmueble.referencia_recaudo }, attributes: ['id'] });
-    if (negocio) return negocio.id;
-  }
-  if (inmueble.datos?.C_digo_inmueble != null) {
-    const rows = await sequelize.query(`SELECT id FROM negocios WHERE datos->>'Nomenclatura' = $1 ORDER BY id ASC LIMIT 1`, {
-      bind: [String(inmueble.datos.C_digo_inmueble)],
-      type: QueryTypes.SELECT,
-    });
-    if (rows[0]) return rows[0].id;
-  }
-  return null;
+  // Misma decisión que el listado: la tabla de vínculos (vinculoResolver.js).
+  const rows = await sequelize.query(
+    `SELECT n.id FROM vinculos_negocio_inmueble v JOIN negocios n ON n.referencia = v.referencia
+     WHERE v.inventario_id = $1 ORDER BY ${PRIORIDAD_ESTADO_SQL}, n.id ASC LIMIT 1`,
+    { bind: [inmueble.id], type: QueryTypes.SELECT }
+  );
+  return rows[0]?.id ?? null;
 }
 
 const INCLUDE_NEGOCIO_DETALLE = [{ model: NegocioComprador, as: 'compradores', separate: true, order: [['orden', 'ASC']] }];

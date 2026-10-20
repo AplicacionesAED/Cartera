@@ -7,6 +7,7 @@
 // confirmadas una por una en producción, no UI, así que no se simplifica.
 const { QueryTypes, Op } = require('sequelize');
 const sequelize = require('../../config/db');
+const { PRIORIDAD_ESTADO_SQL } = require('../vinculo/vinculoResolver');
 const InventarioItem = require('../inventario/inventarioItem.model');
 const Negocio = require('../negocio/negocio.model');
 const NegocioComprador = require('../negocio/negocioComprador.model');
@@ -47,33 +48,22 @@ async function resolverNegociosYOportunidades(inmuebles) {
     raw: false,
   });
   const negocioPorReferencia = new Map(negocios.map((n) => [n.referencia, n]));
-  const negocioPorNomenclatura = new Map();
-  for (const n of negocios) {
-    if (n.datos?.Nomenclatura == null) continue;
-    const clave = String(n.datos.Nomenclatura);
-    if (!negocioPorNomenclatura.has(clave)) negocioPorNomenclatura.set(clave, n);
-  }
 
-  // Dos pasadas: primero el cruce exacto por Referencia de Recaudo; después, solo para los inmuebles que
-  // quedaron sin negocio, el cruce de respaldo por código de inmueble <-> Nomenclatura. El respaldo NO puede
-  // tomar un negocio que ya pertenece a otro inmueble por referencia exacta: 'Vela Village 210A' (código 210,
-  // Disponible en Zoho, sin referencia) se llevaba el negocio de 'The Plaza 210' y se contaba como vendido
-  // (Jefe Gabriel, 2026-10-15: la app daba 222/223 disponibles y el consolidado manual 225).
+  // El negocio de cada inmueble lo decide vinculoResolver.js (referencia + oportunidad + nomenclatura de la
+  // fiducia) y queda guardado en vinculos_negocio_inmueble: todos los módulos leen la misma decisión. Si una
+  // unidad tiene varios negocios, cuenta el vigente (VENDIDO > PROMETIDO/OPCIONADO > EN_RETIRO > CEDIDO > LIBRE).
+  const vinculos = inmuebles.length
+    ? await sequelize.query(
+        `SELECT v.inventario_id, v.referencia FROM vinculos_negocio_inmueble v
+         JOIN negocios n ON n.referencia = v.referencia
+         WHERE v.inventario_id = ANY($1::int[]) ORDER BY ${PRIORIDAD_ESTADO_SQL}, n.id ASC`,
+        { bind: [inmuebles.map((i) => i.id)], type: QueryTypes.SELECT }
+      )
+    : [];
   const negocioPorInmuebleId = new Map();
-  const negociosReclamados = new Set();
-  for (const inv of inmuebles) {
-    const negocio = inv.referencia_recaudo ? negocioPorReferencia.get(inv.referencia_recaudo) : null;
-    if (negocio) {
-      negocioPorInmuebleId.set(inv.id, negocio);
-      negociosReclamados.add(negocio.id);
-    }
-  }
-  for (const inv of inmuebles) {
-    if (negocioPorInmuebleId.has(inv.id) || inv.datos?.C_digo_inmueble == null) continue;
-    const negocio = negocioPorNomenclatura.get(String(inv.datos.C_digo_inmueble)) ?? null;
-    if (!negocio || negociosReclamados.has(negocio.id)) continue;
-    negocioPorInmuebleId.set(inv.id, negocio);
-    negociosReclamados.add(negocio.id);
+  for (const v of vinculos.reverse()) {
+    const negocio = negocioPorReferencia.get(v.referencia);
+    if (negocio) negocioPorInmuebleId.set(v.inventario_id, negocio); // el último en escribirse es el de mayor prioridad
   }
 
   const referenciasNegocio = [...new Set([...negocioPorInmuebleId.values()].map((n) => n.referencia).filter(Boolean))];
@@ -750,12 +740,8 @@ async function estadisticasPorEtapaYFrente() {
   const rows = await sequelize.query(
     `SELECT n.estado, n.saldo_actual, inv.datos->>'Proyecto_Torre' AS proyecto_torre
      FROM negocios n
-     LEFT JOIN LATERAL (
-       SELECT i.* FROM inventario_items i
-       WHERE i.referencia_recaudo = n.referencia OR (i.datos->>'C_digo_inmueble') = (n.datos->>'Nomenclatura')
-       ORDER BY (i.referencia_recaudo = n.referencia) DESC, i.id ASC
-       LIMIT 1
-     ) inv ON true
+     LEFT JOIN vinculos_negocio_inmueble v ON v.referencia = n.referencia
+     LEFT JOIN inventario_items inv ON inv.id = v.inventario_id
      WHERE inv.datos->>'Proyecto_Torre' IS NULL OR inv.datos->>'Proyecto_Torre' <> ALL($1::text[])`,
     { bind: [[...PROYECTO_TORRE_EXCLUIDOS]], type: QueryTypes.SELECT }
   );

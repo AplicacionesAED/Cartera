@@ -10,6 +10,7 @@ const { getAccessToken } = require('../../utils/zohoAuth');
 const zohoConfig = require('../../config/zoho');
 const Oportunidad = require('./oportunidad.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 const { progresoSync } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('subforms');
@@ -80,7 +81,10 @@ async function runSubformsBackfill() {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
     result = { ok: true, total: pendientes.length, actualizadas, errores, elapsed: `${elapsed}s` };
     console.log(`[subformsBackfill] Listo: ${actualizadas}/${pendientes.length} en ${elapsed}s (${errores} errores)`); // eslint-disable-line no-console
-    if (actualizadas > 0) invalidarCacheDashboard();
+    if (actualizadas > 0) {
+      await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
+      invalidarCacheDashboard();
+    }
   } catch (err) {
     result = { ok: false, error: err.message };
     console.error('[subformsBackfill] Error fatal:', err.message); // eslint-disable-line no-console

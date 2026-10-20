@@ -17,6 +17,7 @@ const { progresoSync } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('negocios');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 
 function cleanStr(v) {
   if (v == null) return null;
@@ -280,6 +281,8 @@ async function runBackfill() {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
     result = { ok: true, negocios: total, elapsed: `${elapsed}s` };
     console.log(`[backfill] Listo: ${total} negocios en ${elapsed}s`); // eslint-disable-line no-console
+    // Los negocios se reconstruyeron: se vuelve a decidir a qué inmueble corresponde cada uno.
+    await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
     invalidarCacheDashboard();
   } catch (err) {
     result = { ok: false, error: err.message };

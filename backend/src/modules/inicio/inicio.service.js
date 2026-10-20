@@ -9,6 +9,7 @@ const Otrosi = require('../otrosi/otrosi.model');
 const SyncLog = require('../oportunidad/syncLog.model');
 const OlivSyncLog = require('../olivOportunidad/olivSyncLog.model');
 const configuracionFrenteService = require('../configuracionFrente/configuracionFrente.service');
+const { contarPendientes: contarVinculosPendientes } = require('../vinculo/vinculoRevision.service');
 const { tienePermiso, getRolesPermisos } = require('../../utils/permisos');
 
 const HORAS_SYNC_DESACTUALIZADA = 36;
@@ -110,6 +111,13 @@ async function inicioBaiaKristal(puede, esAdmin) {
     const sinFecha = [...porFrente.values()].filter((tiene) => !tiene).length;
     if (sinFecha > 0) {
       alertas.push({ id: 'fechas', tipo: 'info', titulo: 'Frentes sin fecha de entrega configurada', detalle: 'La conciliación usa la fecha estimada del plan en vez de la real.', cuenta: sinFecha, to: '/accesos/frentes' });
+    }
+  }
+
+  if (puede('negocios')) {
+    const porRevisar = await contarVinculosPendientes().catch(() => 0);
+    if (porRevisar > 0) {
+      alertas.push({ id: 'vinculos', tipo: 'warning', titulo: 'Vínculos Negocio ↔ Inmueble por revisar', detalle: 'Negocios cuyo inmueble no coincide con lo que dice Zoho. La app ya usa el vínculo resuelto; el CRM debe corregir el dato.', cuenta: porRevisar, to: '/negocios/vinculos' });
     }
   }
 

@@ -7,6 +7,7 @@ const { getAccessToken } = require('../../utils/zohoAuth');
 const config = require('../../config/zoho');
 const InventarioItem = require('./inventarioItem.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
+const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 const { progresoSync } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('inventario');
@@ -90,6 +91,7 @@ async function syncInventario() {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
     syncResult = { ok: true, total: productos.length, saved, elapsed: `${elapsed}s` };
     console.log(`[inventario] Listo: ${saved} productos en ${elapsed}s`); // eslint-disable-line no-console
+    await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
     invalidarCacheDashboard();
   } catch (err) {
     console.error('[inventario] Error:', err.message); // eslint-disable-line no-console
