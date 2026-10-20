@@ -9,6 +9,7 @@
 const sequelize = require('../../config/db');
 const { QueryTypes } = require('sequelize');
 const { PROYECTO_TORRE_EXCLUIDOS } = require('../../config/inventarioExcluido');
+const { esEtapaDesistida } = require('../../config/estadosOportunidad');
 
 // Etapa constructiva de cada Torre (proyecto + número de torre → etapa
 // 1-4), solo para Kabo/Prive/Kala/Kaliza. Isla Laguna, The Plaza y Vela
@@ -189,6 +190,15 @@ async function inmueblesPorReferencia(referencias) {
   return porRef;
 }
 
+// Inmueble que se muestra en la fila de una oportunidad/otrosí. Una oportunidad caída (BACKOUT, desistida...) que
+// comparte la referencia con la vigente NO se cuelga del inmueble del negocio vigente: si no tiene inmueble propio
+// en Zoho queda "Sin inmueble" (si no, el mismo inmueble parecería tener dos oportunidades).
+function inmuebleDeFila(row, porRef) {
+  const propio = row.seccion_inmueble?.Inmueble?.id;
+  if (!propio && esEtapaDesistida(row.stage)) return undefined;
+  return porRef.get(row.referencia_recaudo);
+}
+
 function mapInmueble(item) {
   if (!item) return null;
   const info = parseProyectoTorre(item.proyecto_torre);
@@ -327,6 +337,7 @@ module.exports = {
   valoresProyectoTorre,
   pisosPorFrenteTorre,
   inmueblesPorReferencia,
+  inmuebleDeFila,
   mapInmueble,
   referenciasPorProyectoTorre,
   referenciasSinProyecto,

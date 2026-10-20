@@ -16,6 +16,7 @@ const {
   esFrenteSeleccionable,
   SIN_PROYECTO,
   inmueblesPorReferencia,
+  inmuebleDeFila,
   mapInmueble,
   referenciasPorProyectoTorre,
   referenciasSinProyecto,
@@ -159,7 +160,7 @@ async function listOtrosi({ search, requerido, stage, sortBy, sortDir, etapa, fr
       // Columna 'Inmueble': objeto con las 4 partes (mismas del Dashboard) + el
       // texto listo para pintar. `null` cuando la referencia no matchea ningún
       // inventario_item (el frontend muestra 'Sin inmueble').
-      inmueble: mapInmueble(inmueblesPorRef.get(row.referencia_recaudo)),
+      inmueble: mapInmueble(inmuebleDeFila(row, inmueblesPorRef)),
       otroSiRequerido: row.otro_si_requerido,
       // Se sigue exponiendo aunque el Jefe pidiera ocultar la columna: dijo
       // "hasta nuevo aviso", así que no se borra de modelo/sync/backfill.
