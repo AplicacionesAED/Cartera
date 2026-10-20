@@ -9,13 +9,14 @@
 // filtros aplicados).
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, RefreshCw, Building, Download } from 'lucide-react';
+import { Search, Building, Download } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { SyncModoButton, MODOS_SYNC_OLIV } from '../../components/SyncModoButton.jsx';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listInmueblesOliv, iniciarSyncInmueblesOliv, getSyncStatusInmueblesOliv } from '../../api/oliv.js';
@@ -71,8 +72,9 @@ function OlivInventarioLista() {
     cargar();
   }, [cargar]);
 
+  const [modoSync, setModoSync] = usePersistentState('oliv-inmuebles:sync-modo', 'cambios');
   const sync = useSyncControl({
-    iniciar: iniciarSyncInmueblesOliv,
+    iniciar: () => iniciarSyncInmueblesOliv(modoSync === 'todo'),
     obtener: getSyncStatusInmueblesOliv,
     normalizar: normalizarEstadoRunning,
     alTerminar: (e) => { if (e.ok || e.cancelada) cargar(); },
@@ -114,12 +116,7 @@ function OlivInventarioLista() {
           {sync.corriendo ? (
             <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando desde HubSpot…" compacto />
           ) : (
-            <Button variant="secondary" onClick={sync.ejecutar}>
-              <span className={styles.botonInterior}>
-                <RefreshCw size={14} aria-hidden="true" />
-                Sincronizar desde HubSpot
-              </span>
-            </Button>
+            <SyncModoButton opciones={MODOS_SYNC_OLIV} modo={modoSync} onModo={setModoSync} onEjecutar={() => sync.ejecutar()} />
           )}
         </div>
       </div>

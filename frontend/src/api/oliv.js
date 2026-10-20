@@ -25,8 +25,8 @@ export function getOportunidadOliv(id) {
   return client.get(`/oliv/oportunidades/${id}`);
 }
 
-export function iniciarSyncOportunidadesOliv() {
-  return client.post('/oliv/oportunidades/sync');
+export function iniciarSyncOportunidadesOliv(full = false) {
+  return client.post(`/oliv/oportunidades/sync${full ? '?full=true' : ''}`);
 }
 
 export function getSyncStatusOportunidadesOliv() {
@@ -47,8 +47,8 @@ export function getInmuebleOliv(id) {
   return client.get(`/oliv/inmuebles/${id}`);
 }
 
-export function iniciarSyncInmueblesOliv() {
-  return client.post('/oliv/inmuebles/sync');
+export function iniciarSyncInmueblesOliv(full = false) {
+  return client.post(`/oliv/inmuebles/sync${full ? '?full=true' : ''}`);
 }
 
 export function getSyncStatusInmueblesOliv() {

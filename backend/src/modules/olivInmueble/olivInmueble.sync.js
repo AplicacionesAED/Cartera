@@ -26,8 +26,11 @@ const PROPIEDADES = [
   'tipo_de_apartamento', 'floor_plan_link',
 ];
 
-async function fetchAllUnidadesOliv() {
-  const filterGroups = [{ filters: [{ propertyName: 'proyecto_inmobiliario', operator: 'EQ', value: PROYECTO }] }];
+async function fetchAllUnidadesOliv(desde = null) {
+  const filters = [{ propertyName: 'proyecto_inmobiliario', operator: 'EQ', value: PROYECTO }];
+  // Por cambios: solo las unidades modificadas en HubSpot desde la última sync buena.
+  if (desde) filters.push({ propertyName: 'hs_lastmodifieddate', operator: 'GTE', value: String(desde) });
+  const filterGroups = [{ filters }];
   const all = [];
   let after;
   let page = 1;
@@ -150,7 +153,11 @@ async function upsertOlivInmueble(data) {
 let syncRunning = false;
 let syncResult = null;
 
-async function syncInmueblesOliv() {
+// `modo`: 'todo' (por defecto) o 'cambios' (solo lo modificado desde la última sync buena en este proceso; si no hay
+// una -- p. ej. tras reiniciar el servidor --, equivale a 'todo'). Solo hace upsert, nunca borra, así que por cambios es seguro.
+let ultimoExitoMs = null;
+
+async function syncInmueblesOliv(modo = 'todo') {
   if (syncRunning) return;
   syncRunning = true;
   syncResult = null;
@@ -158,7 +165,9 @@ async function syncInmueblesOliv() {
   progreso.iniciar('Trayendo unidades de HubSpot');
 
   try {
-    const unidades = await fetchAllUnidadesOliv();
+    const iniciadoMs = Date.now();
+    const desde = modo === 'cambios' && ultimoExitoMs ? ultimoExitoMs - 5 * 60 * 1000 : null;
+    const unidades = await fetchAllUnidadesOliv(desde);
     progreso.fase('Guardando unidades', unidades.length);
     console.log(`[oliv-inmuebles-sync] ${unidades.length} unidades traídas de HubSpot`); // eslint-disable-line no-console
 
@@ -173,7 +182,8 @@ async function syncInmueblesOliv() {
     }
 
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    syncResult = { ok: true, total: unidades.length, saved, elapsed: `${elapsed}s` };
+    syncResult = { ok: true, total: unidades.length, saved, elapsed: `${elapsed}s`, modo: desde ? 'cambios' : 'todo' };
+    ultimoExitoMs = iniciadoMs;
     console.log(`[oliv-inmuebles-sync] Listo: ${saved} unidades en ${elapsed}s`); // eslint-disable-line no-console
     // Invalida el cache del Resumen de Oliv -- ver el mismo comentario en
     // olivOportunidad.sync.js.

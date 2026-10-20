@@ -1,9 +1,16 @@
 // Programador diario de las sincronizaciones (antes eran botones que alguien tenía que pulsar).
 //
-// Corre UNA vez al día, a la hora de AUTO_SYNC_HORA (Bogotá, por defecto 12:30: los Excel de la
-// fiducia llegan hacia las 12:00), en este orden:
-//   1. Zoho: Inventario y Oportunidades (Baía Kristal)
-//   2. HubSpot: Oportunidades e Inmuebles (Oliv)
+// DOS corridas al día (hora de Bogotá):
+//
+//  A. SINCRONIZACIÓN COMPLETA, a las AUTO_SYNC_HORA_COMPLETA (por defecto 04:00): "Sincronizar todo" en Baía Kristal
+//     (Inventario + todas las Oportunidades de Zoho con su información y TODOS los planes de pago, limpiando lo que
+//     ya no cumple la regla) y en Oliv (todas las Oportunidades e Inmuebles de HubSpot). Es la red de seguridad: deja
+//     todo al día aunque un cambio no se haya detectado en las sincronizaciones por cambios.
+//
+//  B. SINCRONIZACIÓN DEL DÍA, a las AUTO_SYNC_HORA (por defecto 12:30: los Excel de la fiducia llegan hacia las
+//     12:00), en este orden:
+//   1. Zoho: Inventario y Oportunidades por cambios (Baía Kristal)
+//   2. HubSpot: Oportunidades e Inmuebles por cambios (Oliv)
 //   3. Reconstruir Negocios desde los encargos de la fiducia (Baía Kristal) -- lo que alimenta
 //      Dashboard, Resumen, Negocios y Estado de cuenta
 //   4. Cerrar el mes anterior si todavía no tiene foto (Baía Kristal y Oliv; no hace nada si ya existe)
@@ -13,9 +20,11 @@
 // está apagado a esa hora, ese día no corre (no se recupera solo al volver a arrancar, para que un
 // despliegue a media tarde no dispare todo de nuevo). AUTO_SYNC=false lo desactiva.
 const DEFAULT_HORA = '12:30';
+const DEFAULT_HORA_COMPLETA = '04:00';
 const ZONA = 'America/Bogota';
 
 let ultimoDiaEjecutado = null;
+let ultimoDiaCompleta = null;
 let ejecutando = false;
 let ultimaEjecucion = null;
 
@@ -46,6 +55,26 @@ async function paso(nombre, fn) {
   }
 }
 
+// Corrida completa (04:00): todo desde cero en los dos proyectos. No toca Negocios (eso depende de los Excel de la
+// fiducia, que llegan hacia las 12:00) ni el cierre de mes.
+async function ejecutarSincronizacionCompleta() {
+  if (ejecutando) return null;
+  ejecutando = true;
+  const resultados = [];
+  try {
+    console.log('[programador] Iniciando sincronización COMPLETA (todo)'); // eslint-disable-line no-console
+    resultados.push(await paso('Zoho · Inventario (todo)', () => require('./inventario/inventario.sync').syncInventario()));
+    resultados.push(await paso('Zoho · Oportunidades (todo, con planes de pago)', () => require('./oportunidad/oportunidad.sync').syncOportunidadesFromZoho(true)));
+    resultados.push(await paso('HubSpot · Oportunidades Oliv (todo)', () => require('./olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('todo')));
+    resultados.push(await paso('HubSpot · Inmuebles Oliv (todo)', () => require('./olivInmueble/olivInmueble.sync').syncInmueblesOliv('todo')));
+    ultimaEjecucion = { tipo: 'completa', en: new Date().toISOString(), resultados };
+    console.log('[programador] Sincronización completa terminada'); // eslint-disable-line no-console
+    return ultimaEjecucion;
+  } finally {
+    ejecutando = false;
+  }
+}
+
 async function ejecutarSincronizaciones() {
   if (ejecutando) return null;
   ejecutando = true;
@@ -53,13 +82,13 @@ async function ejecutarSincronizaciones() {
   try {
     console.log('[programador] Iniciando sincronizaciones diarias'); // eslint-disable-line no-console
     resultados.push(await paso('Zoho · Inventario', () => require('./inventario/inventario.sync').syncInventario()));
-    resultados.push(await paso('Zoho · Oportunidades', () => require('./oportunidad/oportunidad.sync').syncOportunidadesFromZoho(false)));
-    resultados.push(await paso('HubSpot · Oportunidades Oliv', () => require('./olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv()));
-    resultados.push(await paso('HubSpot · Inmuebles Oliv', () => require('./olivInmueble/olivInmueble.sync').syncInmueblesOliv()));
+    resultados.push(await paso('Zoho · Oportunidades (cambios)', () => require('./oportunidad/oportunidad.sync').syncOportunidadesFromZoho(false)));
+    resultados.push(await paso('HubSpot · Oportunidades Oliv (cambios)', () => require('./olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('cambios')));
+    resultados.push(await paso('HubSpot · Inmuebles Oliv (cambios)', () => require('./olivInmueble/olivInmueble.sync').syncInmueblesOliv('cambios')));
     resultados.push(await paso('Negocios desde la fiducia', () => require('./negocio/negocio.backfill').runBackfill()));
     resultados.push(await paso('Cierre de mes · Baía Kristal', () => require('./dashboard/dashboard.service').cerrarMesAnteriorSiFalta()));
     resultados.push(await paso('Cierre de mes · Oliv', () => require('./olivResumen/olivResumen.service').cerrarMesAnteriorSiFalta()));
-    ultimaEjecucion = { en: new Date().toISOString(), resultados };
+    ultimaEjecucion = { tipo: 'diaria', en: new Date().toISOString(), resultados };
     console.log('[programador] Sincronizaciones diarias terminadas'); // eslint-disable-line no-console
     return ultimaEjecucion;
   } finally {
@@ -70,24 +99,32 @@ async function ejecutarSincronizaciones() {
 function iniciar() {
   if (process.env.AUTO_SYNC === 'false') return;
   const hora = process.env.AUTO_SYNC_HORA || DEFAULT_HORA;
+  const horaCompleta = process.env.AUTO_SYNC_HORA_COMPLETA || DEFAULT_HORA_COMPLETA;
   const objetivo = minutosDeHora(hora);
-  if (objetivo == null) {
-    console.error(`[programador] AUTO_SYNC_HORA inválida ("${hora}"), se esperaba HH:MM. No se programa nada.`); // eslint-disable-line no-console
+  const objetivoCompleta = minutosDeHora(horaCompleta);
+  if (objetivo == null || objetivoCompleta == null) {
+    console.error(`[programador] Hora inválida (AUTO_SYNC_HORA="${hora}", AUTO_SYNC_HORA_COMPLETA="${horaCompleta}"), se esperaba HH:MM. No se programa nada.`); // eslint-disable-line no-console
     return;
   }
   // Si el servidor arranca ya pasada la hora de hoy, hoy se da por ejecutado (ver nota arriba).
   const inicio = ahoraBogota();
   if (inicio.minutos >= objetivo) ultimoDiaEjecutado = inicio.dia;
-  console.log(`[programador] Sincronizaciones diarias a las ${hora} (hora de Bogotá)`); // eslint-disable-line no-console
+  if (inicio.minutos >= objetivoCompleta) ultimoDiaCompleta = inicio.dia;
+  console.log(`[programador] Sincronización completa a las ${horaCompleta} y del día a las ${hora} (hora de Bogotá)`); // eslint-disable-line no-console
 
   setInterval(() => {
     const { dia, minutos } = ahoraBogota();
+    if (minutos >= objetivoCompleta && ultimoDiaCompleta !== dia) {
+      ultimoDiaCompleta = dia;
+      ejecutarSincronizacionCompleta().catch((err) => console.error('[programador] Error inesperado (completa):', err.message)); // eslint-disable-line no-console
+      return;
+    }
     if (minutos < objetivo || ultimoDiaEjecutado === dia) return;
     ultimoDiaEjecutado = dia;
     ejecutarSincronizaciones().catch((err) => console.error('[programador] Error inesperado:', err.message)); // eslint-disable-line no-console
   }, 60 * 1000).unref();
 }
 
-const estado = () => ({ ejecutando, ultimaEjecucion, ultimoDiaEjecutado });
+const estado = () => ({ ejecutando, ultimaEjecucion, ultimoDiaEjecutado, ultimoDiaCompleta });
 
-module.exports = { iniciar, ejecutarSincronizaciones, estado };
+module.exports = { iniciar, ejecutarSincronizaciones, ejecutarSincronizacionCompleta, estado };

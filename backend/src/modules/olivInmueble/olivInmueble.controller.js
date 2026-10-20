@@ -12,7 +12,7 @@ const getById = asyncHandler(async (req, res) => ok(res, await service.getById(r
 
 const iniciarSync = asyncHandler(async (req, res) => {
   ok(res, { message: 'Sincronización iniciada' });
-  syncInmueblesOliv();
+  syncInmueblesOliv(req.query.full === 'true' ? 'todo' : 'cambios');
 });
 
 const syncStatus = asyncHandler(async (req, res) => ok(res, getSyncStatus()));

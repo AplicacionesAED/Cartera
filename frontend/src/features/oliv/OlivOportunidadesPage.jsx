@@ -25,7 +25,7 @@
 // olivNegocio.service.js/olivInmueble.service.js.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Search, ListFilter, Building } from 'lucide-react';
+import { Search, ListFilter, Building } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
 import { StageBadge } from '../../components/ui/StageBadge.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
@@ -42,6 +42,7 @@ import {
 } from '../../api/oliv.js';
 import { formatDateTime } from '../../utils/format.js';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { SyncModoButton, MODOS_SYNC_OLIV } from '../../components/SyncModoButton.jsx';
 import { useSyncControl, normalizarEstadoLog } from '../../hooks/useSyncControl.js';
 import styles from '../oportunidades/OportunidadesListPage.module.css';
 
@@ -52,8 +53,9 @@ function iniciales(texto = '') {
 
 function SyncStatusBar({ onTerminado }) {
   const [hubspotConfigurado, setHubspotConfigurado] = useState(null);
+  const [modo, setModo] = usePersistentState('oliv-oportunidades:sync-modo', 'cambios');
   const sync = useSyncControl({
-    iniciar: iniciarSyncOportunidadesOliv,
+    iniciar: () => iniciarSyncOportunidadesOliv(modo === 'todo'),
     obtener: getSyncStatusOportunidadesOliv,
     normalizar: normalizarEstadoLog,
     alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
@@ -86,12 +88,16 @@ function SyncStatusBar({ onTerminado }) {
               <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
             )}
           </div>
-          <Button variant="secondary" onClick={sync.ejecutar} disabled={!hubspotConfigurado}>
-            <span className={styles.botonSyncInterior}>
-              <RefreshCw size={14} aria-hidden="true" />
-              Sincronizar ahora
-            </span>
-          </Button>
+          <SyncModoButton
+            opciones={MODOS_SYNC_OLIV}
+            modo={modo}
+            onModo={setModo}
+            disabled={!hubspotConfigurado}
+            onEjecutar={(m) => {
+              if (m === 'todo' && !window.confirm('Se volverán a traer de HubSpot TODAS las oportunidades e inmuebles de Oliv que cumplen la regla, y se quitará lo que ya no la cumple. ¿Continuar?')) return;
+              sync.ejecutar();
+            }}
+          />
         </>
       )}
     </div>

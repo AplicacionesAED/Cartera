@@ -21,12 +21,13 @@ const status = asyncHandler(async (req, res) => ok(res, await service.status()))
 
 const iniciarSync = asyncHandler(async (req, res) => {
   ok(res, { message: 'Sincronización iniciada' });
-  syncOportunidadesOliv().catch((err) => console.error('[oliv-sync] Error en sync manual:', err.message)); // eslint-disable-line no-console
+  const modo = req.query.full === 'true' ? 'todo' : 'cambios';
+  syncOportunidadesOliv(modo).catch((err) => console.error('[oliv-sync] Error en sync manual:', err.message)); // eslint-disable-line no-console
   // Jefe Gabriel, 2026-10-01: al sincronizar Oportunidades también se
   // sincronizan los Inmuebles. Solo upsert, nunca borra filas --
   // `syncInmueblesOliv` ya tiene su propia guarda de "ya en ejecución" y no
   // lanza, así que un fallo acá nunca afecta al sync de Oportunidades.
-  syncInmueblesOliv();
+  syncInmueblesOliv(modo);
 });
 
 function _mapSyncLog(log) {

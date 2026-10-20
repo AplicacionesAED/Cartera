@@ -5,6 +5,12 @@ import { RefreshCw, ChevronDown, Check } from 'lucide-react';
 import { Button } from './ui/Button.jsx';
 import styles from './SyncModoButton.module.css';
 
+// Modos de las sincronizaciones de Oliv (HubSpot).
+export const MODOS_SYNC_OLIV = [
+  { value: 'cambios', label: 'Sincronizar cambios', descripcion: 'Trae solo lo que cambió en HubSpot desde la última sincronización (rápido).' },
+  { value: 'todo', label: 'Sincronizar todo', descripcion: 'Vuelve a traer todo lo que cumple la regla y quita lo que ya no la cumple (tarda más).' },
+];
+
 // opciones: [{ value, label, descripcion }]
 export function SyncModoButton({ opciones, modo, onModo, onEjecutar, disabled = false }) {
   const [abierto, setAbierto] = useState(false);

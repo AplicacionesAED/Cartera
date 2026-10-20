@@ -71,13 +71,20 @@ async function fetchStageMap() {
 // las que cumplen con los requisitos". `dealstageIds` ya viene resuelto por
 // el caller (fetchStageMap() + el mismo criterio de orden/perdida que usaba
 // antes el filtro local, ver mapDeal más abajo).
-async function fetchAllDealsOliv(propertyNames, dealstageIds) {
+// `desde` (ms, opcional): sync por cambios -- solo lo modificado en HubSpot desde esa fecha, SIN filtrar por etapa
+// (así también llegan las que acaban de salir de una etapa válida, y se pueden quitar).
+async function fetchAllDealsOliv(propertyNames, dealstageIds, desde = null) {
   const filterGroups = [
     {
-      filters: [
-        { propertyName: 'proyecto_inmobiliario_cac', operator: 'EQ', value: PROYECTO },
-        { propertyName: 'dealstage', operator: 'IN', values: dealstageIds },
-      ],
+      filters: desde
+        ? [
+            { propertyName: 'proyecto_inmobiliario_cac', operator: 'EQ', value: PROYECTO },
+            { propertyName: 'hs_lastmodifieddate', operator: 'GTE', value: String(desde) },
+          ]
+        : [
+            { propertyName: 'proyecto_inmobiliario_cac', operator: 'EQ', value: PROYECTO },
+            { propertyName: 'dealstage', operator: 'IN', values: dealstageIds },
+          ],
     },
   ];
   const allDeals = [];
@@ -197,7 +204,9 @@ async function limpiarOportunidadesObsoletas(hubspotIdsVigentes) {
   return meta?.rowCount ?? 0;
 }
 
-async function syncOportunidadesOliv() {
+// `modo`: 'todo' (por defecto; trae todo lo que cumple la regla y limpia lo que ya no la cumple) o 'cambios' (solo lo
+// modificado en HubSpot desde la última sync buena; si no hay una, equivale a 'todo').
+async function syncOportunidadesOliv(modo = 'todo') {
   const log = await OlivSyncLog.create({ status: 'running' });
   progreso.iniciar('Preparando la sincronización');
 
@@ -217,8 +226,18 @@ async function syncOportunidadesOliv() {
       throw new Error('No se encontró ninguna etapa de HubSpot con order >= ETAPA_MINIMA_ORDER -- revisar pipelines de deals');
     }
 
-    const deals = await fetchAllDealsOliv(propertyNames, dealstageIds);
-    console.log(`[oliv-sync] Fetched ${deals.length} deals de proyecto="${PROYECTO}" en etapa >= ${ETAPA_MINIMA_ORDER}`); // eslint-disable-line no-console
+    let desde = null;
+    if (modo === 'cambios') {
+      const ultima = await OlivSyncLog.findOne({ where: { status: 'success' }, order: [['finalizado_en', 'DESC']] });
+      // Margen de 5 min por si el reloj de HubSpot y el de este servidor no coinciden.
+      if (ultima?.finalizado_en) desde = new Date(ultima.finalizado_en).getTime() - 5 * 60 * 1000;
+    }
+    const traidos = await fetchAllDealsOliv(propertyNames, dealstageIds, desde);
+    // Por cambios llegan también deals que ya no califican (cambiaron de etapa): se separan y se quitan de la base.
+    const idsElegibles = new Set(dealstageIds);
+    const deals = desde ? traidos.filter((d) => idsElegibles.has(d.properties?.dealstage)) : traidos;
+    const yaNoCalifican = desde ? traidos.filter((d) => !idsElegibles.has(d.properties?.dealstage)).map((d) => String(d.id)) : [];
+    console.log(`[oliv-sync] ${desde ? 'Por cambios' : 'Completo'}: ${traidos.length} deals traídos, ${deals.length} califican (etapa >= ${ETAPA_MINIMA_ORDER})`); // eslint-disable-line no-console // eslint-disable-line no-console
 
     progreso.fase('Guardando oportunidades', deals.length);
     const BATCH_SIZE = 50;
@@ -241,7 +260,16 @@ async function syncOportunidadesOliv() {
     }
 
     progreso.verificar(); // la limpieza es destructiva: nunca en una sync cancelada
-    const eliminados = await limpiarOportunidadesObsoletas(deals.map((d) => d.id));
+    let eliminados = 0;
+    if (desde) {
+      // Por cambios solo se quitan los deals puntuales que HubSpot reportó como modificados y ya no califican.
+      if (yaNoCalifican.length > 0) {
+        const [, meta] = await sequelize.query('DELETE FROM oliv_oportunidades WHERE proyecto = $1 AND hubspot_id = ANY($2::text[])', { bind: [PROYECTO, yaNoCalifican] });
+        eliminados = meta?.rowCount ?? 0;
+      }
+    } else {
+      eliminados = await limpiarOportunidadesObsoletas(deals.map((d) => d.id));
+    }
     if (eliminados > 0) {
       console.log(`[oliv-sync] Removed ${eliminados} stale records that no longer qualify.`); // eslint-disable-line no-console
     }
