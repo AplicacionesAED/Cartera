@@ -37,7 +37,7 @@ function SyncStatusBar({ onTerminado }) {
     normalizar: normalizarEstadoLog,
     alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
   });
-  // "Actualizar planes de pago": vuelve a leer de Zoho el plan de TODAS las oportunidades y reemplaza lo guardado
+  // "Actualizar planes de pago": vuelve a leer de Zoho el plan de TODAS las oportunidades guardadas y reemplaza lo guardado
   // (5 consultas a la vez; se puede cancelar sin perder lo ya actualizado).
   const syncPlanes = useSyncControl({
     iniciar: () => iniciarBackfillSubforms(true),
@@ -73,7 +73,7 @@ function SyncStatusBar({ onTerminado }) {
               <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
             )}
           </div>
-          <Button variant="secondary" onClick={() => { if (window.confirm('Se volverá a leer de Zoho el plan de pagos de todas las oportunidades (tarda varios minutos). Puedes cancelar en cualquier momento sin perder lo ya actualizado. ¿Continuar?')) syncPlanes.ejecutar(); }}>
+          <Button variant="secondary" onClick={() => { if (window.confirm('Se volverá a leer de Zoho el plan de pagos de TODAS las oportunidades (más de 4.000; tarda bastante). Puedes cancelar en cualquier momento sin perder lo ya actualizado. ¿Continuar?')) syncPlanes.ejecutar(); }}>
             <span className={styles.botonSyncInterior}>
               <RefreshCw size={14} aria-hidden="true" />
               Actualizar planes de pago

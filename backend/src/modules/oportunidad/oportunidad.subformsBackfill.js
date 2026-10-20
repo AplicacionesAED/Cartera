@@ -44,7 +44,7 @@ async function refrescarSubformsDe(opp) {
 async function refrescarSubformsLote(zohoIds, max = 300) {
   const ids = [...new Set(zohoIds)].slice(0, max);
   if (!ids.length) return { total: 0, actualizadas: 0, errores: 0 };
-  const opps = await Oportunidad.findAll({ where: { zoho_id: { [Op.in]: ids }, fecha_inicio_plan_pagos: { [Op.ne]: null } } });
+  const opps = await Oportunidad.findAll({ where: { zoho_id: { [Op.in]: ids } } });
   let actualizadas = 0;
   let errores = 0;
   for (const opp of opps) {
@@ -62,7 +62,7 @@ async function refrescarSubformsLote(zohoIds, max = 300) {
 }
 
 // `todos = false`: solo las que no tienen plan guardado (lo normal). `todos = true`: relee el plan de TODAS las
-// oportunidades con fecha de inicio de plan y sobreescribe lo guardado -- para reflejar cambios hechos en Zoho.
+// oportunidades guardadas y sobreescribe lo guardado -- para reflejar cambios hechos en Zoho.
 // Trae y guarda el plan de una oportunidad; si Zoho rechaza por velocidad o falla un momento, reintenta una vez.
 async function consultarYGuardar(opp) {
   try {
@@ -95,7 +95,7 @@ async function runSubformsBackfill(todos = false) {
   try {
     const pendientes = await Oportunidad.findAll({
       where: todos
-        ? { fecha_inicio_plan_pagos: { [Op.ne]: null } }
+        ? {} // TODAS las oportunidades que trae el sistema, tengan o no fecha de inicio de plan
         : { fecha_inicio_plan_pagos: { [Op.ne]: null }, forma_pago: null, propuesta_pago: null },
       attributes: ['id', 'zoho_id'],
     });
