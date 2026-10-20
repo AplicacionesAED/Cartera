@@ -19,6 +19,7 @@ const ESTADOS = {
   AMBIGUO: { etiqueta: 'Varios inmuebles', variante: 'warning' },
   RESPALDO: { etiqueta: 'Vinculado por código', variante: 'warning' },
   CONFIRMADO: { etiqueta: 'Vinculado', variante: 'success' },
+  REFERENCIA: { etiqueta: 'Vinculado por referencia', variante: 'warning' },
 };
 
 // Una sola línea con "…"; el texto completo se ve al pasar el mouse.

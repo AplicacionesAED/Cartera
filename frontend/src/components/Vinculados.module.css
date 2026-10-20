@@ -151,3 +151,14 @@
     gap: var(--space-sm);
   }
 }
+
+.via {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-label-size);
+  font-style: italic;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

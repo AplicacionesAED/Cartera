@@ -7,8 +7,9 @@
 //   - si la nomenclatura coincide con más de un inmueble (la misma unidad en dos frentes de una categoría compartida)
 //     se desempata por área; si aun así quedan varios, el negocio queda AMBIGUO y no se vincula.
 //   - sin coincidencia queda SIN_VINCULO. Depósitos y parqueaderos no tienen inmueble en el inventario.
-// La referencia de recaudo YA NO decide el vínculo: solo se usa como pista ("sugerencia") para quien deba revisar los
-// casos sin vincular. El resultado se guarda en `vinculos_negocio_inmueble` (una fila por negocio) y lo leen todos los
+// 2.º PASO: si la nomenclatura no resuelve (ambiguo o sin coincidencia), se vincula por la REFERENCIA DE RECAUDO (el inmueble
+// de Zoho que tiene la referencia del negocio), siempre que sea un solo inmueble. Si las dos coinciden en un inmueble distinto,
+// manda la nomenclatura. Lo que ninguna resuelve queda sin vincular, con una sugerencia (la oportunidad) como pista. El resultado se guarda en `vinculos_negocio_inmueble` (una fila por negocio) y lo leen todos los
 // módulos -- ver `recalcularVinculos`.
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
@@ -95,14 +96,25 @@ function resolverNegocio(n, ctx) {
     return { ...base, inventario_id: candidatos[0].id, estado: 'CONFIRMADO', metodo: 'nomenclatura', requiere_revision: false, detalle: null, observaciones: null, senales: { candidatos: [candidatos[0].id] } };
   }
 
-  // Sin vincular: se arma una sugerencia (solo pista) con la referencia de recaudo o la oportunidad.
+  // 2.º paso: la referencia de recaudo (el inmueble de Zoho que tiene la referencia del negocio), solo si es UN inmueble.
+  // Rescata los negocios que la nomenclatura deja ambiguos o sin coincidencia; entra a "por revisar" porque la
+  // nomenclatura no lo confirmó.
   const A = (porRef.get(n.referencia) ?? []).map((i) => i.id);
+  if (A.length === 1) {
+    const motivo = candidatos.length > 1
+      ? `La nomenclatura "${n.nom}" coincide con ${candidatos.length} inmuebles y el área no los desempata`
+      : torres
+        ? `No hay un inmueble con la nomenclatura "${n.nom}" en la torre que indica la categoría "${n.categoria}"`
+        : `La categoría "${n.categoria ?? '—'}" no tiene traducción a frente y torre`;
+    return { ...base, inventario_id: A[0], estado: 'REFERENCIA', metodo: 'referencia', requiere_revision: !esLibre, detalle: `${motivo}; se vinculó por la referencia de recaudo.`, observaciones: null, senales: { referencia: A, candidatos: candidatos.map((i) => i.id) } };
+  }
+
+  // Sin vincular: se arma una sugerencia (solo pista) con la oportunidad.
   const opps = oppsPorRef.get(n.referencia) ?? [];
   const B = [...new Set(opps.map((o) => o.inv_zoho_id && porZoho.get(o.inv_zoho_id)?.id).filter((x) => x != null))];
   let sugerido = null;
   let origen = null;
-  if (A.length === 1) { sugerido = A[0]; origen = 'la referencia de recaudo'; }
-  else if (B.length === 1) { sugerido = B[0]; origen = 'la oportunidad'; }
+  if (B.length === 1) { sugerido = B[0]; origen = 'la oportunidad'; }
   const u = sugerido != null ? porId.get(sugerido) : null;
   const observaciones = [];
   if (u) observaciones.push(`Sugerencia (según ${origen}): ${etiqueta(u)}${u.ref ? `, que hoy tiene la referencia ${u.ref} en Zoho` : ''}.`);

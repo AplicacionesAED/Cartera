@@ -5,6 +5,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 
 const ACCION_SUGERIDA = {
+  REFERENCIA: 'Revisar la nomenclatura y la categoría del negocio en la fiducia o el inmueble en el CRM: no coinciden y se usó la referencia de recaudo.',
   AMBIGUO: 'La nomenclatura coincide con varios inmuebles: definir cuál es y corregir la categoría o la nomenclatura del negocio en la fiducia.',
   SIN_VINCULO: 'Revisar la nomenclatura y la categoría del negocio contra el inmueble en el CRM (ver la sugerencia).',
 };

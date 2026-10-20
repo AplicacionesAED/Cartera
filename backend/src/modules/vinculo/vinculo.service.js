@@ -55,11 +55,23 @@ async function esDesistidaConOtraVigente(opp) {
   return vigentes > 0;
 }
 
+// Cómo quedó vinculado un negocio con su inmueble (lo guarda vinculoResolver.js en `metodo`).
+const VIA_METODO = {
+  nomenclatura: 'Por nomenclatura y categoría del negocio',
+  referencia: 'Por referencia de recaudo',
+};
+async function viaNegocioInmueble(negocio) {
+  if (!negocio?.referencia) return null;
+  const rows = await sequelize.query('SELECT metodo FROM vinculos_negocio_inmueble WHERE referencia = $1', { bind: [negocio.referencia], type: QueryTypes.SELECT });
+  return VIA_METODO[rows[0]?.metodo] ?? null;
+}
+
 async function resolverBaia(tipo, id) {
   let oportunidad = null; // { id, dealName, stage }
   let negocio = null;
   let inmueble = null;
   let ocultarInmueble = false;
+  let inmuebleDeLaOportunidad = false; // el inmueble salió del campo Inmueble que la oportunidad tiene en Zoho
 
   if (tipo === 'oportunidad') {
     const opp = await Oportunidad.findByPk(id, { attributes: ['id', 'deal_name', 'stage', 'referencia_recaudo', 'seccion_inmueble'] });
@@ -73,6 +85,7 @@ async function resolverBaia(tipo, id) {
       // oportunidad esté caída (BACKOUT, desistida...): esa comparte la referencia con la vigente pero no es dueña del inmueble.
       const propioZohoId = opp.seccion_inmueble?.Inmueble?.id;
       if (propioZohoId) inmueble = await InventarioItem.findOne({ where: { zoho_id: String(propioZohoId) } });
+      if (inmueble) inmuebleDeLaOportunidad = true;
       if (!inmueble && !(await esDesistidaConOtraVigente(opp))) {
         inmueble = (negocio ? await inmuebleDeNegocio(negocio) : null) ?? (await InventarioItem.findOne({ where: { referencia_recaudo: referencia }, order: [['id', 'ASC']] }));
       }
@@ -101,9 +114,15 @@ async function resolverBaia(tipo, id) {
     if (opp) oportunidad = { id: opp.id, dealName: opp.dealName, stage: opp.stage };
   }
 
+  // "Vinculado por…": de qué forma se relaciona cada pieza con la que se está viendo.
+  const viaMetodo = negocio && inmueble ? await viaNegocioInmueble(negocio) : null;
+  const viaOportunidad = 'Por referencia de recaudo';
+  const viaNegocio = tipo === 'oportunidad' ? 'Por referencia de recaudo' : viaMetodo;
+  const viaInmueble = tipo === 'oportunidad' ? (inmuebleDeLaOportunidad ? 'Por el inmueble que declara la oportunidad en Zoho' : viaMetodo && `A través del negocio: ${viaMetodo.charAt(0).toLowerCase()}${viaMetodo.slice(1)}`) : viaMetodo;
+
   return {
     oportunidad: oportunidad
-      ? { to: `/oportunidades/${oportunidad.id}`, titulo: oportunidad.dealName, detalle: oportunidad.stage }
+      ? { to: `/oportunidades/${oportunidad.id}`, titulo: oportunidad.dealName, detalle: oportunidad.stage, via: viaOportunidad }
       : null,
     negocio: negocio
       ? {
@@ -111,10 +130,11 @@ async function resolverBaia(tipo, id) {
           to: inmueble ? `/negocios/inv-${inmueble.id}` : `/negocios/neg-${negocio.id}`,
           titulo: negocio.referencia ? `Ref. ${negocio.referencia}` : 'Negocio',
           detalle: negocio.estado,
+          via: viaNegocio,
         }
       : null,
     inmueble: inmueble
-      ? { to: `/inventario/${inmueble.id}`, titulo: inmueble.datos?.Product_Name || inmueble.nombre || `Inmueble ${inmueble.id}`, detalle: inmueble.estado }
+      ? { to: `/inventario/${inmueble.id}`, titulo: inmueble.datos?.Product_Name || inmueble.nombre || `Inmueble ${inmueble.id}`, detalle: inmueble.estado, via: viaInmueble }
       : null,
   };
 }
@@ -149,15 +169,16 @@ async function resolverOliv(tipo, id) {
   // misma condición que usa el detalle de Negocios.
   const esNegocio = opp && opp.stage_order >= ETAPA_MINIMA_ORDER;
   return {
-    oportunidad: opp ? { to: `/oliv/oportunidades/${opp.id}`, titulo: opp.deal_name, detalle: opp.stage } : null,
+    oportunidad: opp ? { to: `/oliv/oportunidades/${opp.id}`, titulo: opp.deal_name, detalle: opp.stage, via: 'Es el mismo registro: la oportunidad es el negocio' } : null,
     negocio: esNegocio
       ? {
           to: inmueble ? `/oliv/negocios/inm-${inmueble.id}` : `/oliv/negocios/op-${opp.id}`,
           titulo: opp.referencia_recaudo ? `Ref. ${opp.referencia_recaudo}` : opp.deal_name,
           detalle: limpiarNombreContacto(opp.nombre_contacto, opp.proyecto) || null,
+          via: 'La oportunidad en etapa de venta es el negocio',
         }
       : null,
-    inmueble: inmueble ? { to: `/oliv/inmuebles/${inmueble.id}`, titulo: inmueble.codigo_unidad, detalle: inmueble.estado } : null,
+    inmueble: inmueble ? { to: `/oliv/inmuebles/${inmueble.id}`, titulo: inmueble.codigo_unidad, detalle: inmueble.estado, via: 'Por el inmueble asociado a la oportunidad en HubSpot' } : null,
   };
 }
 

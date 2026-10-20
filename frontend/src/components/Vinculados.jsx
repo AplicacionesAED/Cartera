@@ -69,11 +69,12 @@ export function Vinculados({ proyecto, tipo, id }) {
             return <div key={t} className={`${styles.pieza} ${styles.vacia}`}>{cuerpo(<span className={styles.detalle}>{sin}</span>)}</div>;
           }
           return (
-            <Link key={t} to={v.to} className={`${styles.pieza} ${styles.enlace}`} title={[v.titulo, v.detalle].filter(Boolean).join(' · ')}>
+            <Link key={t} to={v.to} className={`${styles.pieza} ${styles.enlace}`} title={[v.titulo, v.detalle, v.via].filter(Boolean).join(' · ')}>
               {cuerpo(
                 <>
                   <span className={styles.valor}>{v.titulo}</span>
                   {v.detalle && <span className={styles.detalle}>{v.detalle}</span>}
+                  {v.via && <span className={styles.via}>{v.via}</span>}
                 </>
               )}
               <ChevronRight size={16} className={styles.chevron} aria-hidden="true" />
