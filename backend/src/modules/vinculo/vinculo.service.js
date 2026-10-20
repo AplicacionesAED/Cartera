@@ -22,6 +22,7 @@ const { limpiarNombreContacto, ETAPA_MINIMA_ORDER } = require('../../utils/olivH
 const Negocio = require('../negocio/negocio.model');
 const Oportunidad = require('../oportunidad/oportunidad.model');
 const InventarioItem = require('../inventario/inventarioItem.model');
+const { esEtapaDesistida } = require('../../config/estadosOportunidad');
 const { findOportunidadByReferencia, resolverNegocioIdDesdeInmueble } = require('../negocio/negocio.service');
 const olivOportunidad = require('../olivOportunidad/olivOportunidad.model');
 const OlivInmueble = require('../olivInmueble/olivInmueble.model');
@@ -50,13 +51,19 @@ async function resolverBaia(tipo, id) {
   let inmueble = null;
 
   if (tipo === 'oportunidad') {
-    const opp = await Oportunidad.findByPk(id, { attributes: ['id', 'deal_name', 'stage', 'referencia_recaudo'] });
+    const opp = await Oportunidad.findByPk(id, { attributes: ['id', 'deal_name', 'stage', 'referencia_recaudo', 'seccion_inmueble'] });
     if (!opp) throw new ApiError(404, 'Oportunidad no encontrada');
     oportunidad = { id: opp.id, dealName: opp.deal_name, stage: opp.stage };
     const referencia = opp.referencia_recaudo;
     if (referencia) {
       negocio = await Negocio.findOne({ where: { referencia } });
-      inmueble = (negocio ? await inmuebleDeNegocio(negocio) : null) ?? (await InventarioItem.findOne({ where: { referencia_recaudo: referencia }, order: [['id', 'ASC']] }));
+      // El inmueble propio de la oportunidad (el que tiene en Zoho) manda; si no tiene, el del negocio, salvo que la
+      // oportunidad esté caída (BACKOUT, desistida...): esa comparte la referencia con la vigente pero no es dueña del inmueble.
+      const propioZohoId = opp.seccion_inmueble?.Inmueble?.id;
+      if (propioZohoId) inmueble = await InventarioItem.findOne({ where: { zoho_id: String(propioZohoId) } });
+      if (!inmueble && !esEtapaDesistida(opp.stage)) {
+        inmueble = (negocio ? await inmuebleDeNegocio(negocio) : null) ?? (await InventarioItem.findOne({ where: { referencia_recaudo: referencia }, order: [['id', 'ASC']] }));
+      }
     }
   } else if (tipo === 'inmueble') {
     inmueble = await InventarioItem.findByPk(id);
@@ -76,7 +83,7 @@ async function resolverBaia(tipo, id) {
   }
 
   // Completa lo que falte con lo que ya se sabe.
-  if (!inmueble && negocio) inmueble = await inmuebleDeNegocio(negocio);
+  if (!inmueble && negocio && !(tipo === 'oportunidad' && esEtapaDesistida(oportunidad?.stage))) inmueble = await inmuebleDeNegocio(negocio);
   if (!oportunidad) {
     const opp = await findOportunidadByReferencia(negocio?.referencia ?? inmueble?.referencia_recaudo ?? null);
     if (opp) oportunidad = { id: opp.id, dealName: opp.dealName, stage: opp.stage };
