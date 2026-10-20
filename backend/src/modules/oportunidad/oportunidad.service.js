@@ -184,6 +184,21 @@ async function getSubforms(id) {
   return { formaPago, propuestaPago };
 }
 
+// Botón "Actualizar desde Zoho" del plan de pagos: vuelve a traer los subforms de esta oportunidad y reemplaza lo guardado.
+async function refrescarSubforms(id) {
+  const opp = await Oportunidad.findByPk(id);
+  if (!opp) throw new ApiError(404, 'Oportunidad no encontrada');
+  const { refrescarSubformsDe } = require('./oportunidad.subformsBackfill');
+  let resultado;
+  try {
+    resultado = await refrescarSubformsDe(opp);
+  } catch (err) {
+    throw new ApiError(502, `No se pudo consultar Zoho: ${err.response?.data?.message || err.message}`);
+  }
+  require('../dashboard/dashboardCache').invalidarCacheDashboard();
+  return resultado;
+}
+
 // Metadatos de campos de Zoho (api_name -> field_label) -- el legado los
 // exponía en /api/fields/metadata para que el frontend tradujera nombres
 // crudos de API (seccionInmueble/seccionCotizacion/camposFinancieros) a
@@ -198,4 +213,4 @@ async function listCamposMetadata() {
 // cubrir TODOS los Deals de Baía Kristal y `oportunidades` solo sincroniza
 // los que tienen `pago_separacion`. El endpoint `GET /otrosies` ahora lo
 // atiende `otrosi.service.js`; acá ya no vive.
-module.exports = { list, listStages, getById, getSubforms, listCamposMetadata, _mapItem };
+module.exports = { list, listStages, getById, getSubforms, refrescarSubforms, listCamposMetadata, _mapItem };

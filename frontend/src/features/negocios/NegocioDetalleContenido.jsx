@@ -12,7 +12,8 @@ import { Pagination } from '../../components/ui/Pagination.jsx';
 import { ConceptoHint } from '../../components/ui/ConceptoHint.jsx';
 import { ListaInfo, ListaFinanciera } from '../../components/ui/DatosFinancieros.jsx';
 import { getNegocio, getMovimientosNegocio } from '../../api/negocios.js';
-import { getSubformsOportunidad } from '../../api/oportunidades.js';
+import { getSubformsOportunidad, refrescarSubformsOportunidad } from '../../api/oportunidades.js';
+import { Button } from '../../components/ui/Button.jsx';
 import { filtrarDatosResumen, filtrarKeysMovimiento } from '../../utils/columnasExcluidas.js';
 import { ordenarFinanciero } from '../../utils/ordenColumnas.js';
 import { estadoToken } from '../../utils/estados.js';
@@ -182,6 +183,31 @@ function PlanSubTable({ rows }) {
 function PlanDePagosZoho({ oportunidad }) {
   const [subforms, setSubforms] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [actualizando, setActualizando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+
+  async function actualizarDesdeZoho() {
+    setActualizando(true);
+    setMensaje(null);
+    try {
+      const res = await refrescarSubformsOportunidad(oportunidad.id);
+      setSubforms(res.data || { formaPago: [], propuestaPago: [] });
+      setMensaje({ ok: true, texto: 'Plan de pagos actualizado desde Zoho.' });
+    } catch (err) {
+      setMensaje({ ok: false, texto: err.message || 'No se pudo actualizar desde Zoho.' });
+    } finally {
+      setActualizando(false);
+    }
+  }
+
+  const botonActualizar = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+      <Button variant="secondary" onClick={actualizarDesdeZoho} disabled={actualizando}>
+        {actualizando ? 'Actualizando…' : 'Actualizar desde Zoho'}
+      </Button>
+      {mensaje && <span style={{ fontSize: 'var(--text-data-size)', color: mensaje.ok ? 'var(--color-success, #15803d)' : 'var(--color-danger, #b91c1c)' }}>{mensaje.texto}</span>}
+    </div>
+  );
 
   useEffect(() => {
     let alive = true;
@@ -199,7 +225,12 @@ function PlanDePagosZoho({ oportunidad }) {
   const tieneFechas = (rows) => rows.some((r) => 'Fecha estimada' in r);
 
   if (forma.length === 0 && propuesta.length === 0) {
-    return <p className={styles.sinDatosPad}>Sin forma ni propuesta de pago registradas</p>;
+    return (
+      <div className={styles.seccionBody}>
+        {botonActualizar}
+        <p className={styles.sinDatosPad}>Sin forma ni propuesta de pago registradas</p>
+      </div>
+    );
   }
 
   const aviso = (
@@ -208,6 +239,7 @@ function PlanDePagosZoho({ oportunidad }) {
 
   return (
     <div className={styles.seccionBody}>
+      {botonActualizar}
       {forma.length > 0 && (
         <div>
           <p className={styles.subtitulo}>Forma de pago</p>

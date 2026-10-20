@@ -13,7 +13,9 @@ import { Vinculados } from '../../components/Vinculados.jsx';
 import { StageBadge } from '../../components/ui/StageBadge.jsx';
 import { Accordion } from '../../components/ui/Accordion.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
-import { getOportunidad, getSubformsOportunidad, getCamposMetadata } from '../../api/oportunidades.js';
+import { getOportunidad, getSubformsOportunidad, refrescarSubformsOportunidad, getCamposMetadata } from '../../api/oportunidades.js';
+import { Button } from '../../components/ui/Button.jsx';
+import { RefreshCw } from 'lucide-react';
 import { formatCOP, formatDate, formatDateTime } from '../../utils/format.js';
 import { addFechaEstimada } from '../../utils/planDePagos.js';
 import layoutStyles from '../../components/layout/WizardLayout.module.css';
@@ -107,6 +109,22 @@ function SubformTable({ rows }) {
 function SubformsSection({ oportunidadId, fechaInicioPlanPagos }) {
   const [subforms, setSubforms] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [actualizando, setActualizando] = useState(false);
+  const [mensaje, setMensaje] = useState(null);
+
+  async function actualizarDesdeZoho() {
+    setActualizando(true);
+    setMensaje(null);
+    try {
+      const res = await refrescarSubformsOportunidad(oportunidadId);
+      setSubforms(res.data || { formaPago: [], propuestaPago: [] });
+      setMensaje({ ok: true, texto: 'Plan de pagos actualizado desde Zoho.' });
+    } catch (err) {
+      setMensaje({ ok: false, texto: err.message || 'No se pudo actualizar desde Zoho.' });
+    } finally {
+      setActualizando(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -123,6 +141,15 @@ function SubformsSection({ oportunidadId, fechaInicioPlanPagos }) {
 
   return (
     <div className={styles.seccionBody}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <Button variant="secondary" onClick={actualizarDesdeZoho} disabled={actualizando}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <RefreshCw size={14} aria-hidden="true" />
+            {actualizando ? 'Actualizando…' : 'Actualizar desde Zoho'}
+          </span>
+        </Button>
+        {mensaje && <span style={{ fontSize: 'var(--text-data-size)', color: mensaje.ok ? 'var(--color-success, #15803d)' : 'var(--color-danger, #b91c1c)' }}>{mensaje.texto}</span>}
+      </div>
       <div>
         <p className={styles.subtitulo}>Forma de Pago</p>
         <SubformTable rows={forma} />

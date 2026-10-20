@@ -29,6 +29,11 @@ export function getSubformsOportunidad(id) {
   return client.get(`/oportunidades/${id}/subforms`);
 }
 
+// Vuelve a traer de Zoho el plan de pagos de esta oportunidad y reemplaza lo guardado.
+export function refrescarSubformsOportunidad(id) {
+  return client.post(`/oportunidades/${id}/subforms/refrescar`);
+}
+
 export function iniciarSyncOportunidades(full) {
   return client.post(`/oportunidades/sync${full ? '?full=true' : ''}`);
 }

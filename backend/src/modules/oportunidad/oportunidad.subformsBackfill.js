@@ -24,6 +24,43 @@ function limpiarFilasSubform(arr) {
   return (arr || []).map((row) => Object.fromEntries(Object.entries(row).filter(([k, v]) => !SKIP_SUBFORM_KEYS.includes(k) && v != null && v !== '')));
 }
 
+// Trae de Zoho el plan de pagos (Forma/Propuesta de Pago) de UNA oportunidad y SOBREESCRIBE lo guardado, aunque ya
+// hubiera algo: es la forma de reflejar un cambio hecho en Zoho (el cache normal nunca se renueva solo).
+async function refrescarSubformsDe(opp) {
+  const token = await getAccessToken();
+  const response = await axios.get(`${zohoConfig.apiBase}/Deals/${opp.zoho_id}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    params: { fields: 'Forma_de_Pago,Propuesta_de_Pago' },
+  });
+  const deal = response.data?.data?.[0] || {};
+  const formaPago = limpiarFilasSubform(deal.Forma_de_Pago);
+  const propuestaPago = limpiarFilasSubform(deal.Propuesta_de_Pago);
+  await opp.update({ forma_pago: formaPago.length ? formaPago : null, propuesta_pago: propuestaPago.length ? propuestaPago : null });
+  return { formaPago, propuestaPago };
+}
+
+// Tras un sync incremental: las oportunidades que Zoho reporta como modificadas pueden haber cambiado su plan de
+// pagos, así que se vuelve a traer el de cada una (con un tope por si el incremental fue enorme).
+async function refrescarSubformsLote(zohoIds, max = 300) {
+  const ids = [...new Set(zohoIds)].slice(0, max);
+  if (!ids.length) return { total: 0, actualizadas: 0, errores: 0 };
+  const opps = await Oportunidad.findAll({ where: { zoho_id: { [Op.in]: ids }, fecha_inicio_plan_pagos: { [Op.ne]: null } } });
+  let actualizadas = 0;
+  let errores = 0;
+  for (const opp of opps) {
+    try {
+      await refrescarSubformsDe(opp);
+      actualizadas++;
+    } catch (err) {
+      errores++;
+      console.error(`[subforms] No se pudo refrescar ${opp.zoho_id}:`, err.message); // eslint-disable-line no-console
+    }
+  }
+  console.log(`[subforms] Planes de pago refrescados tras el sync: ${actualizadas}/${opps.length} (${errores} errores)`); // eslint-disable-line no-console
+  if (actualizadas > 0) invalidarCacheDashboard();
+  return { total: opps.length, actualizadas, errores };
+}
+
 async function runSubformsBackfill() {
   if (running) return;
   running = true;
@@ -104,4 +141,4 @@ function getSubformsBackfillResult() {
 
 const getSubformsBackfillProgreso = () => progreso.snapshot();
 
-module.exports = { runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult, getSubformsBackfillProgreso };
+module.exports = { refrescarSubformsDe, refrescarSubformsLote, runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult, getSubformsBackfillProgreso };

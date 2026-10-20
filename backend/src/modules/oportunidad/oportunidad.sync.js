@@ -9,7 +9,7 @@ const config = require('../../config/zoho');
 const sequelize = require('../../config/db');
 const ZohoFieldMetadata = require('./zohoFieldMetadata.model');
 const SyncLog = require('./syncLog.model');
-const { runSubformsBackfill } = require('./oportunidad.subformsBackfill');
+const { runSubformsBackfill, refrescarSubformsLote } = require('./oportunidad.subformsBackfill');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 const { progresoSync } = require('../../utils/progresoSync');
@@ -420,6 +420,9 @@ async function syncOportunidadesFromZoho(force = false) {
 
     // Backfill de subforms en segundo plano -- el sync masivo nunca los trae
     // (ver buildFieldsList). No se espera, no debe bloquear la respuesta.
+    // En un incremental, las oportunidades modificadas en Zoho pueden traer un plan de pagos nuevo: se vuelve a leer.
+    const tarea = modifiedSince ? refrescarSubformsLote(deals.map((d) => String(d.id))) : Promise.resolve();
+    tarea.catch((err) => console.error('[sync] Error al refrescar planes de pago:', err.message)); // eslint-disable-line no-console
     runSubformsBackfill().catch((err) => console.error('[sync] Error en backfill de subforms automático:', err.message)); // eslint-disable-line no-console
 
     progreso.terminar();

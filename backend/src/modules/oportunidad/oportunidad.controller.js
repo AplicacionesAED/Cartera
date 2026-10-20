@@ -20,6 +20,8 @@ const getById = asyncHandler(async (req, res) => ok(res, await service.getById(r
 
 const getSubforms = asyncHandler(async (req, res) => ok(res, await service.getSubforms(req.params.id)));
 
+const refrescarSubforms = asyncHandler(async (req, res) => ok(res, await service.refrescarSubforms(req.params.id)));
+
 const iniciarSync = asyncHandler(async (req, res) => {
   const force = req.query.full === 'true';
   ok(res, { message: 'Sincronización iniciada' });
@@ -58,4 +60,4 @@ const iniciarBackfill = asyncHandler(async (req, res) => {
 
 const backfillStatus = asyncHandler(async (req, res) => ok(res, { running: isSubformsBackfillRunning(), result: getSubformsBackfillResult(), progreso: getSubformsBackfillProgreso() }));
 
-module.exports = { list, stages, camposMetadata, getById, getSubforms, iniciarSync, syncStatus, syncLogs, iniciarBackfill, backfillStatus };
+module.exports = { list, stages, camposMetadata, getById, getSubforms, refrescarSubforms, iniciarSync, syncStatus, syncLogs, iniciarBackfill, backfillStatus };

@@ -18,6 +18,7 @@ router.get('/campos/metadata', requireAuth, requireModulo(['oportunidades', 'neg
 
 router.get('/', requireAuth, requireModulo('oportunidades'), controller.list);
 router.get('/:id', requireAuth, requireModulo('oportunidades'), controller.getById);
+router.post('/:id/subforms/refrescar', requireAuth, requireModulo(['oportunidades', 'negocios']), controller.refrescarSubforms);
 router.get('/:id/subforms', requireAuth, requireModulo(['oportunidades', 'negocios']), controller.getSubforms);
 
 module.exports = router;
