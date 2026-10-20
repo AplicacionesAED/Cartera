@@ -16,7 +16,7 @@ import styles from './NegociosPage.module.css';
 
 const ESTADOS = {
   SIN_VINCULO: { etiqueta: 'Sin vínculo', variante: 'danger' },
-  AMBIGUO: { etiqueta: 'Referencia repetida', variante: 'warning' },
+  AMBIGUO: { etiqueta: 'Varios inmuebles', variante: 'warning' },
   RESPALDO: { etiqueta: 'Vinculado por código', variante: 'warning' },
   CONFIRMADO: { etiqueta: 'Vinculado', variante: 'success' },
 };
@@ -96,7 +96,7 @@ export function VinculosRevisionPage() {
         <div>
           <h1 className={styles.title}>Vínculos por revisar</h1>
           <p className={styles.subtitle}>
-            Negocios cuya referencia de recaudo no está en ningún inmueble de Zoho (o está en varios). La app no los vincula hasta que el CRM lo corrija; la sugerencia es solo una pista.
+            Negocios que no se pudieron vincular a un inmueble por nomenclatura y categoría (sin coincidencia, o con varias). La app no los vincula hasta que se corrija el dato; la sugerencia es solo una pista.
             {datos ? ` · ${datos.resumen.pendientes.toLocaleString('es-CO')} por revisar` : ''}
           </p>
         </div>

@@ -1,25 +1,22 @@
 // Vínculo Negocio (fiducia) <-> Inmueble (Zoho), Baía Kristal.
 //
-// REGLA: la fuente de verdad es el CRM. Un negocio se vincula al inmueble de Zoho que tiene SU MISMA referencia de
-// recaudo (`negocio.referencia = inventario_items.referencia_recaudo`), nada más. La app no corrige ni decide:
-//   - una sola coincidencia  -> CONFIRMADO (vinculado)
-//   - varios inmuebles con esa referencia -> AMBIGUO (no se vincula: el CRM debe dejar uno)
-//   - ninguna coincidencia   -> SIN_VINCULO (no se vincula)
-// Respaldo (el mismo de la app original): si ninguna referencia coincide, el negocio se vincula al inmueble cuyo
-// código (`C_digo_inmueble`) es EXACTAMENTE la nomenclatura del negocio, siempre que sea un solo inmueble y que ese
-// inmueble no pertenezca ya (por referencia) a otro negocio -- así no se roban negocios entre unidades (caso Vela
-// 210A / The Plaza 210). Estado RESPALDO: cuenta como vinculado pero entra a "Vínculos por revisar" (el inmueble
-// debería tener la referencia del negocio en Zoho).
-// En los dos últimos casos el negocio entra a "Vínculos por revisar" con una SUGERENCIA para el CRM, calculada con
-// la oportunidad (su campo Inmueble) y la nomenclatura de la fiducia. La sugerencia es solo una pista: no vincula
-// nada ni afecta ningún total hasta que el CRM corrija la referencia en Zoho. El resultado se guarda en
-// `vinculos_negocio_inmueble` (una fila por negocio) y lo leen todos los módulos -- ver `recalcularVinculos`.
+// REGLA: el negocio se vincula al inmueble por NOMENCLATURA + FRENTE/TORRE, usando lo que trae el Excel de la fiducia:
+//   - "Categoría" (junto al fideicomiso) se traduce a frente y torre del CRM (ver categoriaTorre.js);
+//   - la "Nomenclatura" del negocio ("1A", "1-A", "524"...) se busca, dentro de esas torres, como nombre de la unidad
+//     o, si no, como código del inmueble (Kala, Kaliza, Isla y Vela la traen como código, ej. 53101).
+//   - si la nomenclatura coincide con más de un inmueble (la misma unidad en dos frentes de una categoría compartida)
+//     se desempata por área; si aun así quedan varios, el negocio queda AMBIGUO y no se vincula.
+//   - sin coincidencia queda SIN_VINCULO. Depósitos y parqueaderos no tienen inmueble en el inventario.
+// La referencia de recaudo YA NO decide el vínculo: solo se usa como pista ("sugerencia") para quien deba revisar los
+// casos sin vincular. El resultado se guarda en `vinculos_negocio_inmueble` (una fila por negocio) y lo leen todos los
+// módulos -- ver `recalcularVinculos`.
 const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 const { PROYECTO_TORRE_EXCLUIDOS } = require('../inventario/inventarioTorres.service');
 const { ESTADOS_DESISTIDOS } = require('../../config/estadosOportunidad');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const VinculoNegocioInmueble = require('./vinculoNegocioInmueble.model');
+const { torresDeCategoria, TIPOS_CON_INMUEBLE } = require('./categoriaTorre');
 
 // Cuando un inmueble tiene varios negocios (uno vigente y otros antiguos en retiro/libre), el que cuenta es el
 // vigente. Mismo orden que se usa en el SQL de los módulos (ver PRIORIDAD_ESTADO_SQL).
@@ -31,7 +28,6 @@ const numero = (v) => {
   const n = parseFloat(String(v ?? '').replace(',', '.'));
   return Number.isFinite(n) ? n : null;
 };
-const primeraPalabra = (p) => norm(String(p || '').split(/\s+/)[0]);
 const etiqueta = (i) => `${i.nombre} (${i.pt ?? i.proyecto ?? 's/proyecto'})`;
 
 async function cargarDatos() {
@@ -47,7 +43,8 @@ async function cargarDatos() {
       { bind: [[...PROYECTO_TORRE_EXCLUIDOS]], type: QueryTypes.SELECT }
     ),
     sequelize.query(
-      `SELECT id, referencia, estado, datos->>'Nomenclatura' AS nom, upper(datos->>'Fideicomiso') AS fid, datos->>'Area' AS area
+      `SELECT id, referencia, estado, datos->>'Nomenclatura' AS nom, upper(datos->>'Fideicomiso') AS fid, datos->>'Area' AS area,
+              datos->>'Categoria' AS categoria, upper(datos->>'Tipo Inmueble') AS tipo
        FROM negocios WHERE referencia IS NOT NULL`,
       { type: QueryTypes.SELECT }
     ),
@@ -62,103 +59,71 @@ async function cargarDatos() {
   return { inmuebles, negocios, oportunidades };
 }
 
-// Señal C: nomenclatura de la fiducia -> inmuebles candidatos.
-function porNomenclatura(n, inmuebles) {
-  const nom = norm(n.nom);
-  if (!nom) return { nivel: 0, ids: [] };
-  const completo = inmuebles.filter((i) => i.cod && norm(i.cod) === nom);
-  if (completo.length) return { nivel: 1, ids: completo.map((i) => i.id) };
-  const fid = norm(n.fid);
-  const porNombre = inmuebles.filter((i) => norm(i.nombre) === nom && primeraPalabra(i.proyecto) && fid.includes(primeraPalabra(i.proyecto)));
-  if (porNombre.length === 1) return { nivel: 2, ids: [porNombre[0].id] };
-  if (porNombre.length > 1) {
-    const area = numero(n.area);
-    if (area && area > 2) {
-      const porArea = porNombre.filter((i) => [numero(i.ap), numero(i.ac)].some((x) => x != null && Math.abs(x - area) < 0.06));
-      if (porArea.length) return { nivel: 3, ids: porArea.map((i) => i.id) };
-    }
-    return { nivel: 2, ids: porNombre.map((i) => i.id) };
-  }
-  return { nivel: 0, ids: [] };
-}
-
-// Decide el inmueble de UN negocio: solo por referencia. Sin coincidencia exacta calcula una sugerencia para el CRM.
+// Decide el inmueble de UN negocio por nomenclatura + frente/torre (ver el encabezado). La referencia de recaudo y la
+// oportunidad solo alimentan la "sugerencia" de los casos que no se pudieron vincular.
 function resolverNegocio(n, ctx) {
   const { porId, porRef, porZoho, oppsPorRef, inmuebles } = ctx;
-  const A = (porRef.get(n.referencia) ?? []).map((i) => i.id);
   const esLibre = n.estado === 'LIBRE';
+  const base = { referencia: n.referencia, negocio_estado: n.estado, metodo: null };
+  const sinInmueble = (estado, detalle, requiere, extra = {}) => ({
+    ...base, inventario_id: null, estado, requiere_revision: requiere, detalle, observaciones: extra.observaciones ?? null, senales: extra.senales ?? null,
+  });
 
-  if (A.length === 1) {
-    return {
-      referencia: n.referencia, inventario_id: A[0], estado: 'CONFIRMADO', metodo: 'referencia', negocio_estado: n.estado,
-      requiere_revision: false, detalle: null, observaciones: null, senales: { referencia: A },
-    };
+  // Depósitos y parqueaderos no están en el inventario de inmuebles del CRM.
+  if (!TIPOS_CON_INMUEBLE.has(n.tipo)) {
+    return sinInmueble('SIN_VINCULO', `${n.tipo ? n.tipo.charAt(0) + n.tipo.slice(1).toLowerCase() : 'Esta unidad'} (${n.nom ?? '—'}): no tiene inmueble en el inventario, no se vincula por nomenclatura.`, false);
   }
 
-  // Respaldo por código exacto de inmueble.
-  const porCodigo = n.nom ? inmuebles.filter((i) => i.cod != null && String(i.cod) === String(n.nom)) : [];
-  if (A.length === 0 && porCodigo.length === 1 && !ctx.reclamados.has(porCodigo[0].id)) {
-    const u = porCodigo[0];
-    return {
-      referencia: n.referencia, inventario_id: u.id, estado: 'RESPALDO', metodo: 'codigo', negocio_estado: n.estado,
-      requiere_revision: !esLibre,
-      detalle: u.ref
-        ? `Vinculado por el código del inmueble (${u.cod}). El inmueble ${etiqueta(u)} tiene en Zoho la referencia ${u.ref} y no la del negocio (${n.referencia}).`
-        : `Vinculado por el código del inmueble (${u.cod}). El inmueble ${etiqueta(u)} no tiene referencia de recaudo en Zoho (debería ser ${n.referencia}).`,
-      observaciones: null, senales: { referencia: A, codigo: [u.id] },
-    };
+  const torres = torresDeCategoria(n.fid, n.categoria);
+  const nom = norm(n.nom);
+  let candidatos = [];
+  if (torres && nom) {
+    const enTorres = inmuebles.filter((i) => torres.includes(norm(i.pt)));
+    candidatos = enTorres.filter((i) => norm(i.nombre) === nom);
+    if (!candidatos.length) candidatos = enTorres.filter((i) => i.cod && norm(i.cod) === nom);
+    // La misma unidad en dos frentes de una categoría compartida: se desempata por área.
+    if (candidatos.length > 1) {
+      const area = numero(n.area);
+      if (area && area > 2) {
+        const porArea = candidatos.filter((i) => [numero(i.ap), numero(i.ac)].some((x) => x != null && Math.abs(x - area) < 0.06));
+        if (porArea.length === 1) candidatos = porArea;
+      }
+    }
   }
 
-  // Sugerencia (solo pista): inmueble de la oportunidad y/o nomenclatura de la fiducia.
+  if (candidatos.length === 1) {
+    return { ...base, inventario_id: candidatos[0].id, estado: 'CONFIRMADO', metodo: 'nomenclatura', requiere_revision: false, detalle: null, observaciones: null, senales: { candidatos: [candidatos[0].id] } };
+  }
+
+  // Sin vincular: se arma una sugerencia (solo pista) con la referencia de recaudo o la oportunidad.
+  const A = (porRef.get(n.referencia) ?? []).map((i) => i.id);
   const opps = oppsPorRef.get(n.referencia) ?? [];
-  // La oportunidad declara su inmueble de dos formas: el campo Inmueble (id de Zoho) o, si ese está vacío, la torre
-  // y la nomenclatura que escribe en su sección Inmueble (se acepta solo si coincide con un único inmueble).
   const B = [...new Set(opps.map((o) => o.inv_zoho_id && porZoho.get(o.inv_zoho_id)?.id).filter((x) => x != null))];
-  const B2 = [...new Set(opps.flatMap((o) => (o.nom && o.torre ? ctx.porTorreNom.get(`${norm(o.torre)}|${norm(o.nom)}`) ?? [] : [])))];
-  const c = porNomenclatura(n, inmuebles);
   let sugerido = null;
   let origen = null;
-  if (B.length === 1) { sugerido = B[0]; origen = 'la oportunidad'; }
-  else if (B.length === 0 && B2.length === 1) { sugerido = B2[0]; origen = 'la torre y nomenclatura que declara la oportunidad'; }
-  else if (c.ids.length === 1) { sugerido = c.ids[0]; origen = 'la nomenclatura de la fiducia'; }
+  if (A.length === 1) { sugerido = A[0]; origen = 'la referencia de recaudo'; }
+  else if (B.length === 1) { sugerido = B[0]; origen = 'la oportunidad'; }
   const u = sugerido != null ? porId.get(sugerido) : null;
-  const unoOpp = B.length === 1 ? B[0] : B.length === 0 && B2.length === 1 ? B2[0] : null;
-  const confirmaOtra = unoOpp != null && c.ids.length === 1 && unoOpp === c.ids[0] ? ' (la oportunidad y la nomenclatura coinciden)' : '';
+  const observaciones = [];
+  if (u) observaciones.push(`Sugerencia (según ${origen}): ${etiqueta(u)}${u.ref ? `, que hoy tiene la referencia ${u.ref} en Zoho` : ''}.`);
 
   let estado;
   let detalle;
-  const observaciones = [];
-  if (A.length > 1) {
+  if (candidatos.length > 1) {
     estado = 'AMBIGUO';
-    detalle = `${A.length} inmuebles de Zoho tienen la referencia ${n.referencia}: ${A.map((id) => etiqueta(porId.get(id))).join(', ')}. Debe quedar en uno solo.`;
+    detalle = `La nomenclatura "${n.nom}" (categoría ${n.categoria ?? '—'}) coincide con ${candidatos.length} inmuebles y no se pudo desempatar por área: ${candidatos.map((i) => etiqueta(i)).join(', ')}.`;
   } else {
     estado = 'SIN_VINCULO';
-    detalle = `Ningún inmueble de Zoho tiene la referencia ${n.referencia}.`;
+    detalle = !torres
+      ? `La categoría "${n.categoria ?? '—'}" del fideicomiso ${String(n.fid ?? '').slice(0, 5)} no tiene traducción a frente y torre.`
+      : !nom
+        ? 'El negocio no trae nomenclatura.'
+        : `No hay un inmueble con la nomenclatura "${n.nom}" en la torre que indica la categoría "${n.categoria}".`;
   }
-  if (u) {
-    observaciones.push(
-      u.ref
-        ? `Sugerencia (según ${origen}${confirmaOtra}): ${etiqueta(u)}, que hoy tiene la referencia ${u.ref} en Zoho.`
-        : `Sugerencia (según ${origen}${confirmaOtra}): ${etiqueta(u)}, que no tiene referencia de recaudo en Zoho.`
-    );
-  } else if (c.ids.length > 1) {
-    observaciones.push(`La nomenclatura "${n.nom}" coincide con varios inmuebles: ${c.ids.slice(0, 5).map((id) => etiqueta(porId.get(id))).join(', ')}${c.ids.length > 5 ? '…' : ''}.`);
-  }
-
-  return {
-    referencia: n.referencia,
-    inventario_id: null,
-    estado,
-    metodo: null,
-    negocio_estado: n.estado,
-    requiere_revision: !esLibre,
-    detalle,
-    observaciones: observaciones.length ? observaciones : null,
-    senales: { referencia: A, sugerido },
-  };
+  return sinInmueble(estado, detalle, !esLibre, { observaciones: observaciones.length ? observaciones : null, senales: { sugerido, candidatos: candidatos.map((i) => i.id) } });
 }
 
-function construirContexto({ inmuebles, oportunidades, negocios }) {
+function construirContexto({ inmuebles, oportunidades }) {
   const porId = new Map(inmuebles.map((i) => [i.id, i]));
   const porZoho = new Map(inmuebles.map((i) => [i.zoho_id, i]));
   const porRef = new Map();
@@ -173,15 +138,7 @@ function construirContexto({ inmuebles, oportunidades, negocios }) {
     oppsPorRef.get(o.ref).push(o);
   }
   // Inmuebles que ya pertenecen (por referencia) a algún negocio: el respaldo por código no puede tomarlos.
-  const porTorreNom = new Map();
-  for (const i of inmuebles) {
-    const k = `${norm(i.pt)}|${norm(i.nombre)}`;
-    if (!porTorreNom.has(k)) porTorreNom.set(k, []);
-    porTorreNom.get(k).push(i.id);
-  }
-  const refsNegocio = new Set(negocios.map((n) => n.referencia));
-  const reclamados = new Set(inmuebles.filter((i) => i.ref && refsNegocio.has(i.ref)).map((i) => i.id));
-  return { porId, porZoho, porRef, oppsPorRef, inmuebles, reclamados, porTorreNom };
+  return { porId, porZoho, porRef, oppsPorRef, inmuebles };
 }
 
 // Calcula (sin guardar) el vínculo de todos los negocios.

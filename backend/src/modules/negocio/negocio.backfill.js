@@ -13,10 +13,10 @@ const { resolverColumnasMovPorPropietario, parseCompradoresCell, extraerDatosMov
 const Negocio = require('./negocio.model');
 const NegocioComprador = require('./negocioComprador.model');
 const NegocioMovimiento = require('./negocioMovimiento.model');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
-// No cancelable: reconstruye las tablas de negocios (vacía y vuelve a llenar); interrumpirla dejaría datos a medias.
-const progreso = progresoSync('negocios', { cancelable: false });
+// Cancelable mientras lee (aún no escribe nada); la escritura final es una sola transacción, todo o nada.
+const progreso = progresoSync('negocios');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 
@@ -73,51 +73,30 @@ function findHeaderInStoredFilas(filas, knownCol, knownIdx) {
   return null;
 }
 
-// Corre `fn` sobre `items` en lotes concurrentes -- contra una base remota
-// el cuello de botella es la latencia de ida y vuelta de cada query, no el
-// trabajo en sí, así que paralelizar dentro del lote da una mejora enorme.
-async function runBatched(items, batchSize, fn) {
-  for (let i = 0; i < items.length; i += batchSize) {
-    await Promise.all(items.slice(i, i + batchSize).map(fn));
-  }
-}
-
-// Prisma en el legado podía ignorar nroId en createMany silenciosamente;
-// esta función se conserva por fidelidad aunque en Sequelize bulkCreate sí
-// lo respeta -- no hace daño y deja la migración a prueba de esa clase de bug.
-async function applyNroIdRaw(negocioId, list) {
-  for (const c of list) {
-    if (!c.nroId) continue;
-    await sequelize.query('UPDATE negocio_compradores SET nro_id = $1 WHERE negocio_id = $2::integer AND nombre = $3', {
-      bind: [c.nroId, negocioId, c.nombre],
-    });
-  }
-}
-
 let running = false;
 let result = null;
 
+// Reconstruye Negocios, Compradores y Movimientos desde las hojas de la fiducia.
+//
+// Diseño (2026-10-20): TODO se lee y se arma en memoria primero, sin tocar la base; recién al final, en UNA sola
+// transacción, se vacían las tablas y se insertan los datos en lotes grandes. Así:
+//   - es mucho más rápido (antes: por cada una de las ~740 hojas se borraban y volvían a crear los compradores de cada
+//     negocio y se actualizaba la cédula comprador por comprador, contra una base remota; ahora son unos pocos
+//     INSERT grandes);
+//   - es atómico: si algo falla o se cancela, las tablas quedan EXACTAMENTE como estaban (antes un corte a mitad dejaba
+//     negocios sin movimientos y los totales de recaudo se caían);
+//   - se puede cancelar mientras se lee (la escritura final es corta y no se interrumpe).
+// Reglas de combinación (idénticas a la versión anterior): el resumen de un negocio lo define la ÚLTIMA hoja
+// "Movimientos" que lo trae; sus compradores, la última hoja "Mov_Por_Propietario" que trae alguno (si ninguna, los de
+// la celda Propietarios del resumen); un movimiento (por ID Movimiento) se guarda una sola vez, el de la primera hoja.
 async function runBackfill() {
   if (running) return;
   running = true;
   result = null;
   const startedAt = Date.now();
-  let marcasManuales = [];
   progreso.iniciar('Preparando la reconstrucción');
 
   try {
-    // Las marcas manuales (en trámite / canje, ver negocio.service.js#updateFlags) no vienen del
-    // Excel: se guardan antes de vaciar la tabla y se devuelven al final, para que reconstruir
-    // (ahora a diario y sin que nadie lo mire, ver programador.js) no las borre.
-    marcasManuales = await sequelize.query(
-      'SELECT referencia, en_tramite, es_canje FROM negocios WHERE en_tramite OR es_canje',
-      { type: QueryTypes.SELECT }
-    );
-    // TRUNCATE simple (por tabla) falla en Postgres si otra tabla la
-    // referencia por FK, sin importar que ya este vacia -- hay que truncar
-    // las tres juntas en un solo statement (o con CASCADE).
-    await sequelize.query('TRUNCATE TABLE negocio_movimientos, negocio_compradores, negocios');
-
     const hojaIds = await HojaFiduciaria.findAll({
       where: { nombre_hoja: { [Op.in]: ['Movimientos', 'Mov_Por_Propietario'] } },
       attributes: ['id', 'nombre_hoja'],
@@ -129,6 +108,7 @@ async function runBackfill() {
     const resumenMap = new Map();
     progreso.fase('Leyendo los resúmenes de la fiducia', hojasFase1.length);
     for (const hojaRef of hojasFase1) {
+      progreso.verificar(); // todavía no se escribió nada en la base: cancelar es seguro
       progreso.avanzar(1);
       const hoja = await HojaFiduciaria.findByPk(hojaRef.id, { attributes: ['columnas', 'filas'] });
       const filas = Array.isArray(hoja.filas) ? hoja.filas : [];
@@ -173,130 +153,188 @@ async function runBackfill() {
       }
     }
 
-    const resumenEntries = [...resumenMap.entries()];
-    progreso.fase('Creando negocios', resumenEntries.length);
-    await runBatched(resumenEntries, 20, async ([referencia, data]) => {
-      progreso.avanzar(1);
-      const [negocio] = await Negocio.upsert(
-        { referencia, estado: data.estado, datos: data.datos, saldo_actual: data.saldoActual },
-        { conflictFields: ['referencia'] }
-      );
+    // Negocios en memoria: referencia -> { estado, datos, saldoActual, compradores[] }
+    const negocios = new Map();
+    for (const [referencia, data] of resumenMap) {
+      const comps = data.propietariosRaw ? parseCompradoresCell(data.propietariosRaw, null, null) : [];
+      negocios.set(referencia, {
+        estado: data.estado,
+        datos: data.datos,
+        saldoActual: data.saldoActual,
+        compradores: comps.map((c, i) => ({ nombre: c.nombre, nroId: c.nroId, porcentaje: c.porcentaje, orden: i })),
+      });
+    }
 
-      if (data.propietariosRaw) {
-        const comps = parseCompradoresCell(data.propietariosRaw, null, null);
-        if (comps.length > 0) {
-          const existingComps = await NegocioComprador.count({ where: { negocio_id: negocio.id } });
-          if (existingComps === 0) {
-            await NegocioComprador.bulkCreate(
-              comps.map((c, i) => ({ negocio_id: negocio.id, nombre: c.nombre, nro_id: c.nroId, porcentaje: c.porcentaje, orden: i }))
-            );
-            await applyNroIdRaw(negocio.id, comps);
+    // ── Fase 2: hojas "Mov_Por_Propietario" -> compradores + movimientos ──
+    // Cada hoja pesa ~4,5 MB como JSON y son ~740 (≈3,3 GB): traerlas todas por una conexión remota tardaba horas. En
+    // lugar de eso la BASE hace el trabajo pesado y solo se trae lo que cuenta:
+    //   - movimientos: una fila por ID Movimiento (la de la primera hoja que lo trae), ~48 mil filas en total;
+    //   - compradores: para cada negocio, las filas de la ÚLTIMA hoja que trae propietarios para él.
+    const hojasFase2 = hojaIds.filter((h) => h.nombre_hoja === 'Mov_Por_Propietario');
+    progreso.fase('Analizando las hojas de movimientos', hojasFase2.length);
+    progreso.verificar();
+    const cabeceras = await sequelize.query(
+      "SELECT id, columnas FROM hojas_fiduciarias WHERE nombre_hoja = 'Mov_Por_Propietario' ORDER BY creado_en ASC, id ASC",
+      { type: QueryTypes.SELECT }
+    );
+    // Hojas agrupadas por la posición de sus columnas (normalmente es una sola disposición para todas).
+    const grupos = new Map();
+    for (const c of cabeceras) {
+      const idx = resolverColumnasMovPorPropietario(Array.isArray(c.columnas) ? c.columnas : []);
+      const clave = JSON.stringify(idx);
+      if (!grupos.has(clave)) grupos.set(clave, { idx, ids: [] });
+      grupos.get(clave).ids.push(c.id);
+    }
+
+    const movimientos = new Map(); // id_movimiento -> fila (la primera hoja gana)
+    const entradasComp = new Map(); // referencia -> { compradores: Map }
+    const entero = (n) => Number.isInteger(n) && n >= 0;
+    let hechas = 0;
+    progreso.fase('Leyendo movimientos y compradores', cabeceras.length);
+    for (const { idx, ids } of grupos.values()) {
+      progreso.verificar();
+      if (![idx.negRefIdx, idx.idMovIdx, idx.propIdx].every(entero)) continue;
+      const ref = `f.fila->>${idx.negRefIdx}`;
+      const idMov = `f.fila->>${idx.idMovIdx}`;
+      const prop = `f.fila->>${idx.propIdx}`;
+      const desde = `FROM hojas_fiduciarias h CROSS JOIN LATERAL jsonb_array_elements(h.filas) WITH ORDINALITY AS f(fila, pos) WHERE h.id = ANY($1::int[])`;
+
+      // Movimientos: una fila por ID Movimiento (la de la primera hoja, y dentro de ella la primera posición).
+      const filasMov = await sequelize.query(
+        `SELECT DISTINCT ON (${idMov}) f.fila ${desde} AND NULLIF(btrim(${idMov}), '') IS NOT NULL
+         ORDER BY ${idMov}, h.creado_en ASC, h.id ASC, f.pos ASC`,
+        { bind: [ids], type: QueryTypes.SELECT }
+      );
+      for (const { fila } of filasMov) {
+        const referencia = cleanRef(cleanStr(fila[idx.negRefIdx]));
+        if (!referencia) continue;
+        const mov = extraerDatosMovimiento(fila, idx);
+        if (mov && !movimientos.has(mov.idMovimiento)) movimientos.set(mov.idMovimiento, { ...mov, referencia });
+      }
+      progreso.verificar();
+
+      // Compradores: por cada referencia, la última hoja que trae propietarios y TODAS sus filas de esa referencia.
+      const ultimas = await sequelize.query(
+        `SELECT DISTINCT ON (${ref}) ${ref} AS ref, h.id AS hoja ${desde} AND NULLIF(btrim(${prop}), '') IS NOT NULL AND NULLIF(btrim(${ref}), '') IS NOT NULL
+         ORDER BY ${ref}, h.creado_en DESC, h.id DESC`,
+        { bind: [ids], type: QueryTypes.SELECT }
+      );
+      if (ultimas.length > 0) {
+        const filasComp = await sequelize.query(
+          `SELECT f.fila ${desde} AND (h.id, ${ref}) IN (SELECT * FROM unnest($2::int[], $3::text[]))
+           ORDER BY h.creado_en ASC, h.id ASC, f.pos ASC`,
+          { bind: [ids, ultimas.map((u) => u.hoja), ultimas.map((u) => u.ref)], type: QueryTypes.SELECT }
+        );
+        for (const { fila } of filasComp) {
+          const referencia = cleanRef(cleanStr(fila[idx.negRefIdx]));
+          if (!referencia) continue;
+          if (!entradasComp.has(referencia)) entradasComp.set(referencia, { compradores: new Map() });
+          const entry = entradasComp.get(referencia);
+          const comps = parseCompradoresCell(fila[idx.propIdx], fila[idx.nroIdIdx], idx.pctIdx !== -1 ? fila[idx.pctIdx] : null);
+          for (const comp of comps) {
+            const byId = comp.nroId ? entry.compradores.get(comp.nroId) : undefined;
+            const byName = entry.compradores.get(comp.nombre);
+            if (byId) {
+              // ya conocido por cedula
+            } else if (byName) {
+              if (comp.nroId) {
+                entry.compradores.delete(comp.nombre);
+                entry.compradores.set(comp.nroId, { ...byName, nroId: comp.nroId });
+              }
+            } else {
+              const key = comp.nroId || comp.nombre;
+              entry.compradores.set(key, { ...comp, orden: entry.compradores.size });
+            }
           }
         }
+      }
+      hechas += ids.length;
+      progreso.establecer(hechas);
+    }
+
+    for (const [referencia, entry] of entradasComp) {
+      let neg = negocios.get(referencia);
+      if (!neg) {
+        neg = { estado: null, datos: null, saldoActual: null, compradores: [] };
+        negocios.set(referencia, neg);
+      }
+      const lista = [...entry.compradores.values()];
+      if (lista.length > 0) neg.compradores = lista.map((c) => ({ nombre: c.nombre, nroId: c.nroId, porcentaje: c.porcentaje, orden: c.orden }));
+    }
+    // Un movimiento de un negocio que no estaba en ningún resumen igual crea el negocio (como antes).
+    for (const m of movimientos.values()) {
+      if (!negocios.has(m.referencia)) negocios.set(m.referencia, { estado: null, datos: null, saldoActual: null, compradores: [] });
+    }
+
+    // ── Escritura: una sola transacción (todo o nada) ─────────────────────
+    // A partir de aquí ya no se puede cancelar (es corta y no debe dejar nada a medias).
+    progreso.fase('Guardando los negocios', negocios.size);
+    // Las marcas manuales (en trámite / canje, ver negocio.service.js#updateFlags) no vienen del Excel: se guardan antes de
+    // vaciar la tabla y se devuelven al final, para que reconstruir (ahora a diario y sin que nadie lo mire) no las borre.
+    const marcasManuales = await sequelize.query('SELECT referencia, en_tramite, es_canje FROM negocios WHERE en_tramite OR es_canje', { type: QueryTypes.SELECT });
+
+    let totalComp = 0;
+    await sequelize.transaction(async (t) => {
+      // TRUNCATE simple (por tabla) falla en Postgres si otra tabla la referencia por FK: se truncan las tres juntas.
+      await sequelize.query('TRUNCATE TABLE negocio_movimientos, negocio_compradores, negocios', { transaction: t });
+
+      const LOTE = 500;
+      const referencias = [...negocios.keys()];
+      const idPorReferencia = new Map();
+      for (let i = 0; i < referencias.length; i += LOTE) {
+        const lote = referencias.slice(i, i + LOTE).map((referencia) => {
+          const n = negocios.get(referencia);
+          return { referencia, estado: n.estado, datos: n.datos, saldo_actual: n.saldoActual };
+        });
+        const creados = await Negocio.bulkCreate(lote, { transaction: t, returning: ['id', 'referencia'] });
+        for (const c of creados) idPorReferencia.set(c.referencia, c.id);
+        progreso.establecer(Math.min(i + LOTE, referencias.length));
+      }
+
+      progreso.fase('Guardando compradores', referencias.length);
+      const filasComp = [];
+      for (const [referencia, n] of negocios) {
+        for (const c of n.compradores) {
+          filasComp.push({ negocio_id: idPorReferencia.get(referencia), nombre: c.nombre, nro_id: c.nroId ?? null, porcentaje: c.porcentaje ?? null, orden: c.orden });
+        }
+      }
+      for (let i = 0; i < filasComp.length; i += 1000) {
+        await NegocioComprador.bulkCreate(filasComp.slice(i, i + 1000), { transaction: t });
+        progreso.establecer(Math.min(i + 1000, filasComp.length));
+      }
+      totalComp = filasComp.length;
+
+      progreso.fase('Guardando movimientos', movimientos.size);
+      const filasMov = [...movimientos.values()].map((m) => ({
+        negocio_id: idPorReferencia.get(m.referencia), referencia: m.referencia, id_movimiento: m.idMovimiento, fecha_contable: m.fechaContable ?? null, datos: m.datos,
+      }));
+      for (let i = 0; i < filasMov.length; i += 1000) {
+        await NegocioMovimiento.bulkCreate(filasMov.slice(i, i + 1000), { transaction: t });
+        progreso.establecer(Math.min(i + 1000, filasMov.length));
+      }
+
+      for (const m of marcasManuales) {
+        await Negocio.update({ en_tramite: m.en_tramite, es_canje: m.es_canje }, { where: { referencia: m.referencia }, transaction: t });
       }
     });
 
-    // ── Fase 2: hoja "Mov_Por_Propietario" -> compradores + movimientos ───
-    const hojasFase2 = hojaIds.filter((h) => h.nombre_hoja === 'Mov_Por_Propietario');
-    progreso.fase('Cargando compradores y movimientos', hojasFase2.length);
-    for (const hojaRef of hojasFase2) {
-      progreso.avanzar(1);
-      const hoja = await HojaFiduciaria.findByPk(hojaRef.id, { attributes: ['columnas', 'filas'] });
-      const filas = Array.isArray(hoja.filas) ? hoja.filas : [];
-      const storedCols = Array.isArray(hoja.columnas) ? hoja.columnas : [];
-      const idx = resolverColumnasMovPorPropietario(storedCols);
-
-      const negMap = new Map();
-      for (const row of filas) {
-        const referencia = cleanRef(cleanStr(row[idx.negRefIdx]));
-        if (!referencia) continue;
-
-        if (!negMap.has(referencia)) negMap.set(referencia, { compradores: new Map(), movimientos: [] });
-        const entry = negMap.get(referencia);
-
-        const comps = parseCompradoresCell(row[idx.propIdx], row[idx.nroIdIdx], idx.pctIdx !== -1 ? row[idx.pctIdx] : null);
-        for (const comp of comps) {
-          const byId = comp.nroId ? entry.compradores.get(comp.nroId) : undefined;
-          const byName = entry.compradores.get(comp.nombre);
-          if (byId) {
-            // ya conocido por cedula
-          } else if (byName) {
-            if (comp.nroId) {
-              entry.compradores.delete(comp.nombre);
-              entry.compradores.set(comp.nroId, { ...byName, nroId: comp.nroId });
-            }
-          } else {
-            const key = comp.nroId || comp.nombre;
-            entry.compradores.set(key, { ...comp, orden: entry.compradores.size });
-          }
-        }
-
-        const mov = extraerDatosMovimiento(row, idx);
-        if (mov) entry.movimientos.push({ ...mov, referencia });
-      }
-
-      const negMapEntries = [...negMap.entries()];
-      const referenciasHoja = negMapEntries.map(([r]) => r);
-      const idsMovHoja = negMapEntries.flatMap(([, entry]) => entry.movimientos.map((m) => m.idMovimiento));
-
-      const [existingNegocios, existingMovIds] = await Promise.all([
-        Negocio.findAll({ where: { referencia: { [Op.in]: referenciasHoja } }, attributes: ['id', 'referencia'] }),
-        idsMovHoja.length > 0
-          ? NegocioMovimiento.findAll({ where: { id_movimiento: { [Op.in]: idsMovHoja } }, attributes: ['id_movimiento'] })
-          : [],
-      ]);
-      const negocioByRef = new Map(existingNegocios.map((n) => [n.referencia, n]));
-      const existingMovSet = new Set(existingMovIds.map((m) => m.id_movimiento));
-
-      let compCount = 0, movCount = 0;
-      await runBatched(negMapEntries, 20, async ([referencia, entry]) => {
-        let neg = negocioByRef.get(referencia);
-        if (!neg) {
-          neg = await Negocio.create({ referencia });
-          negocioByRef.set(referencia, neg);
-        }
-
-        const list = [...entry.compradores.values()];
-        if (list.length > 0) {
-          await NegocioComprador.destroy({ where: { negocio_id: neg.id } });
-          await NegocioComprador.bulkCreate(list.map((c) => ({ negocio_id: neg.id, nombre: c.nombre, nro_id: c.nroId, porcentaje: c.porcentaje, orden: c.orden })));
-          await applyNroIdRaw(neg.id, list);
-          compCount += list.length;
-        }
-
-        const toInsert = entry.movimientos.filter((m) => !existingMovSet.has(m.idMovimiento));
-        if (toInsert.length > 0) {
-          const BATCH = 100;
-          for (let i = 0; i < toInsert.length; i += BATCH) {
-            await NegocioMovimiento.bulkCreate(
-              toInsert.slice(i, i + BATCH).map((m) => ({ negocio_id: neg.id, referencia: m.referencia, id_movimiento: m.idMovimiento, fecha_contable: m.fechaContable ?? null, datos: m.datos }))
-            );
-          }
-          movCount += toInsert.length;
-        }
-      });
-      console.log(`[backfill] Mov_Por_Propietario: ${compCount} compradores, ${movCount} movimientos`); // eslint-disable-line no-console
-    }
-
-    const total = await Negocio.count();
+    const total = negocios.size;
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    result = { ok: true, negocios: total, elapsed: `${elapsed}s` };
-    console.log(`[backfill] Listo: ${total} negocios en ${elapsed}s`); // eslint-disable-line no-console
+    result = { ok: true, negocios: total, compradores: totalComp, movimientos: movimientos.size, elapsed: `${elapsed}s` };
+    console.log(`[backfill] Listo: ${total} negocios, ${totalComp} compradores, ${movimientos.size} movimientos en ${elapsed}s`); // eslint-disable-line no-console
     // Los negocios se reconstruyeron: se vuelve a decidir a qué inmueble corresponde cada uno.
     await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
     invalidarCacheDashboard();
   } catch (err) {
-    result = { ok: false, error: err.message };
-    console.error('[backfill] Error:', err.message); // eslint-disable-line no-console
+    if (esCancelacion(err)) {
+      result = { ok: false, cancelada: true, error: 'Cancelada: no se modificó nada, los negocios quedaron como estaban.' };
+      console.log('[backfill] Cancelada por el usuario (sin cambios en la base)'); // eslint-disable-line no-console
+    } else {
+      result = { ok: false, error: err.message };
+      console.error('[backfill] Error (la base quedó como estaba):', err.message); // eslint-disable-line no-console
+    }
   } finally {
     progreso.terminar();
-    for (const m of marcasManuales) {
-      try {
-        await Negocio.update({ en_tramite: m.en_tramite, es_canje: m.es_canje }, { where: { referencia: m.referencia } });
-      } catch (err) {
-        console.error('[backfill] No se pudo restaurar la marca de', m.referencia, err.message); // eslint-disable-line no-console
-      }
-    }
     running = false;
   }
 }

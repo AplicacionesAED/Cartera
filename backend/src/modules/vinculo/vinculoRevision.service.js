@@ -5,9 +5,8 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 
 const ACCION_SUGERIDA = {
-  RESPALDO: 'Poner la referencia de recaudo del negocio en este inmueble de Zoho (hoy se vincula por el código del inmueble).',
-  AMBIGUO: 'Dejar la referencia de recaudo en un solo inmueble de Zoho (quitarla de los demás).',
-  SIN_VINCULO: 'Poner esta referencia de recaudo en el inmueble correcto de Zoho (ver la sugerencia).',
+  AMBIGUO: 'La nomenclatura coincide con varios inmuebles: definir cuál es y corregir la categoría o la nomenclatura del negocio en la fiducia.',
+  SIN_VINCULO: 'Revisar la nomenclatura y la categoría del negocio contra el inmueble en el CRM (ver la sugerencia).',
 };
 
 async function listar({ estado, search, soloRevision = 'true' } = {}) {

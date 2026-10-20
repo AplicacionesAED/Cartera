@@ -117,7 +117,7 @@ async function inicioBaiaKristal(puede, esAdmin) {
   if (puede('negocios')) {
     const porRevisar = await contarVinculosPendientes().catch(() => 0);
     if (porRevisar > 0) {
-      alertas.push({ id: 'vinculos', tipo: 'warning', titulo: 'Vínculos Negocio ↔ Inmueble por revisar', detalle: 'Negocios cuyo inmueble no coincide con lo que dice Zoho. La app ya usa el vínculo resuelto; el CRM debe corregir el dato.', cuenta: porRevisar, to: '/negocios/vinculos' });
+      alertas.push({ id: 'vinculos', tipo: 'warning', titulo: 'Vínculos Negocio ↔ Inmueble por revisar', detalle: 'Negocios que no se pudieron vincular a un inmueble por nomenclatura y categoría; hay que revisar el dato.', cuenta: porRevisar, to: '/negocios/vinculos' });
     }
   }
 

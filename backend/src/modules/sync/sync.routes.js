@@ -18,6 +18,7 @@ const TAREAS = {
   'oliv-oportunidades': 'oliv-oportunidades',
   'oliv-inmuebles': 'oliv-inmuebles',
   subforms: 'oportunidades',
+  negocios: 'negocios',
 };
 
 router.post(
