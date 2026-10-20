@@ -14,6 +14,7 @@ const {
   SIN_PROYECTO,
   inmueblesPorReferencia,
   inmuebleDeFila,
+  referenciasConOportunidadVigente,
   mapInmueble,
   referenciasPorProyectoTorre,
   referenciasSinProyecto,
@@ -128,9 +129,10 @@ async function list({ stage, search, etapa, frente, torre, sortBy, sortDir, page
   });
 
   const inmueblesPorRef = await inmueblesPorReferencia(rows.map((r) => r.referencia_recaudo));
+  const refsConVigente = await referenciasConOportunidadVigente(rows.map((r) => r.referencia_recaudo));
 
   return {
-    data: rows.map((row) => _mapItem(row, mapInmueble(inmuebleDeFila(row, inmueblesPorRef)))),
+    data: rows.map((row) => _mapItem(row, mapInmueble(inmuebleDeFila(row, inmueblesPorRef, refsConVigente)))),
     pagination: { total: count, page: pageNum, limit: limitNum, totalPages: Math.ceil(count / limitNum) },
     // Cascada de filtros del inmueble (mismo shape que Otrosíes/Negocios),
     // para que el frontend no los escriba a mano.

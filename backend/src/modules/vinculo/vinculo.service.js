@@ -22,7 +22,7 @@ const { limpiarNombreContacto, ETAPA_MINIMA_ORDER } = require('../../utils/olivH
 const Negocio = require('../negocio/negocio.model');
 const Oportunidad = require('../oportunidad/oportunidad.model');
 const InventarioItem = require('../inventario/inventarioItem.model');
-const { esEtapaDesistida } = require('../../config/estadosOportunidad');
+const { esEtapaDesistida, ESTADOS_DESISTIDOS } = require('../../config/estadosOportunidad');
 const { findOportunidadByReferencia, resolverNegocioIdDesdeInmueble } = require('../negocio/negocio.service');
 const olivOportunidad = require('../olivOportunidad/olivOportunidad.model');
 const OlivInmueble = require('../olivInmueble/olivInmueble.model');
@@ -45,15 +45,27 @@ async function inmuebleDeNegocio(negocio) {
   return rows[0]?.inventario_id ? InventarioItem.findByPk(rows[0].inventario_id) : null;
 }
 
+// Oportunidad caída (BACKOUT, desistida...) que comparte la referencia con OTRA oportunidad vigente: el inmueble del
+// negocio es de la vigente, no de esta. Si es la única con esa referencia, sigue siendo la dueña del negocio.
+async function esDesistidaConOtraVigente(opp) {
+  if (!esEtapaDesistida(opp.stage) || !opp.referencia_recaudo) return false;
+  const vigentes = await Oportunidad.count({
+    where: { referencia_recaudo: opp.referencia_recaudo, id: { [Op.ne]: opp.id }, stage: { [Op.notIn]: [...ESTADOS_DESISTIDOS] } },
+  });
+  return vigentes > 0;
+}
+
 async function resolverBaia(tipo, id) {
   let oportunidad = null; // { id, dealName, stage }
   let negocio = null;
   let inmueble = null;
+  let ocultarInmueble = false;
 
   if (tipo === 'oportunidad') {
     const opp = await Oportunidad.findByPk(id, { attributes: ['id', 'deal_name', 'stage', 'referencia_recaudo', 'seccion_inmueble'] });
     if (!opp) throw new ApiError(404, 'Oportunidad no encontrada');
     oportunidad = { id: opp.id, dealName: opp.deal_name, stage: opp.stage };
+    ocultarInmueble = await esDesistidaConOtraVigente(opp);
     const referencia = opp.referencia_recaudo;
     if (referencia) {
       negocio = await Negocio.findOne({ where: { referencia } });
@@ -61,7 +73,7 @@ async function resolverBaia(tipo, id) {
       // oportunidad esté caída (BACKOUT, desistida...): esa comparte la referencia con la vigente pero no es dueña del inmueble.
       const propioZohoId = opp.seccion_inmueble?.Inmueble?.id;
       if (propioZohoId) inmueble = await InventarioItem.findOne({ where: { zoho_id: String(propioZohoId) } });
-      if (!inmueble && !esEtapaDesistida(opp.stage)) {
+      if (!inmueble && !(await esDesistidaConOtraVigente(opp))) {
         inmueble = (negocio ? await inmuebleDeNegocio(negocio) : null) ?? (await InventarioItem.findOne({ where: { referencia_recaudo: referencia }, order: [['id', 'ASC']] }));
       }
     }
@@ -83,7 +95,7 @@ async function resolverBaia(tipo, id) {
   }
 
   // Completa lo que falte con lo que ya se sabe.
-  if (!inmueble && negocio && !(tipo === 'oportunidad' && esEtapaDesistida(oportunidad?.stage))) inmueble = await inmuebleDeNegocio(negocio);
+  if (!inmueble && negocio && !(tipo === 'oportunidad' && ocultarInmueble)) inmueble = await inmuebleDeNegocio(negocio);
   if (!oportunidad) {
     const opp = await findOportunidadByReferencia(negocio?.referencia ?? inmueble?.referencia_recaudo ?? null);
     if (opp) oportunidad = { id: opp.id, dealName: opp.dealName, stage: opp.stage };

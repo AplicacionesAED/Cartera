@@ -9,7 +9,7 @@
 const sequelize = require('../../config/db');
 const { QueryTypes } = require('sequelize');
 const { PROYECTO_TORRE_EXCLUIDOS } = require('../../config/inventarioExcluido');
-const { esEtapaDesistida } = require('../../config/estadosOportunidad');
+const { esEtapaDesistida, ESTADOS_DESISTIDOS } = require('../../config/estadosOportunidad');
 
 // Etapa constructiva de cada Torre (proyecto + número de torre → etapa
 // 1-4), solo para Kabo/Prive/Kala/Kaliza. Isla Laguna, The Plaza y Vela
@@ -193,10 +193,23 @@ async function inmueblesPorReferencia(referencias) {
 // Inmueble que se muestra en la fila de una oportunidad/otrosí. Una oportunidad caída (BACKOUT, desistida...) que
 // comparte la referencia con la vigente NO se cuelga del inmueble del negocio vigente: si no tiene inmueble propio
 // en Zoho queda "Sin inmueble" (si no, el mismo inmueble parecería tener dos oportunidades).
-function inmuebleDeFila(row, porRef) {
+// Solo se le quita cuando hay OTRA oportunidad vigente con la misma referencia; si es la única, el negocio sigue
+// siendo suyo y conserva el inmueble.
+function inmuebleDeFila(row, porRef, refsConVigente) {
   const propio = row.seccion_inmueble?.Inmueble?.id;
-  if (!propio && esEtapaDesistida(row.stage)) return undefined;
+  if (!propio && esEtapaDesistida(row.stage) && refsConVigente?.has(row.referencia_recaudo)) return undefined;
   return porRef.get(row.referencia_recaudo);
+}
+
+// Referencias (de la lista dada) que tienen al menos una oportunidad que NO está caída.
+async function referenciasConOportunidadVigente(referencias) {
+  const refs = [...new Set((referencias || []).filter(Boolean))];
+  if (!refs.length) return new Set();
+  const rows = await sequelize.query(
+    `SELECT DISTINCT referencia_recaudo FROM oportunidades WHERE referencia_recaudo = ANY($1::text[]) AND NOT (stage = ANY($2::text[]))`,
+    { bind: [refs, [...ESTADOS_DESISTIDOS]], type: QueryTypes.SELECT }
+  );
+  return new Set(rows.map((r) => r.referencia_recaudo));
 }
 
 function mapInmueble(item) {
@@ -338,6 +351,7 @@ module.exports = {
   pisosPorFrenteTorre,
   inmueblesPorReferencia,
   inmuebleDeFila,
+  referenciasConOportunidadVigente,
   mapInmueble,
   referenciasPorProyectoTorre,
   referenciasSinProyecto,

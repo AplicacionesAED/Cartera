@@ -17,6 +17,7 @@ const {
   SIN_PROYECTO,
   inmueblesPorReferencia,
   inmuebleDeFila,
+  referenciasConOportunidadVigente,
   mapInmueble,
   referenciasPorProyectoTorre,
   referenciasSinProyecto,
@@ -143,6 +144,7 @@ async function listOtrosi({ search, requerido, stage, sortBy, sortDir, etapa, fr
   });
 
   const inmueblesPorRef = await inmueblesPorReferencia(rows.map((r) => r.referencia_recaudo));
+  const refsConVigente = await referenciasConOportunidadVigente(rows.map((r) => r.referencia_recaudo));
 
   return {
     data: rows.map((row) => ({
@@ -160,7 +162,7 @@ async function listOtrosi({ search, requerido, stage, sortBy, sortDir, etapa, fr
       // Columna 'Inmueble': objeto con las 4 partes (mismas del Dashboard) + el
       // texto listo para pintar. `null` cuando la referencia no matchea ningún
       // inventario_item (el frontend muestra 'Sin inmueble').
-      inmueble: mapInmueble(inmuebleDeFila(row, inmueblesPorRef)),
+      inmueble: mapInmueble(inmuebleDeFila(row, inmueblesPorRef, refsConVigente)),
       otroSiRequerido: row.otro_si_requerido,
       // Se sigue exponiendo aunque el Jefe pidiera ocultar la columna: dijo
       // "hasta nuevo aviso", así que no se borra de modelo/sync/backfill.
