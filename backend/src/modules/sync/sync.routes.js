@@ -17,7 +17,7 @@ const TAREAS = {
   otrosies: 'otrosies',
   'oliv-oportunidades': 'oliv-oportunidades',
   'oliv-inmuebles': 'oliv-inmuebles',
-  subforms: null,
+  subforms: 'oportunidades',
 };
 
 router.post(

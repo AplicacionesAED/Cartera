@@ -22,37 +22,27 @@ function BackfillSubformsCard() {
     obtener: getBackfillSubformsStatus,
     normalizar: normalizarEstadoRunning,
   });
-  const syncTodos = useSyncControl({
-    iniciar: () => iniciarBackfillSubforms(true),
-    obtener: getBackfillSubformsStatus,
-    normalizar: normalizarEstadoRunning,
-  });
-  // Los dos botones leen el mismo estado del servidor: se muestra el de la corrida que esté activa.
-  const sync = syncTodos.corriendo || syncTodos.errorInicio ? syncTodos : syncFaltantes;
+  const sync = syncFaltantes;
   const result = sync.estado?.result;
-  const enCurso = syncFaltantes.corriendo || syncTodos.corriendo;
+  const enCurso = syncFaltantes.corriendo;
 
   return (
     <section className={shared.sectionCard}>
       <div>
         <h2 className={shared.sectionTitle}>Plan de pagos desde Zoho</h2>
         <p className={shared.sectionHint}>
-          "Traer los que faltan" trae el plan de pagos (Forma de Pago / Propuesta de Pago) de las oportunidades que todavía no lo tienen guardado. Si ya están todos, no hace nada.
-          "Releer todos" vuelve a leer de Zoho el plan de todas las oportunidades y reemplaza lo guardado: úsalo cuando se cambió un plan en Zoho y no se refleja (tarda varios minutos).
+          Trae el plan de pagos (Forma de Pago / Propuesta de Pago) de las oportunidades que todavía no lo tienen guardado. Si ya están todos, no hace nada.
+          Para volver a leer los planes ya guardados (cuando se cambió uno en Zoho), usa "Actualizar planes de pago" en el módulo Oportunidades.
         </p>
       </div>
 
       {enCurso ? (
-        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo={syncTodos.corriendo ? 'Releyendo todos los planes de pago…' : 'Trayendo planes de pago…'} />
+        <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Trayendo planes de pago…" />
       ) : (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button variant="secondary" onClick={syncFaltantes.ejecutar}>
             <RefreshCw size={13} />
             Traer los que faltan
-          </Button>
-          <Button variant="secondary" onClick={syncTodos.ejecutar}>
-            <RefreshCw size={13} />
-            Releer todos
           </Button>
         </div>
       )}

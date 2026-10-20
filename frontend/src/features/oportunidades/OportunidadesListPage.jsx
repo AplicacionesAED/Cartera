@@ -18,9 +18,9 @@ import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SortHeader } from '../../components/ui/SortHeader.jsx';
 import { useSortableTable, ariaSort } from '../../hooks/useSortableTable.js';
-import { listOportunidades, listStages, iniciarSyncOportunidades, getSyncStatusOportunidades } from '../../api/oportunidades.js';
+import { listOportunidades, listStages, iniciarSyncOportunidades, getSyncStatusOportunidades, iniciarBackfillSubforms, getBackfillSubformsStatus } from '../../api/oportunidades.js';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
-import { useSyncControl, normalizarEstadoLog } from '../../hooks/useSyncControl.js';
+import { useSyncControl, normalizarEstadoLog, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { formatDateTime } from '../../utils/format.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
 import styles from './OportunidadesListPage.module.css';
@@ -37,13 +37,24 @@ function SyncStatusBar({ onTerminado }) {
     normalizar: normalizarEstadoLog,
     alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
   });
+  // "Actualizar planes de pago": vuelve a leer de Zoho el plan de TODAS las oportunidades y reemplaza lo guardado
+  // (5 consultas a la vez; se puede cancelar sin perder lo ya actualizado).
+  const syncPlanes = useSyncControl({
+    iniciar: () => iniciarBackfillSubforms(true),
+    obtener: getBackfillSubformsStatus,
+    normalizar: normalizarEstadoRunning,
+    alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
+  });
   const status = sync.estado;
-  const errorSync = sync.errorInicio;
+  const errorSync = sync.errorInicio || syncPlanes.errorInicio;
+  const resultadoPlanes = syncPlanes.ejecutado && !syncPlanes.corriendo ? syncPlanes.estado : null;
 
   return (
     <div className={styles.syncBar}>
       {sync.corriendo ? (
         <SyncProgreso progreso={sync.progreso} recibidoEn={sync.recibidoEn} titulo="Sincronizando con Zoho…" compacto embebido />
+      ) : syncPlanes.corriendo ? (
+        <SyncProgreso progreso={syncPlanes.progreso} recibidoEn={syncPlanes.recibidoEn} titulo="Actualizando planes de pago desde Zoho…" compacto embebido />
       ) : (
         <>
           <div className={styles.syncEstado}>
@@ -55,11 +66,19 @@ function SyncStatusBar({ onTerminado }) {
               </span>
             )}
             {errorSync && <span className={styles.syncError}>No se pudo iniciar la sincronización: {errorSync}</span>}
+            {!errorSync && resultadoPlanes?.cancelada && <span>Actualización de planes cancelada: {resultadoPlanes.result?.actualizadas ?? 0} planes ya quedaron actualizados</span>}
+            {!errorSync && resultadoPlanes?.ok === true && <span className={styles.syncOk}>Planes de pago actualizados ({resultadoPlanes.result?.actualizadas ?? 0}{resultadoPlanes.result?.errores > 0 ? `, ${resultadoPlanes.result.errores} con error` : ''})</span>}
             {!errorSync && status?.status === 'cancelled' && <span>Última sync cancelada: se conservó lo ya guardado</span>}
             {!errorSync && status?.status === 'error' && (
               <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
             )}
           </div>
+          <Button variant="secondary" onClick={() => { if (window.confirm('Se volverá a leer de Zoho el plan de pagos de todas las oportunidades (tarda varios minutos). Puedes cancelar en cualquier momento sin perder lo ya actualizado. ¿Continuar?')) syncPlanes.ejecutar(); }}>
+            <span className={styles.botonSyncInterior}>
+              <RefreshCw size={14} aria-hidden="true" />
+              Actualizar planes de pago
+            </span>
+          </Button>
           <Button variant="secondary" onClick={sync.ejecutar}>
             <span className={styles.botonSyncInterior}>
               <RefreshCw size={14} aria-hidden="true" />
