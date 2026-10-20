@@ -5,6 +5,11 @@
 //   - una sola coincidencia  -> CONFIRMADO (vinculado)
 //   - varios inmuebles con esa referencia -> AMBIGUO (no se vincula: el CRM debe dejar uno)
 //   - ninguna coincidencia   -> SIN_VINCULO (no se vincula)
+// Respaldo (el mismo de la app original): si ninguna referencia coincide, el negocio se vincula al inmueble cuyo
+// código (`C_digo_inmueble`) es EXACTAMENTE la nomenclatura del negocio, siempre que sea un solo inmueble y que ese
+// inmueble no pertenezca ya (por referencia) a otro negocio -- así no se roban negocios entre unidades (caso Vela
+// 210A / The Plaza 210). Estado RESPALDO: cuenta como vinculado pero entra a "Vínculos por revisar" (el inmueble
+// debería tener la referencia del negocio en Zoho).
 // En los dos últimos casos el negocio entra a "Vínculos por revisar" con una SUGERENCIA para el CRM, calculada con
 // la oportunidad (su campo Inmueble) y la nomenclatura de la fiducia. La sugerencia es solo una pista: no vincula
 // nada ni afecta ningún total hasta que el CRM corrija la referencia en Zoho. El resultado se guarda en
@@ -89,6 +94,20 @@ function resolverNegocio(n, ctx) {
     };
   }
 
+  // Respaldo por código exacto de inmueble.
+  const porCodigo = n.nom ? inmuebles.filter((i) => i.cod != null && String(i.cod) === String(n.nom)) : [];
+  if (A.length === 0 && porCodigo.length === 1 && !ctx.reclamados.has(porCodigo[0].id)) {
+    const u = porCodigo[0];
+    return {
+      referencia: n.referencia, inventario_id: u.id, estado: 'RESPALDO', metodo: 'codigo', negocio_estado: n.estado,
+      requiere_revision: !esLibre,
+      detalle: u.ref
+        ? `Vinculado por el código del inmueble (${u.cod}). El inmueble ${etiqueta(u)} tiene en Zoho la referencia ${u.ref} y no la del negocio (${n.referencia}).`
+        : `Vinculado por el código del inmueble (${u.cod}). El inmueble ${etiqueta(u)} no tiene referencia de recaudo en Zoho (debería ser ${n.referencia}).`,
+      observaciones: null, senales: { referencia: A, codigo: [u.id] },
+    };
+  }
+
   // Sugerencia (solo pista): inmueble de la oportunidad y/o nomenclatura de la fiducia.
   const B = [...new Set((oppsPorRef.get(n.referencia) ?? []).map((z) => porZoho.get(z)?.id).filter((x) => x != null))];
   const c = porNomenclatura(n, inmuebles);
@@ -132,7 +151,7 @@ function resolverNegocio(n, ctx) {
   };
 }
 
-function construirContexto({ inmuebles, oportunidades }) {
+function construirContexto({ inmuebles, oportunidades, negocios }) {
   const porId = new Map(inmuebles.map((i) => [i.id, i]));
   const porZoho = new Map(inmuebles.map((i) => [i.zoho_id, i]));
   const porRef = new Map();
@@ -146,7 +165,10 @@ function construirContexto({ inmuebles, oportunidades }) {
     if (!oppsPorRef.has(o.ref)) oppsPorRef.set(o.ref, []);
     oppsPorRef.get(o.ref).push(o.inv_zoho_id);
   }
-  return { porId, porZoho, porRef, oppsPorRef, inmuebles };
+  // Inmuebles que ya pertenecen (por referencia) a algún negocio: el respaldo por código no puede tomarlos.
+  const refsNegocio = new Set(negocios.map((n) => n.referencia));
+  const reclamados = new Set(inmuebles.filter((i) => i.ref && refsNegocio.has(i.ref)).map((i) => i.id));
+  return { porId, porZoho, porRef, oppsPorRef, inmuebles, reclamados };
 }
 
 // Calcula (sin guardar) el vínculo de todos los negocios.

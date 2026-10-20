@@ -5,6 +5,7 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 
 const ACCION_SUGERIDA = {
+  RESPALDO: 'Poner la referencia de recaudo del negocio en este inmueble de Zoho (hoy se vincula por el código del inmueble).',
   AMBIGUO: 'Dejar la referencia de recaudo en un solo inmueble de Zoho (quitarla de los demás).',
   SIN_VINCULO: 'Poner esta referencia de recaudo en el inmueble correcto de Zoho (ver la sugerencia).',
 };

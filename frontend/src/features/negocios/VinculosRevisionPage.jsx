@@ -17,6 +17,7 @@ import styles from './NegociosPage.module.css';
 const ESTADOS = {
   SIN_VINCULO: { etiqueta: 'Sin vínculo', variante: 'danger' },
   AMBIGUO: { etiqueta: 'Referencia repetida', variante: 'warning' },
+  RESPALDO: { etiqueta: 'Vinculado por código', variante: 'warning' },
   CONFIRMADO: { etiqueta: 'Vinculado', variante: 'success' },
 };
 
