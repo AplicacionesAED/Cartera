@@ -11,7 +11,7 @@ const zohoConfig = require('../../config/zoho');
 const Oportunidad = require('./oportunidad.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('subforms');
 
@@ -63,6 +63,16 @@ async function refrescarSubformsLote(zohoIds, max = 300) {
 
 // `todos = false`: solo las que no tienen plan guardado (lo normal). `todos = true`: relee el plan de TODAS las
 // oportunidades con fecha de inicio de plan y sobreescribe lo guardado -- para reflejar cambios hechos en Zoho.
+// Trae y guarda el plan de una oportunidad; si Zoho rechaza por velocidad o falla un momento, reintenta una vez.
+async function consultarYGuardar(opp) {
+  try {
+    return await refrescarSubformsDe(opp);
+  } catch (err) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return refrescarSubformsDe(opp);
+  }
+}
+
 async function runSubformsBackfill(todos = false) {
   if (running) return;
   running = true;
@@ -93,28 +103,27 @@ async function runSubformsBackfill(todos = false) {
     progreso.fase(todos ? 'Releyendo todos los planes de pago' : 'Trayendo planes de pago', pendientes.length);
     reportarProgreso(pendientes.length);
 
-    for (const opp of pendientes) {
-      try {
-        const token = await getAccessToken();
-        const response = await axios.get(`${zohoConfig.apiBase}/Deals/${opp.zoho_id}`, {
-          headers: { Authorization: `Zoho-oauthtoken ${token}` },
-          params: { fields: 'Forma_de_Pago,Propuesta_de_Pago' },
-        });
-        const deal = response.data?.data?.[0] || {};
-        const formaPago = limpiarFilasSubform(deal.Forma_de_Pago);
-        const propuestaPago = limpiarFilasSubform(deal.Propuesta_de_Pago);
-
-        await opp.update({ forma_pago: formaPago.length ? formaPago : null, propuesta_pago: propuestaPago.length ? propuestaPago : null });
-        actualizadas++;
-      } catch (err) {
-        errores++;
-        console.error(`[subformsBackfill] Error en ${opp.zoho_id}:`, err.message); // eslint-disable-line no-console
-      }
-
-      procesadas++;
+    // 5 consultas a Zoho a la vez (antes una por una). Entre grupos se revisa si el usuario pidió cancelar: así lo ya
+    // guardado queda completo (cada plan se guarda entero) y nunca se corta a mitad de una oportunidad.
+    const CONCURRENCIA = 5;
+    for (let i = 0; i < pendientes.length; i += CONCURRENCIA) {
+      progreso.verificar();
+      const grupo = pendientes.slice(i, i + CONCURRENCIA);
+      await Promise.all(
+        grupo.map(async (opp) => {
+          try {
+            await consultarYGuardar(opp);
+            actualizadas++;
+          } catch (err) {
+            errores++;
+            console.error(`[subformsBackfill] Error en ${opp.zoho_id}:`, err.message); // eslint-disable-line no-console
+          }
+          procesadas++;
+        })
+      );
       progreso.establecer(procesadas);
       reportarProgreso(pendientes.length);
-      if (procesadas % 50 === 0 || procesadas === pendientes.length) {
+      if (procesadas % 50 < CONCURRENCIA || procesadas === pendientes.length) {
         console.log(`[subformsBackfill] Progreso: ${procesadas}/${pendientes.length} (${actualizadas} ok, ${errores} errores)`); // eslint-disable-line no-console
       }
     }
@@ -127,8 +136,13 @@ async function runSubformsBackfill(todos = false) {
       invalidarCacheDashboard();
     }
   } catch (err) {
-    result = { ok: false, error: err.message };
-    console.error('[subformsBackfill] Error fatal:', err.message); // eslint-disable-line no-console
+    if (esCancelacion(err)) {
+      console.log(`[subformsBackfill] Cancelado por el usuario (${actualizadas} planes ya guardados)`); // eslint-disable-line no-console
+      result = { ok: false, cancelada: true, total: procesadas, actualizadas, errores, error: `Cancelado: se conservaron ${actualizadas} planes ya actualizados.` };
+    } else {
+      result = { ok: false, error: err.message };
+      console.error('[subformsBackfill] Error fatal:', err.message); // eslint-disable-line no-console
+    }
   } finally {
     progreso.terminar();
     running = false;

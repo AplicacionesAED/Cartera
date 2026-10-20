@@ -12,7 +12,7 @@ const SyncLog = require('./syncLog.model');
 const { runSubformsBackfill, refrescarSubformsLote } = require('./oportunidad.subformsBackfill');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
 async function zohoGet(path, params = {}) {
   const token = await getAccessToken();
@@ -157,6 +157,7 @@ async function fetchAllDeals(fieldsList, modifiedSince = null) {
   console.log(modifiedSince ? `[sync] Incremental sync — modified since: ${modifiedSince}` : '[sync] Full sync — fetching all deals'); // eslint-disable-line no-console
 
   while (moreRecords) {
+    progreso.verificar(); // cancelación: aún no se ha guardado nada en esta fase
     console.log(`[sync] Fetching deals page ${page}...`); // eslint-disable-line no-console
     progreso.etiqueta(`Trayendo oportunidades de Zoho (página ${page})`);
     try {
@@ -365,6 +366,7 @@ async function syncOportunidadesFromZoho(force = false) {
     const BATCH_SIZE = 50;
     let saved = 0;
     for (let i = 0; i < deals.length; i += BATCH_SIZE) {
+      progreso.verificar(); // punto seguro: lo ya guardado queda completo, cada oportunidad se guarda entera
       const batch = deals.slice(i, i + BATCH_SIZE);
       await Promise.all(batch.map((deal) => upsertOportunidad(mapDeal(deal, fieldMap))));
       saved += batch.length;
@@ -382,6 +384,7 @@ async function syncOportunidadesFromZoho(force = false) {
     const CONTACT_FIELDS = 'Email,Phone,Mobile';
     const contactMap = {};
     for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+      progreso.verificar();
       const batch = contactIds.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map((cid) => zohoGet(`/Contacts/${cid}`, { fields: CONTACT_FIELDS })));
       progreso.avanzar(batch.length);
@@ -407,6 +410,7 @@ async function syncOportunidadesFromZoho(force = false) {
     // Limpieza (solo en sync COMPLETO, que es el único que ve todas las oportunidades de Zoho): lo guardado
     // que ya no cumple la regla (p. ej. las que entraron solo por Pago Separación) se elimina. Guarda de
     // seguridad: no se borra nada si Zoho devolvió muy pocas oportunidades (respuesta truncada o con error).
+    progreso.verificar(); // la limpieza de abajo es destructiva: nunca se hace en una sync cancelada
     if (!modifiedSince && allDeals.length >= 1000 && deals.length > 0) {
       const vigentes = deals.map((d) => String(d.id));
       const [, resultado] = await sequelize.query('DELETE FROM oportunidades WHERE NOT (zoho_id = ANY($1::text[]))', { bind: [vigentes] });
@@ -429,6 +433,15 @@ async function syncOportunidadesFromZoho(force = false) {
     return { success: true, recordsSync: saved };
   } catch (err) {
     progreso.terminar();
+    if (esCancelacion(err)) {
+      // Cancelada por el usuario: lo ya guardado se conserva. NO se marca 'success' (el siguiente incremental parte
+      // de la última sync completa y vuelve a traer lo que faltó) ni se hace la limpieza de cierre.
+      console.log('[sync] Cancelada por el usuario'); // eslint-disable-line no-console
+      await log.update({ finalizado_en: new Date(), status: 'cancelled', error_msg: 'Cancelada por el usuario' });
+      await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
+      invalidarCacheDashboard();
+      return { success: false, cancelada: true };
+    }
     console.error('[sync] Error:', err.message); // eslint-disable-line no-console
     await log.update({ finalizado_en: new Date(), status: 'error', error_msg: err.message });
     return { success: false, error: err.message };

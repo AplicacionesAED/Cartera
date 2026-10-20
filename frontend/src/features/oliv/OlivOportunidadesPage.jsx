@@ -56,7 +56,7 @@ function SyncStatusBar({ onTerminado }) {
     iniciar: iniciarSyncOportunidadesOliv,
     obtener: getSyncStatusOportunidadesOliv,
     normalizar: normalizarEstadoLog,
-    alTerminar: (e) => { if (e.ok) onTerminado?.(); },
+    alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
   });
   const status = sync.estado;
   const errorSync = sync.errorInicio;
@@ -81,6 +81,7 @@ function SyncStatusBar({ onTerminado }) {
               </span>
             )}
             {errorSync && <span className={styles.syncError}>No se pudo iniciar la sincronización: {errorSync}</span>}
+            {hubspotConfigurado && !errorSync && status?.status === 'cancelled' && <span>Última sync cancelada: se conservó lo ya guardado</span>}
             {hubspotConfigurado && !errorSync && status?.status === 'error' && (
               <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
             )}

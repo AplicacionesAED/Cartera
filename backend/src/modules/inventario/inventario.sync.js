@@ -8,7 +8,7 @@ const config = require('../../config/zoho');
 const InventarioItem = require('./inventarioItem.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('inventario');
 
@@ -20,6 +20,7 @@ async function fetchAllProducts() {
   let moreRecords = true;
 
   while (moreRecords) {
+    progreso.verificar();
     console.log(`[inventario] Fetching Products página ${page}...`); // eslint-disable-line no-console
     const res = await axios.get(`${config.apiBase}/Products`, { headers, params: { per_page: 200, page } });
     const data = res.data.data || [];
@@ -77,6 +78,7 @@ async function syncInventario() {
     const BATCH_SIZE = 50;
     let saved = 0;
     for (let i = 0; i < productos.length; i += BATCH_SIZE) {
+      progreso.verificar(); // punto seguro: cada producto se guarda entero
       const batch = productos.slice(i, i + BATCH_SIZE);
       await Promise.all(
         batch.map((p) => {
@@ -94,8 +96,15 @@ async function syncInventario() {
     await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
     invalidarCacheDashboard();
   } catch (err) {
-    console.error('[inventario] Error:', err.message); // eslint-disable-line no-console
-    syncResult = { ok: false, error: err.message };
+    if (esCancelacion(err)) {
+      console.log('[inventario] Cancelada por el usuario'); // eslint-disable-line no-console
+      syncResult = { ok: false, cancelada: true, error: 'Cancelada por el usuario: se conservó lo ya guardado.' };
+      await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
+      invalidarCacheDashboard();
+    } else {
+      console.error('[inventario] Error:', err.message); // eslint-disable-line no-console
+      syncResult = { ok: false, error: err.message };
+    }
   } finally {
     progreso.terminar();
     syncRunning = false;

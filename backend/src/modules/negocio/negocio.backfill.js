@@ -15,7 +15,8 @@ const NegocioComprador = require('./negocioComprador.model');
 const NegocioMovimiento = require('./negocioMovimiento.model');
 const { progresoSync } = require('../../utils/progresoSync');
 
-const progreso = progresoSync('negocios');
+// No cancelable: reconstruye las tablas de negocios (vacía y vuelve a llenar); interrumpirla dejaría datos a medias.
+const progreso = progresoSync('negocios', { cancelable: false });
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 

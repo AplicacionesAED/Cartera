@@ -87,7 +87,7 @@ function InventarioLista() {
     iniciar: iniciarSyncInventario,
     obtener: getSyncStatusInventario,
     normalizar: normalizarEstadoRunning,
-    alTerminar: (e) => { if (e.ok) cargar(); },
+    alTerminar: (e) => { if (e.ok || e.cancelada) cargar(); },
   });
   const syncError = sync.errorInicio || (sync.ejecutado && !sync.corriendo ? sync.estado?.error : null);
 

@@ -25,6 +25,8 @@ export function normalizarEstadoLog(data) {
     // Un registro 'running' sin progreso activo es de una corrida que murió (reinicio del servidor): no cuenta como en curso.
     corriendo: data.status === 'running' && (data.progreso ? data.progreso.activo !== false : true),
     ok: data.status === 'success' ? true : data.status === 'error' ? false : null,
+    // Cancelada por el usuario: no es un error; lo ya guardado se conserva y la lista debe recargarse.
+    cancelada: data.status === 'cancelled',
     error: data.status === 'error' ? data.errorMsg || 'La sincronización falló.' : null,
     progreso: data.progreso ?? null,
     // Identifica la corrida: cambia cuando termina (o arranca) una distinta. Sirve para saber que la NUESTRA
@@ -42,6 +44,7 @@ export function normalizarEstadoRunning(data) {
     ...data,
     corriendo: data.running === true,
     ok: terminado ? result.ok === true : null,
+    cancelada: terminado && result.cancelada === true,
     error: terminado && result.ok === false ? result.error || 'La sincronización falló.' : null,
     progreso: data.progreso ?? null,
     huella: `${data.progreso?.iniciadoEn}|${JSON.stringify(result)}`,

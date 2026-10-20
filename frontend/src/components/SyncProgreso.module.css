@@ -101,3 +101,27 @@
     animation: none;
   }
 }
+
+.cancelar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border-strong, var(--color-border));
+  border-radius: var(--radius-md, 8px);
+  background: #fff;
+  color: var(--color-ink, #111);
+  font-size: var(--text-label-size);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancelar:hover:not(:disabled) {
+  background: var(--color-surface-hover, var(--color-surface-sunken));
+}
+
+.cancelar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

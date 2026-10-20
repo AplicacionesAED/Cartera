@@ -17,7 +17,7 @@ const { invalidarCacheResumenOliv } = require('../olivResumen/olivResumenCache')
 const { ETAPA_MINIMA_ORDER } = require('../../utils/olivHelpers');
 const OlivPropiedadMetadata = require('./olivPropiedadMetadata.model');
 const OlivSyncLog = require('./olivSyncLog.model');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('oliv-oportunidades');
 
@@ -85,6 +85,7 @@ async function fetchAllDealsOliv(propertyNames, dealstageIds) {
   let page = 1;
 
   do {
+    progreso.verificar();
     console.log(`[oliv-sync] Fetching deals page ${page}...`); // eslint-disable-line no-console
     progreso.etiqueta(`Trayendo oportunidades de HubSpot (página ${page}, ${allDeals.length.toLocaleString('es-CO')} leídas)`);
     const data = await buscarDeals({ properties: propertyNames, limit: 100, after, filterGroups });
@@ -223,6 +224,7 @@ async function syncOportunidadesOliv() {
     const BATCH_SIZE = 50;
     let saved = 0;
     for (let i = 0; i < deals.length; i += BATCH_SIZE) {
+      progreso.verificar(); // punto seguro: cada oportunidad se guarda entera
       const batch = deals.slice(i, i + BATCH_SIZE);
       await Promise.all(
         batch.map(async (deal) => {
@@ -238,6 +240,7 @@ async function syncOportunidadesOliv() {
       }
     }
 
+    progreso.verificar(); // la limpieza es destructiva: nunca en una sync cancelada
     const eliminados = await limpiarOportunidadesObsoletas(deals.map((d) => d.id));
     if (eliminados > 0) {
       console.log(`[oliv-sync] Removed ${eliminados} stale records that no longer qualify.`); // eslint-disable-line no-console
@@ -256,6 +259,12 @@ async function syncOportunidadesOliv() {
     return { success: true, recordsSync: saved };
   } catch (err) {
     progreso.terminar();
+    if (esCancelacion(err)) {
+      console.log('[oliv-sync] Cancelada por el usuario'); // eslint-disable-line no-console
+      await log.update({ finalizado_en: new Date(), status: 'cancelled', error_msg: 'Cancelada por el usuario' });
+      invalidarCacheResumenOliv(); // lo guardado hasta aquí ya cuenta
+      return { success: false, cancelada: true };
+    }
     console.error('[oliv-sync] Error:', err.message); // eslint-disable-line no-console
     await log.update({ finalizado_en: new Date(), status: 'error', error_msg: err.message });
     return { success: false, error: err.message };

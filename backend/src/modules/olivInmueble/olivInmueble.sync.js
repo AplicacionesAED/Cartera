@@ -10,7 +10,7 @@
 const sequelize = require('../../config/db');
 const { buscarObjeto } = require('../../utils/hubspotClient');
 const { invalidarCacheResumenOliv } = require('../olivResumen/olivResumenCache');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('oliv-inmuebles');
 
@@ -33,6 +33,7 @@ async function fetchAllUnidadesOliv() {
   let page = 1;
 
   do {
+    progreso.verificar();
     console.log(`[oliv-inmuebles-sync] Fetching unidades página ${page}...`); // eslint-disable-line no-console
     const data = await buscarObjeto(UNIDADES_OBJECT_ID, { properties: PROPIEDADES, limit: 100, after, filterGroups });
     const results = data.results || [];
@@ -164,6 +165,7 @@ async function syncInmueblesOliv() {
     const BATCH_SIZE = 50;
     let saved = 0;
     for (let i = 0; i < unidades.length; i += BATCH_SIZE) {
+      progreso.verificar(); // punto seguro: cada unidad se guarda entera
       const batch = unidades.slice(i, i + BATCH_SIZE);
       await Promise.all(batch.map((u) => upsertOlivInmueble(mapUnidad(u))));
       saved += batch.length;
@@ -177,8 +179,14 @@ async function syncInmueblesOliv() {
     // olivOportunidad.sync.js.
     invalidarCacheResumenOliv();
   } catch (err) {
-    console.error('[oliv-inmuebles-sync] Error:', err.message); // eslint-disable-line no-console
-    syncResult = { ok: false, error: err.message };
+    if (esCancelacion(err)) {
+      console.log('[oliv-inmuebles-sync] Cancelada por el usuario'); // eslint-disable-line no-console
+      syncResult = { ok: false, cancelada: true, error: 'Cancelada por el usuario: se conservó lo ya guardado.' };
+      invalidarCacheResumenOliv(); // lo guardado hasta aquí ya cuenta
+    } else {
+      console.error('[oliv-inmuebles-sync] Error:', err.message); // eslint-disable-line no-console
+      syncResult = { ok: false, error: err.message };
+    }
   } finally {
     progreso.terminar();
     syncRunning = false;

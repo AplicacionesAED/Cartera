@@ -23,7 +23,7 @@ const zohoConfig = require('../../config/zoho');
 const sequelize = require('../../config/db');
 const ZohoFieldMetadata = require('../oportunidad/zohoFieldMetadata.model');
 const Otrosi = require('./otrosi.model');
-const { progresoSync } = require('../../utils/progresoSync');
+const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
 
 const progreso = progresoSync('otrosies');
 
@@ -191,6 +191,7 @@ async function syncOtrosiesFromZoho() {
     const idsSincronizados = new Set();
     async function guardarLote(filas) {
       for (let i = 0; i < filas.length; i += BATCH_SIZE) {
+        progreso.verificar(); // punto seguro: cada otrosí se guarda entero
         const lote = filas.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(lote.map((deal) => upsertOtrosi(deal)));
         for (let j = 0; j < results.length; j++) {
@@ -208,6 +209,7 @@ async function syncOtrosiesFromZoho() {
 
     let totalPendientes = 0;
     for (const criteria of tramos) {
+      progreso.verificar();
       const filas = await traerTramo(criteria, camposSync);
       totalPendientes += filas.length;
       await guardarLote(filas);
@@ -223,6 +225,7 @@ async function syncOtrosiesFromZoho() {
     // /search en esta misma cuenta (34 páginas, 200 en todas, 0 duplicados,
     // 6663 exactos), así que paginar el criterio base completo es seguro y
     // garantiza los 6663. Upsert-if-missing: no pisa lo ya sincronizado.
+    progreso.verificar();
     progreso.fase('Barrido completo (cierre de cobertura)');
     const sobrantes = await traerTramo(`(${PROYECTO_CRITERIA})`, camposSync);
     const sobrantesNuevos = sobrantes.filter((d) => !idsSincronizados.has(String(d.id)));
@@ -264,9 +267,15 @@ async function syncOtrosiesFromZoho() {
       console.error('[otrosiSync] No se pudo autodisparar el backfill:', e.message); // eslint-disable-line no-console
     }
   } catch (err) {
+    if (esCancelacion(err)) {
+      console.log(`[otrosiSync] Cancelada por el usuario (${registros} registros ya guardados)`); // eslint-disable-line no-console
+      result = { ok: false, cancelada: true, error: 'Cancelada por el usuario: se conservó lo ya guardado.' };
+      ultimoSync = { status: 'cancelled', iniciadoEn, finalizadoEn: new Date(), registrosSync: registros, errorMsg: 'Cancelada por el usuario' };
+    } else {
     console.error('[otrosiSync] Error fatal:', err.message); // eslint-disable-line no-console
     result = { ok: false, error: err.message };
     ultimoSync = { status: 'error', iniciadoEn, finalizadoEn: new Date(), registrosSync: registros, errorMsg: err.message };
+    }
   } finally {
     progreso.terminar();
     running = false;

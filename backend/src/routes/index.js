@@ -17,6 +17,7 @@ const olivEncargoRoutes = require('../modules/olivEncargo/olivEncargo.routes');
 const olivResumenRoutes = require('../modules/olivResumen/olivResumen.routes');
 const inicioRoutes = require('../modules/inicio/inicio.routes');
 const vinculoRoutes = require('../modules/vinculo/vinculo.routes');
+const syncRoutes = require('../modules/sync/sync.routes');
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.use('/oliv/encargos', olivEncargoRoutes);
 router.use('/oliv/resumen', olivResumenRoutes);
 router.use('/inicio', inicioRoutes);
 router.use('/vinculos', vinculoRoutes);
+router.use('/sync', syncRoutes);
 
 router.get('/health', (req, res) => res.json({ success: true, data: { status: 'ok' } }));
 

@@ -93,7 +93,7 @@ function SyncStatusBar({ onTerminado }) {
     iniciar: iniciarSyncOtrosies,
     obtener: getSyncStatusOtrosies,
     normalizar: normalizarEstadoLog,
-    alTerminar: (e) => { if (e.ok) onTerminado?.(); },
+    alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
   });
   const status = sync.estado;
 
@@ -112,6 +112,7 @@ function SyncStatusBar({ onTerminado }) {
               </span>
             )}
             {sync.errorInicio && <span className={styles.syncError}>No se pudo iniciar la sincronización: {sync.errorInicio}</span>}
+            {!sync.errorInicio && status?.status === 'cancelled' && <span>Última sync cancelada: se conservó lo ya guardado</span>}
             {!sync.errorInicio && status?.status === 'error' && (
               <span className={styles.syncError}>Error en sync: {status.errorMsg?.slice(0, 120)}</span>
             )}
