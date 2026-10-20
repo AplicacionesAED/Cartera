@@ -457,3 +457,7 @@
   color: var(--color-danger-ink);
   font-size: var(--text-data-size);
 }
+
+.nowrap {
+  white-space: nowrap;
+}

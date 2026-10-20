@@ -21,6 +21,16 @@ const ESTADOS = {
   CONFIRMADO: { etiqueta: 'Vinculado', variante: 'success' },
 };
 
+// Una sola línea con "…"; el texto completo se ve al pasar el mouse.
+function Corto({ ancho, titulo, children }) {
+  const texto = titulo ?? (typeof children === 'string' ? children : undefined);
+  return (
+    <span title={texto} style={{ display: 'block', maxWidth: ancho, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {children}
+    </span>
+  );
+}
+
 const textoDetalle = (v) => [v.detalle, ...(v.observaciones ?? [])].filter(Boolean).join(' ');
 
 function exportarExcel(vinculos, duplicadas) {
@@ -143,33 +153,35 @@ export function VinculosRevisionPage() {
               {vinculos.map((v) => (
                 <tr key={v.referencia}>
                   <td>
-                    <div className={styles.celdaTitulo}>
+                    <span className={styles.nowrap}>
                       <Link to={`/negocios/neg-${v.negocioId}`} className={styles.nombre}>{v.referencia}</Link>
-                      <span className={styles.detalleSec}>
-                        {v.nomenclatura ? `Nomenclatura ${v.nomenclatura}` : '—'} · <Badge variant={estadoToken(v.negocioEstado)}>{v.negocioEstado ?? '—'}</Badge>
-                      </span>
-                    </div>
+                      {v.nomenclatura ? <span className={styles.detalleSec}> · {v.nomenclatura}</span> : null}{' '}
+                      <Badge variant={estadoToken(v.negocioEstado)}>{v.negocioEstado ?? '—'}</Badge>
+                    </span>
                   </td>
                   <td><Badge variant={ESTADOS[v.estado]?.variante ?? 'neutral'}>{ESTADOS[v.estado]?.etiqueta ?? v.estado}</Badge></td>
                   <td>
                     {v.oportunidadId ? (
-                      <div className={styles.celdaTitulo}>
-                        <Link to={`/oportunidades/${v.oportunidadId}`} className={styles.nombre}>{v.oportunidadNombre}</Link>
-                        <span className={styles.detalleSec}>{v.oportunidadEtapa}</span>
-                      </div>
+                      <Corto ancho={240} titulo={`${v.oportunidadNombre} — ${v.oportunidadEtapa}`}>
+                        <Link to={`/oportunidades/${v.oportunidadId}`}>{v.oportunidadNombre}</Link>
+                      </Corto>
                     ) : <span className={styles.muted}>Sin oportunidad</span>}
                   </td>
-                  <td>{v.oportunidadInmueble ? `${v.oportunidadInmueble}${v.oportunidadTorre ? ` · ${v.oportunidadTorre}` : ''}` : <span className={styles.muted}>—</span>}</td>
                   <td>
-                    {v.sugerido ? (
-                      <div className={styles.celdaTitulo}>
-                        <Link to={`/negocios/inv-${v.sugeridoId}`} className={styles.nombre}>{v.sugerido}</Link>
-                        <span className={styles.detalleSec}>{v.sugeridoProyectoTorre ?? ''}</span>
-                      </div>
+                    {v.oportunidadInmueble ? (
+                      <Corto ancho={180}>{`${v.oportunidadInmueble}${v.oportunidadTorre ? ` · ${v.oportunidadTorre}` : ''}`}</Corto>
                     ) : <span className={styles.muted}>—</span>}
                   </td>
-                  <td>{textoDetalle(v) || '—'}</td>
-                  <td>{v.accionSugerida ?? '—'}</td>
+                  <td>
+                    {v.sugerido ? (
+                      <Corto ancho={180} titulo={`Referencia que tiene hoy: ${v.sugeridoReferencia ?? 'ninguna'}`}>
+                        <Link to={`/negocios/inv-${v.sugeridoId}`}>{v.sugerido}</Link>
+                        <span className={styles.detalleSec}> · {v.sugeridoProyectoTorre ?? ''}</span>
+                      </Corto>
+                    ) : <span className={styles.muted}>—</span>}
+                  </td>
+                  <td><Corto ancho={320}>{textoDetalle(v) || '—'}</Corto></td>
+                  <td><Corto ancho={260}>{v.accionSugerida ?? '—'}</Corto></td>
                 </tr>
               ))}
             </tbody>
