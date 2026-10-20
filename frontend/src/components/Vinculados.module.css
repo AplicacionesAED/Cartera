@@ -162,3 +162,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.mora .icono {
+  color: var(--color-danger, #b91c1c);
+}
+
+.mora .valor {
+  color: var(--color-danger, #b91c1c);
+}

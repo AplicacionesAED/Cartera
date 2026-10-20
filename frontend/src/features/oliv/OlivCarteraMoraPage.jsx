@@ -125,8 +125,9 @@ export function OlivCarteraMoraPage() {
   useEffect(() => {
     const vista = searchParams.get('vista');
     const rango = searchParams.get('rango');
-    if (!vista && !rango) return;
-    setFiltros(() => ({ search: '', torre: '', estadoInmueble: '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
+    const buscar = searchParams.get('buscar');
+    if (!vista && !rango && !buscar) return;
+    setFiltros(() => ({ search: buscar ?? '', torre: '', estadoInmueble: '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
     setPagina(1);
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps

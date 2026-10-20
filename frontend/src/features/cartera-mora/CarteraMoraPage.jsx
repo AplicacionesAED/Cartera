@@ -152,8 +152,10 @@ export function CarteraMoraPage() {
   useEffect(() => {
     const vista = searchParams.get('vista');
     const rango = searchParams.get('rango');
-    if (!vista && !rango) return;
-    setFiltros(() => ({ search: '', etapa: '', frente: '', torre: '', tramite: '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
+    const buscar = searchParams.get('buscar');
+    const tramite = searchParams.get('tramite');
+    if (!vista && !rango && !buscar) return;
+    setFiltros(() => ({ search: buscar ?? '', etapa: '', frente: '', torre: '', tramite: tramite ?? '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
     setPagina(1);
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -6,7 +6,7 @@
 // Si falla la consulta no muestra nada: es un atajo, nunca debe estorbar.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, ChevronRight, Lock, Target, Warehouse } from 'lucide-react';
+import { AlertTriangle, Briefcase, ChevronRight, Lock, Target, Warehouse } from 'lucide-react';
 import { getVinculos } from '../api/vinculos.js';
 import styles from './Vinculados.module.css';
 
@@ -81,6 +81,27 @@ export function Vinculados({ proyecto, tipo, id }) {
             </Link>
           );
         })}
+        {vinculos?.cartera?.restringido && (
+          <div className={`${styles.pieza} ${styles.bloqueada}`} title="No tienes acceso a este módulo">
+            <span className={styles.icono}><AlertTriangle size={18} strokeWidth={1.75} aria-hidden="true" /></span>
+            <span className={styles.texto}>
+              <span className={styles.etiqueta}>Cartera</span>
+              <span className={styles.detalle}><Lock size={12} aria-hidden="true" /> Sin acceso</span>
+            </span>
+          </div>
+        )}
+        {vinculos?.cartera && !vinculos.cartera.restringido && (
+          <Link to={vinculos.cartera.to} className={`${styles.pieza} ${styles.enlace} ${styles.mora}`} title={[vinculos.cartera.titulo, vinculos.cartera.detalle, vinculos.cartera.via].filter(Boolean).join(' · ')}>
+            <span className={styles.icono}><AlertTriangle size={18} strokeWidth={1.75} aria-hidden="true" /></span>
+            <span className={styles.texto}>
+              <span className={styles.etiqueta}>Cartera</span>
+              <span className={styles.valor}>{vinculos.cartera.titulo}</span>
+              {vinculos.cartera.detalle && <span className={styles.detalle}>{vinculos.cartera.detalle}</span>}
+              {vinculos.cartera.via && <span className={styles.via}>{vinculos.cartera.via}</span>}
+            </span>
+            <ChevronRight size={16} className={styles.chevron} aria-hidden="true" />
+          </Link>
+        )}
       </div>
     </nav>
   );

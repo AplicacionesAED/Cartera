@@ -22,6 +22,8 @@ const { limpiarNombreContacto, ETAPA_MINIMA_ORDER } = require('../../utils/olivH
 const Negocio = require('../negocio/negocio.model');
 const Oportunidad = require('../oportunidad/oportunidad.model');
 const InventarioItem = require('../inventario/inventarioItem.model');
+const dashboardService = require('../dashboard/dashboard.service');
+const olivResumenService = require('../olivResumen/olivResumen.service');
 const { esEtapaDesistida, ESTADOS_DESISTIDOS } = require('../../config/estadosOportunidad');
 const { findOportunidadByReferencia, resolverNegocioIdDesdeInmueble } = require('../negocio/negocio.service');
 const olivOportunidad = require('../olivOportunidad/olivOportunidad.model');
@@ -29,9 +31,43 @@ const OlivInmueble = require('../olivInmueble/olivInmueble.model');
 
 const TIPOS = ['oportunidad', 'negocio', 'inmueble'];
 const MODULOS = {
-  baia: { oportunidad: 'oportunidades', negocio: 'negocios', inmueble: 'inventario' },
-  oliv: { oportunidad: 'oliv-oportunidades', negocio: 'oliv-negocios', inmueble: 'oliv-inmuebles' },
+  baia: { oportunidad: 'oportunidades', negocio: 'negocios', inmueble: 'inventario', cartera: 'cartera-mora' },
+  oliv: { oportunidad: 'oliv-oportunidades', negocio: 'oliv-negocios', inmueble: 'oliv-inmuebles', cartera: 'oliv-cartera-mora' },
 };
+
+// ── Cartera (mora) ───────────────────────────────────────────────────────
+// Si la unidad está en mora según la conciliación, se ofrece un enlace directo a Cartera en Gestión, ya filtrado a ese negocio.
+const pesos = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(n) || 0);
+
+function moraDeFila(f) {
+  if (f.cuotasEnMoraInicial > 0) {
+    return { vista: 'inicial', monto: f.montoEnMoraInicial, dias: f.maxDiasAtrasoInicial, via: 'Cuota inicial vencida según la conciliación' };
+  }
+  if (f.saldoContraentregaVencido) {
+    return { vista: 'contraentrega', monto: f.pendienteSaldoContraentrega, dias: f.diasAtrasoSaldoContraentrega, via: 'Saldo contraentrega vencido según la conciliación' };
+  }
+  return null;
+}
+
+function armarCartera(f, ruta, buscar) {
+  const mora = moraDeFila(f);
+  if (!mora) return null;
+  const params = new URLSearchParams({ vista: mora.vista, buscar });
+  if (f.esCanje) params.set('tramite', 'canje');
+  return {
+    to: `${ruta}?${params.toString()}`,
+    titulo: 'En mora',
+    detalle: `${pesos(mora.monto)}${mora.dias != null ? ` · ${mora.dias} días de atraso` : ''}`,
+    via: mora.via,
+  };
+}
+
+async function carteraBaia(inmueble, negocio) {
+  if (!inmueble || !negocio) return null;
+  const { filas } = await dashboardService.precalentarCache();
+  const f = filas.find((x) => x.id === inmueble.id);
+  return f ? armarCartera(f, '/cartera-mora', f.referencia ?? negocio.referencia) : null;
+}
 
 // ── Baía Kristal ─────────────────────────────────────────────────────────
 
@@ -118,6 +154,7 @@ async function resolverBaia(tipo, id) {
   const viaMetodo = negocio && inmueble ? await viaNegocioInmueble(negocio) : null;
   const viaOportunidad = 'Por referencia de recaudo';
   const viaNegocio = tipo === 'oportunidad' ? 'Por referencia de recaudo' : viaMetodo;
+  const cartera = await carteraBaia(inmueble, negocio);
   const viaInmueble = tipo === 'oportunidad' ? (inmuebleDeLaOportunidad ? 'Por el inmueble que declara la oportunidad en Zoho' : viaMetodo && `A través del negocio: ${viaMetodo.charAt(0).toLowerCase()}${viaMetodo.slice(1)}`) : viaMetodo;
 
   return {
@@ -136,6 +173,7 @@ async function resolverBaia(tipo, id) {
     inmueble: inmueble
       ? { to: `/inventario/${inmueble.id}`, titulo: inmueble.datos?.Product_Name || inmueble.nombre || `Inmueble ${inmueble.id}`, detalle: inmueble.estado, via: viaInmueble }
       : null,
+    cartera,
   };
 }
 
@@ -168,6 +206,13 @@ async function resolverOliv(tipo, id) {
   // Todo lo que se sincroniza ya está en la etapa mínima, pero se respeta la
   // misma condición que usa el detalle de Negocios.
   const esNegocio = opp && opp.stage_order >= ETAPA_MINIMA_ORDER;
+  let cartera = null;
+  if (esNegocio) {
+    const { filas } = await olivResumenService.precalentarCache();
+    const clave = inmueble ? `inm-${inmueble.id}` : `op-${opp.id}`;
+    const f = filas.find((x) => x.id === clave);
+    cartera = f ? armarCartera(f, '/oliv/cartera-mora', f.unidad ?? f.referencia ?? opp.referencia_recaudo ?? '') : null;
+  }
   return {
     oportunidad: opp ? { to: `/oliv/oportunidades/${opp.id}`, titulo: opp.deal_name, detalle: opp.stage, via: 'Es el mismo registro: la oportunidad es el negocio' } : null,
     negocio: esNegocio
@@ -179,6 +224,7 @@ async function resolverOliv(tipo, id) {
         }
       : null,
     inmueble: inmueble ? { to: `/oliv/inmuebles/${inmueble.id}`, titulo: inmueble.codigo_unidad, detalle: inmueble.estado, via: 'Por el inmueble asociado a la oportunidad en HubSpot' } : null,
+    cartera,
   };
 }
 
@@ -194,6 +240,10 @@ async function obtener({ proyecto, tipo, id }, usuario) {
     if (t === tipo) continue; // el registro actual no se enlaza a sí mismo
     const v = vinculos[t];
     resultado[t] = v && !tienePermiso(usuario.roles, MODULOS[proyecto][t], permisosPorRol, usuario.esAdmin) ? { restringido: true } : v;
+  }
+  // Cartera: solo aparece si la unidad está en mora.
+  if (vinculos.cartera) {
+    resultado.cartera = tienePermiso(usuario.roles, MODULOS[proyecto].cartera, permisosPorRol, usuario.esAdmin) ? vinculos.cartera : { restringido: true };
   }
   return resultado;
 }
