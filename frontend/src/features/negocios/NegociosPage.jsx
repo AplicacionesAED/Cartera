@@ -31,11 +31,6 @@ import styles from './NegociosPage.module.css';
 const PAGE_SIZE = 50;
 const FILTROS_VACIOS = { search: '', estado: '', etapa: '', frente: '', torre: '', vinculacion: '' };
 
-function formatMoney(v) {
-  if (v == null || v === 0) return '—';
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
-}
-
 function cleanNombre(nombre) {
   if (!nombre) return null;
   return nombre.replace(/^\d+\s+/, '').replace(/\s*\(\d+\.?\d*%\)\s*$/, '');
@@ -120,10 +115,6 @@ function Resumen({ stats }) {
         <div className={styles.kpiCard}>
           <p className={styles.kpiLabel}>Con negocio</p>
           <p className={styles.kpiValor}>{stats.totalNegocios}</p>
-        </div>
-        <div className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Total abonado</p>
-          <p className={`${styles.kpiValorSm} ${styles.exito}`}>{stats.saldoTotal > 0 ? formatMoney(stats.saldoTotal) : '—'}</p>
         </div>
       </div>
     </>
