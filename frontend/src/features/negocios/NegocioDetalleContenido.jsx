@@ -19,6 +19,7 @@ import { ordenarFinanciero } from '../../utils/ordenColumnas.js';
 import { estadoToken } from '../../utils/estados.js';
 import { addFechaEstimada, formatFechaUTC } from '../../utils/planDePagos.js';
 import { obtenerProyecto, desglosarPiso } from '../../utils/proyectos.js';
+import { etiquetaCampoMovimiento, valorCampoMovimiento } from '../../utils/movimientoCampos.js';
 import { separarUnidadesAdicionales } from '../../utils/unidadesAdicionales.js';
 import { obtenerConciliacionCompleta } from './obtenerConciliacionCompleta.js';
 import { exportarEstadoCuenta } from './estadoCuentaPdf.js';
@@ -284,12 +285,12 @@ function MovimientoRow({ mov, fields }) {
           <td colSpan={4}>
             <div className={styles.gridExpandido}>
               {fields.map((col) => {
-                const v = datos[col];
+                const v = valorCampoMovimiento(col, datos[col]);
                 const display = v != null && v !== '' ? (formatCell(col, v) ?? String(v)) : null;
                 return (
                   <div key={col}>
                     <p className={styles.miniLabel}>
-                      {col}
+                      {etiquetaCampoMovimiento(col)}
                       <ConceptoHint columna={col} hoja="movimiento" />
                     </p>
                     <p className={styles.miniValor}>{display ?? <span className={styles.vacio}>—</span>}</p>

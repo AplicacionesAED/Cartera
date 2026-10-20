@@ -22,6 +22,7 @@ import { formatExcelDate } from '../../utils/format.js';
 import styles from './ApartamentoDetallePage.module.css';
 import { DetalleHero, HeroBadges, HeroSaldo } from '../../components/layout/DetalleHero.jsx';
 import { Building2 } from 'lucide-react';
+import { etiquetaCampoMovimiento, valorCampoMovimiento } from '../../utils/movimientoCampos.js';
 
 function formatCOP(val) {
   if (val == null || val === '') return null;
@@ -121,12 +122,12 @@ function MovimientoRow({ mov, fields }) {
           <td colSpan={5}>
             <div className={styles.gridExpandido}>
               {fields.map((col) => {
-                const v = datos[col];
+                const v = valorCampoMovimiento(col, datos[col]);
                 const display = v != null && v !== '' ? (formatCell(col, v) ?? String(v)) : null;
                 return (
                   <div key={col}>
                     <p className={styles.miniLabel}>
-                      {col}
+                      {etiquetaCampoMovimiento(col)}
                       <ConceptoHint columna={col} hoja="movimiento" />
                     </p>
                     <p className={styles.miniValor}>{display ?? <span className={styles.vacio}>—</span>}</p>

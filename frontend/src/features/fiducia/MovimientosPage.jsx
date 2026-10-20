@@ -19,6 +19,7 @@ import { listMovimientosNegocios, exportMovimientosNegocios } from '../../api/ne
 import { formatExcelDate } from '../../utils/format.js';
 import { filtrarKeysMovimiento } from '../../utils/columnasExcluidas.js';
 import { descripcionProyecto, obtenerProyecto } from '../../utils/proyectos.js';
+import { etiquetaCampoMovimiento, valorCampoMovimiento } from '../../utils/movimientoCampos.js';
 import base from '../negocios/NegociosPage.module.css';
 import styles from './MovimientosPage.module.css';
 
@@ -130,12 +131,12 @@ function MovimientoRow({ mov }) {
               <p className={styles.detalleTitulo}>Detalle del movimiento</p>
               <div className={styles.gridExpandido}>
                 {allFields.map((col) => {
-                  const v = datos[col];
+                  const v = valorCampoMovimiento(col, datos[col]);
                   const display = v != null && v !== '' ? (formatCell(col, v) ?? String(v)) : null;
                   return (
                     <div key={col}>
                       <p className={styles.miniLabel}>
-                        {col}
+                        {etiquetaCampoMovimiento(col)}
                         <ConceptoHint columna={col} hoja="movimiento" />
                       </p>
                       <p className={styles.miniValor}>{display ?? <span className={styles.sinDato}>—</span>}</p>
@@ -200,7 +201,7 @@ export function MovimientosPage() {
         }
       }
 
-      const headers = ['Referencia', 'Proyecto', 'Nomenclatura', 'Comprador(es)', 'Cédula(s)', 'Estado negocio', ...datosKeys];
+      const headers = ['Referencia', 'Proyecto', 'Nomenclatura', 'Comprador(es)', 'Cédula(s)', 'Estado negocio', ...datosKeys.map(etiquetaCampoMovimiento)];
       const excelRows = rows.map((mov) => {
         const neg = mov.negocio;
         const compradores = (neg?.compradores || []).map((c) => cleanNombre(c.nombre)).filter(Boolean).join(' | ');
@@ -215,7 +216,7 @@ export function MovimientosPage() {
         ];
         const datos = mov.datos || {};
         for (const k of datosKeys) {
-          const v = datos[k];
+          const v = valorCampoMovimiento(k, datos[k]);
           fila.push(v != null && v !== '' ? (formatCell(k, v) ?? String(v)) : '');
         }
         return fila;

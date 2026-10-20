@@ -137,7 +137,9 @@ function extraerDatosMovimiento(row, idx) {
   ];
   for (const [name, i] of movFields) {
     if (excluirEnMovimiento(name)) continue;
-    const val = v(i);
+    let val = v(i);
+    // La referencia (de recaudo) llega del Excel como "1429635410107.0000": se guarda sin los ceros decimales.
+    if (name === 'Referencia Movimiento' && val !== null) val = val.replace(/\.0+$/, '');
     if (val !== null) datos[name] = val;
   }
   return { idMovimiento, fechaContable, datos };
