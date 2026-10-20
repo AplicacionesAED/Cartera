@@ -20,6 +20,8 @@ import { SortHeader } from '../../components/ui/SortHeader.jsx';
 import { useSortableTable, ariaSort } from '../../hooks/useSortableTable.js';
 import { listOportunidades, listStages, iniciarSyncOportunidades, getSyncStatusOportunidades, iniciarBackfillSubforms, getBackfillSubformsStatus } from '../../api/oportunidades.js';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
+import { SyncModoButton } from '../../components/SyncModoButton.jsx';
+import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { useSyncControl, normalizarEstadoLog, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { formatDateTime } from '../../utils/format.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
@@ -30,9 +32,15 @@ function iniciales(texto = '') {
   return `${partes[0]?.[0] ?? ''}${partes.length > 1 ? partes[1][0] : ''}`.toUpperCase() || '?';
 }
 
+const MODOS_SYNC = [
+  { value: 'cambios', label: 'Sincronizar cambios', descripcion: 'Trae solo lo que cambió en Zoho desde la última sincronización (rápido).' },
+  { value: 'todo', label: 'Sincronizar todo', descripcion: 'Vuelve a traer todas las oportunidades que cumplen la regla, con toda su información y su plan de pagos (tarda más).' },
+];
+
 function SyncStatusBar({ onTerminado }) {
+  const [modo, setModo] = usePersistentState('oportunidades:sync-modo', 'cambios');
   const sync = useSyncControl({
-    iniciar: () => iniciarSyncOportunidades(false),
+    iniciar: () => iniciarSyncOportunidades(modo === 'todo'),
     obtener: getSyncStatusOportunidades,
     normalizar: normalizarEstadoLog,
     alTerminar: (e) => { if (e.ok || e.cancelada) onTerminado?.(); },
@@ -79,12 +87,15 @@ function SyncStatusBar({ onTerminado }) {
               Actualizar planes de pago
             </span>
           </Button>
-          <Button variant="secondary" onClick={sync.ejecutar}>
-            <span className={styles.botonSyncInterior}>
-              <RefreshCw size={14} aria-hidden="true" />
-              Sincronizar ahora
-            </span>
-          </Button>
+          <SyncModoButton
+            opciones={MODOS_SYNC}
+            modo={modo}
+            onModo={setModo}
+            onEjecutar={(m) => {
+              if (m === 'todo' && !window.confirm('Se volverán a traer de Zoho TODAS las oportunidades que cumplen la regla, con su información completa y su plan de pagos. Tarda varios minutos y puedes cancelar sin perder lo ya guardado. ¿Continuar?')) return;
+              sync.ejecutar();
+            }}
+          />
         </>
       )}
     </div>

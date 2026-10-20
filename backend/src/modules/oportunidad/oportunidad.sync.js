@@ -9,7 +9,7 @@ const config = require('../../config/zoho');
 const sequelize = require('../../config/db');
 const ZohoFieldMetadata = require('./zohoFieldMetadata.model');
 const SyncLog = require('./syncLog.model');
-const { runSubformsBackfill, refrescarSubformsLote } = require('./oportunidad.subformsBackfill');
+const { runSubformsBackfill, refrescarSubformsLote, refrescarPlanesDeTodas } = require('./oportunidad.subformsBackfill');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
@@ -325,6 +325,8 @@ async function syncOportunidadesFromZoho(force = false) {
   const log = await SyncLog.create({ status: 'running' });
   const progreso = progresoSync('oportunidades');
   progreso.iniciar('Preparando la sincronización');
+  let datosGuardados = false; // la parte de datos terminó; solo falta (opcional) la fase de planes de pago
+  let planes = null;
 
   try {
     const fields = await syncFieldMetadata();
@@ -417,6 +419,11 @@ async function syncOportunidadesFromZoho(force = false) {
       console.log(`[sync] Limpieza: ${resultado?.rowCount ?? 0} oportunidades eliminadas por no cumplir la regla`); // eslint-disable-line no-console
     }
 
+    // "Sincronizar todo" (sync completo): además de todos los datos, se vuelve a leer el plan de pagos de TODAS las
+    // oportunidades. En el incremental solo se releen las modificadas (más abajo).
+    datosGuardados = true;
+    if (!modifiedSince) planes = await refrescarPlanesDeTodas(progreso);
+
     await log.update({ finalizado_en: new Date(), status: 'success', registros_sync: saved });
     console.log(`[sync] Done. ${saved} records synced.`); // eslint-disable-line no-console
     await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
@@ -427,7 +434,7 @@ async function syncOportunidadesFromZoho(force = false) {
     // En un incremental, las oportunidades modificadas en Zoho pueden traer un plan de pagos nuevo: se vuelve a leer.
     const tarea = modifiedSince ? refrescarSubformsLote(deals.map((d) => String(d.id))) : Promise.resolve();
     tarea.catch((err) => console.error('[sync] Error al refrescar planes de pago:', err.message)); // eslint-disable-line no-console
-    runSubformsBackfill().catch((err) => console.error('[sync] Error en backfill de subforms automático:', err.message)); // eslint-disable-line no-console
+    if (modifiedSince) runSubformsBackfill().catch((err) => console.error('[sync] Error en backfill de subforms automático:', err.message)); // eslint-disable-line no-console
 
     progreso.terminar();
     return { success: true, recordsSync: saved };
@@ -437,7 +444,11 @@ async function syncOportunidadesFromZoho(force = false) {
       // Cancelada por el usuario: lo ya guardado se conserva. NO se marca 'success' (el siguiente incremental parte
       // de la última sync completa y vuelve a traer lo que faltó) ni se hace la limpieza de cierre.
       console.log('[sync] Cancelada por el usuario'); // eslint-disable-line no-console
-      await log.update({ finalizado_en: new Date(), status: 'cancelled', error_msg: 'Cancelada por el usuario' });
+      // Si ya se habían guardado todos los datos y solo se interrumpió la fase de planes de pago, la sync cuenta como
+      // hecha (los datos están completos); si no, queda 'cancelled' y el siguiente incremental retoma desde la última buena.
+      await log.update(datosGuardados
+        ? { finalizado_en: new Date(), status: 'success', registros_sync: null, error_msg: 'Datos sincronizados; la actualización de planes de pago se canceló a la mitad' }
+        : { finalizado_en: new Date(), status: 'cancelled', error_msg: 'Cancelada por el usuario' });
       await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
       invalidarCacheDashboard();
       return { success: false, cancelada: true };

@@ -73,6 +73,34 @@ async function consultarYGuardar(opp) {
   }
 }
 
+// Relee el plan de pagos de TODAS las oportunidades guardadas, reportando en el `progreso` que se le pase (el de la
+// sincronización que la llama) y respetando su cancelación. Es la última fase de "Sincronizar todo".
+async function refrescarPlanesDeTodas(progresoExterno, concurrencia = 5) {
+  const todas = await Oportunidad.findAll({ attributes: ['id', 'zoho_id'] });
+  progresoExterno.fase('Actualizando planes de pago desde Zoho', todas.length);
+  let hechas = 0;
+  let actualizadas = 0;
+  let errores = 0;
+  for (let i = 0; i < todas.length; i += concurrencia) {
+    progresoExterno.verificar(); // punto seguro: cada plan se guarda entero
+    await Promise.all(
+      todas.slice(i, i + concurrencia).map(async (opp) => {
+        try {
+          await consultarYGuardar(opp);
+          actualizadas++;
+        } catch (err) {
+          errores++;
+          console.error(`[planes] Error en ${opp.zoho_id}:`, err.message); // eslint-disable-line no-console
+        }
+        hechas++;
+      })
+    );
+    progresoExterno.establecer(hechas);
+  }
+  console.log(`[planes] Planes de pago actualizados: ${actualizadas}/${todas.length} (${errores} errores)`); // eslint-disable-line no-console
+  return { total: todas.length, actualizadas, errores };
+}
+
 async function runSubformsBackfill(todos = false) {
   if (running) return;
   running = true;
@@ -159,4 +187,4 @@ function getSubformsBackfillResult() {
 
 const getSubformsBackfillProgreso = () => progreso.snapshot();
 
-module.exports = { refrescarSubformsDe, refrescarSubformsLote, runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult, getSubformsBackfillProgreso };
+module.exports = { refrescarPlanesDeTodas, refrescarSubformsDe, refrescarSubformsLote, runSubformsBackfill, isSubformsBackfillRunning, getSubformsBackfillResult, getSubformsBackfillProgreso };
