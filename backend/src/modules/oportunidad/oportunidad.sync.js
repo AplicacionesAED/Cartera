@@ -13,6 +13,7 @@ const { runSubformsBackfill, refrescarSubformsLote, refrescarPlanesDeTodas } = r
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const { recalcularVinculos } = require('../vinculo/vinculoResolver');
 const { progresoSync, esCancelacion } = require('../../utils/progresoSync');
+const { esEtapaExcluida } = require('../../config/estadosOportunidad');
 
 async function zohoGet(path, params = {}) {
   const token = await getAccessToken();
@@ -311,8 +312,9 @@ forma_pago = COALESCE(EXCLUDED.forma_pago, oportunidades.forma_pago),
 const CAMPO_REFERENCIA = 'Referencia_de_Recaudo';
 const CAMPO_FECHA_VINCULACION = 'Fecha_Vinculaci_n_Exitosa';
 const tieneValor = (v) => v !== null && v !== undefined && String(v).trim() !== '';
+// Además, nunca se guardan las de las etapas excluidas (BACKOUT y 4.1 EN ESTUDIO DEMORADO).
 const esElegible = (deal, campoReferencia, campoFecha) =>
-  tieneValor(deal[campoReferencia]) || tieneValor(deal[campoFecha]);
+  !esEtapaExcluida(deal.Stage) && (tieneValor(deal[campoReferencia]) || tieneValor(deal[campoFecha]));
 
 // El incremental (If-Modified-Since) solo trae lo modificado desde el último sync: con la regla
 // nueva, oportunidades que ya cumplían y no se han tocado en Zoho nunca llegarían. Si el último
@@ -376,6 +378,13 @@ async function syncOportunidadesFromZoho(force = false) {
       if (saved % 500 === 0 || saved === deals.length) {
         console.log(`[sync] Saved ${saved}/${deals.length} records...`); // eslint-disable-line no-console
       }
+    }
+
+    // Las que Zoho reporta en una etapa excluida (p. ej. una oportunidad que acaba de pasar a BACKOUT) se quitan de la base.
+    const aQuitar = allDeals.filter((d) => esEtapaExcluida(d.Stage)).map((d) => String(d.id));
+    if (aQuitar.length > 0) {
+      const [, quitadas] = await sequelize.query('DELETE FROM oportunidades WHERE zoho_id = ANY($1::text[])', { bind: [aQuitar] });
+      console.log(`[sync] ${quitadas?.rowCount ?? 0} oportunidades en etapa excluida eliminadas`); // eslint-disable-line no-console
     }
 
     // Enriquecer contactos: email/telefono de los Contactos vinculados.
