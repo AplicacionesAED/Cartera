@@ -222,6 +222,17 @@ async function resolverNegocioIdDesdeInmueble(inmueble) {
   return rows[0]?.id ?? null;
 }
 
+// TOTAL PAGADO de la conciliación de un negocio: la suma de sus movimientos fiduciarios ya normalizados (sin los
+// 'GENERADO POR VENTA UNIDAD' y contando solo desde el último desistimiento/ajuste que cancela), con EXACTAMENTE el mismo
+// cálculo de la pestaña Conciliación y de Cartera/Dashboard. El 'Saldo Actual' que trae el Excel de la fiducia no sirve
+// para esto: en cientos de negocios dice 0 aunque ya hayan pagado.
+async function totalPagadoDeNegocio(negocioId) {
+  const { normalizarPagos } = require('../dashboard/conciliacion');
+  const movs = await NegocioMovimiento.findAll({ where: { negocio_id: negocioId }, attributes: ['id_movimiento', 'fecha_contable', 'datos'], raw: true });
+  const pagos = normalizarPagos(movs.map((m) => ({ idMovimiento: m.id_movimiento, fechaContable: m.fecha_contable, datos: m.datos })));
+  return pagos.reduce((s, p) => s + p.valor, 0);
+}
+
 const INCLUDE_NEGOCIO_DETALLE = [{ model: NegocioComprador, as: 'compradores', separate: true, order: [['orden', 'ASC']] }];
 
 async function getById(id) {
@@ -235,6 +246,7 @@ async function getById(id) {
     const negocioId = await resolverNegocioIdDesdeInmueble(inmueble);
     const negocio = negocioId ? await Negocio.findByPk(negocioId, { include: INCLUDE_NEGOCIO_DETALLE }) : null;
     const totalMovimientos = negocio ? await NegocioMovimiento.count({ where: { negocio_id: negocio.id } }) : 0;
+    const totalPagado = negocio ? await totalPagadoDeNegocio(negocio.id) : null;
 
     const oportunidad = await findOportunidadByReferencia(negocio?.referencia ?? null);
     const info = parseProyectoTorre(inmueble.datos?.Proyecto_Torre);
@@ -245,6 +257,7 @@ async function getById(id) {
       estado: negocio?.estado ?? null,
       datos: negocio?.datos ?? null,
       saldoActual: negocio?.saldo_actual ?? null,
+      totalPagado,
       compradores: negocio?.compradores ?? [],
       totalMovimientos,
       oportunidad,
@@ -266,6 +279,7 @@ async function getById(id) {
     const negocio = await Negocio.findByPk(negocioId, { include: INCLUDE_NEGOCIO_DETALLE });
     if (!negocio) return null;
     const totalMovimientos = await NegocioMovimiento.count({ where: { negocio_id: negocio.id } });
+    const totalPagado = await totalPagadoDeNegocio(negocio.id);
     const oportunidad = await findOportunidadByReferencia(negocio.referencia);
     return {
       id,
@@ -274,6 +288,7 @@ async function getById(id) {
       estado: negocio.estado,
       datos: negocio.datos,
       saldoActual: negocio.saldo_actual,
+      totalPagado,
       compradores: negocio.compradores,
       totalMovimientos,
       oportunidad,

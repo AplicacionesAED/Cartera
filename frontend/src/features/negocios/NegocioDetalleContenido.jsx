@@ -592,8 +592,9 @@ export function NegocioDetalleContenido({ id }) {
   const finEntries = ordenarFinanciero(Object.entries(financiero));
 
   const nomenclatura = negocio.datos?.Nomenclatura;
-  const saldo = negocio.saldoActual ?? null;
-  const saldoFmt = saldo != null ? formatCOP(saldo) : null;
+  // La tarjeta 'Total abonado' es el TOTAL PAGADO de la conciliación (suma de los movimientos), no el 'Saldo Actual' del Excel.
+  const saldo = negocio.totalPagado ?? null;
+  const saldoFmt = saldo != null ? (formatCOP(saldo) ?? '$ 0') : null;
 
   const fideicomisoRaw = negocio.datos?.Fideicomiso || '';
   const codigoMatch = String(fideicomisoRaw).match(/^(\d+)/);
