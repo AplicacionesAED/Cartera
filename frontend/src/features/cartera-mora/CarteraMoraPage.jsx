@@ -256,7 +256,7 @@ export function CarteraMoraPage() {
   function abrirFila(e, fila) {
     if (e.target.closest('a, button, input, select')) return;
     if (window.getSelection()?.toString()) return;
-    const destino = fila.negocioId ? `/negocios/${fila.negocioId}` : `/inventario/${fila.id}`;
+    const destino = fila.negocioId ? `/negocios/inv-${fila.id}` : `/inventario/${fila.id}`;
     if (destino) navigate(destino);
   }
 
@@ -545,7 +545,7 @@ export function CarteraMoraPage() {
                           <tr key={f.id} onClick={(e) => abrirFila(e, f)} onContextMenu={(e) => abrirMenuContextual(e, f)} className={styles.filaCtxMenu}>
                             <td>{f.etapa ? etiquetaEtapa(f.etapa) : '—'}</td>
                             <td><CeldaDoble arriba={f.frente} abajo={f.torre != null ? `Torre ${f.torre}` : null} /></td>
-                            <td>{f.negocioId ? <Link to={`/negocios/${f.negocioId}`}>{f.unidad ?? f.id}</Link> : (f.unidad ?? '—')}</td>
+                            <td>{f.negocioId ? <Link to={`/negocios/inv-${f.id}`}>{f.unidad ?? f.id}</Link> : (f.unidad ?? '—')}</td>
                             <td className={styles.truncar} title={f.comprador ?? ''}>{f.comprador ?? '—'}</td>
                             <td>{f.referencia ?? '—'}</td>
                             <td className={styles.numCellCentro}>{f.valorInmueble != null ? formatCOP(f.valorInmueble) : '—'}</td>
@@ -576,7 +576,7 @@ export function CarteraMoraPage() {
           <button
             className={styles.contextMenuItem}
             disabled={!menuContextual.fila.negocioId}
-            onClick={() => { window.open(rutaApp(`/negocios/${menuContextual.fila.negocioId}`), '_blank'); setMenuContextual(null); }}
+            onClick={() => { window.open(rutaApp(`/negocios/inv-${menuContextual.fila.id}`), '_blank'); setMenuContextual(null); }}
           >
             <Briefcase size={13} /> Ver negocio
           </button>

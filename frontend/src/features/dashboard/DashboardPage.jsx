@@ -601,7 +601,7 @@ export function DashboardPage() {
           <button
             className={styles.contextMenuItem}
             disabled={!menuContextual.fila.negocioId}
-            onClick={() => { window.open(rutaApp(`/negocios/${menuContextual.fila.negocioId}`), '_blank'); setMenuContextual(null); }}
+            onClick={() => { window.open(rutaApp(`/negocios/inv-${menuContextual.fila.id}`), '_blank'); setMenuContextual(null); }}
           >
             <Briefcase size={13} /> Ver negocio
           </button>
