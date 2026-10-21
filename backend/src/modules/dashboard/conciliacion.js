@@ -140,7 +140,32 @@ function pagosEnTramo(prefijos, desde, hasta) {
   return resultado;
 }
 
-function conciliar(cuotasPlan, pagos) {
+// Una cuota con valor NEGATIVO (típico: el Saldo Contraentrega recalculado como Valor Venta - resto del plan cuando el resto del
+// plan suma MÁS que el valor de venta) no es una deuda sino un saldo a favor: se resta de la cuota anterior (y de las
+// anteriores, si no alcanza) y la cuota negativa queda en 0. El total del plan no cambia; solo deja de parecer que se debe
+// algo cuando el cliente ya pagó todo. Cada cuota afectada guarda cuánto se aplicó (`ajusteSaldoAFavor` en la que lo
+// recibe, `saldoAFavorAplicado` en la negativa) para poder mostrarlo.
+function absorberSaldosNegativos(cuotasPlan) {
+  const cuotas = cuotasPlan.map((c) => ({ ...c }));
+  for (let i = cuotas.length - 1; i >= 0; i--) {
+    if (!(cuotas[i].valorPlan < 0)) continue;
+    let pendiente = -cuotas[i].valorPlan;
+    cuotas[i].saldoAFavorAplicado = pendiente;
+    cuotas[i].valorPlan = 0;
+    for (let j = i - 1; j >= 0 && pendiente > 0; j--) {
+      const disponible = cuotas[j].valorPlan;
+      if (!(disponible > 0)) continue;
+      const aplicado = Math.min(disponible, pendiente);
+      cuotas[j].valorPlan = disponible - aplicado;
+      cuotas[j].ajusteSaldoAFavor = (cuotas[j].ajusteSaldoAFavor ?? 0) + aplicado;
+      pendiente -= aplicado;
+    }
+  }
+  return cuotas;
+}
+
+function conciliar(cuotasPlanOriginal, pagos) {
+  const cuotasPlan = absorberSaldosNegativos(cuotasPlanOriginal);
   const totalPagado = pagos.reduce((s, p) => s + p.valor, 0);
   let acumuladoPago = 0;
   const prefijos = pagos.map((p) => ({ id: p.id, fecha: p.fecha, valor: p.valor, acumulado: (acumuladoPago += p.valor) }));
@@ -268,6 +293,6 @@ function acumularPorPeriodo({ cuotas, cuotasCuotaInicial, ultimaCuota, pagos, re
 }
 
 module.exports = {
-  detectarCuotaKey, fechaEstimadaCuota, parseMonto, construirPlan, normalizarPagos, conciliar,
+  detectarCuotaKey, fechaEstimadaCuota, parseMonto, construirPlan, normalizarPagos, conciliar, absorberSaldosNegativos,
   mesKey, diaKey, periodoVacio, acumularPorPeriodo,
 };

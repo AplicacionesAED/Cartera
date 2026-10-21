@@ -382,7 +382,11 @@ function CuotaRow({ c }) {
             </svg>
           )}
         </td>
-        <td className={styles.nowrap}>{labelCuota(c.etiqueta)}</td>
+        <td className={styles.nowrap}>
+          {labelCuota(c.etiqueta)}
+          {c.ajusteSaldoAFavor > 0 && <span className={styles.notaPagada} title="El plan trae una cuota negativa (saldo a favor); se descontó de esta cuota para que no parezca una deuda">saldo a favor aplicado: {formatCOP(c.ajusteSaldoAFavor)}</span>}
+          {c.saldoAFavorAplicado > 0 && <span className={styles.notaPagada} title="La cuota original era negativa (saldo a favor) y se aplicó a la cuota anterior">{formatCOP(c.saldoAFavorAplicado)} a favor, aplicado a la cuota anterior</span>}
+        </td>
         <td className={styles.nowrap}>{c.fechaEstimada ? formatFechaUTC(c.fechaEstimada) : '—'}</td>
         <td className={styles.nowrap}>{c.estado === 'pagada' && c.fechaCubierta ? formatFechaUTC(c.fechaCubierta) : '—'}</td>
         <td className={`${styles.nowrap} ${styles.right} ${styles.tabular}`}>{formatCOP(c.valorPlan) ?? '—'}</td>
