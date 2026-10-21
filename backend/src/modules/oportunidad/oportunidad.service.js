@@ -80,9 +80,22 @@ function _mapDetalle(row) {
 // mismo criterio y mismos helpers compartidos que `otrosi.service.js`
 // (`inventarioTorres.service.js`) -- Oportunidades tampoco tiene su propio
 // Proyecto/Torre, así que se resuelve indirecto vía `referencia_recaudo`.
+// Etapas que el listado de Oportunidades no muestra (Jefe Gabriel): ni en la tabla ni como opción del filtro de etapa.
+// Siguen guardadas en la base (el detalle por id y los demás módulos las usan); solo se ocultan acá. Se comparan sin
+// distinguir mayúsculas ni espacios repetidos (Zoho escribe "4.1 EN ESTUDIO  DEMORADO" con dos espacios).
+const ETAPAS_OCULTAS = ['BACKOUT', '4.1 EN ESTUDIO DEMORADO'];
+async function etapasOcultas() {
+  const rows = await sequelize.query(
+    "SELECT DISTINCT stage FROM oportunidades WHERE regexp_replace(upper(stage), '[[:space:]]+', ' ', 'g') = ANY($1::text[])",
+    { bind: [ETAPAS_OCULTAS], type: QueryTypes.SELECT }
+  );
+  return rows.map((r) => r.stage);
+}
+
 async function list({ stage, search, etapa, frente, torre, sortBy, sortDir, page = 1, limit = 20 }) {
   const where = {};
-  if (stage) where.stage = stage;
+  const ocultas = await etapasOcultas();
+  where.stage = stage ? { [Op.and]: [{ [Op.eq]: stage }, { [Op.notIn]: ocultas }] } : { [Op.notIn]: ocultas };
 
   const valores = await valoresProyectoTorre();
   if (etapa || frente || torre) {
@@ -146,7 +159,8 @@ async function list({ stage, search, etapa, frente, torre, sortBy, sortDir, page
 
 async function listStages() {
   const rows = await sequelize.query('SELECT DISTINCT stage FROM oportunidades WHERE stage IS NOT NULL ORDER BY stage ASC', { type: QueryTypes.SELECT });
-  return rows.map((r) => r.stage);
+  const ocultas = new Set(await etapasOcultas());
+  return rows.map((r) => r.stage).filter((st) => !ocultas.has(st));
 }
 
 async function getById(id) {
