@@ -171,10 +171,11 @@ function conciliar(cuotasPlan, pagos) {
     const atrasada = estado !== 'pagada' && c.fechaEstimada != null && c.fechaEstimada < hoy;
     const diasAtraso = atrasada ? Math.floor((hoy.getTime() - c.fechaEstimada.getTime()) / 86400000) : null;
     const pagosAplicados = pagosEnTramo(prefijos, requeridoAntes, requerido);
-    return { ...c, cubierto, estado, atrasada, diasAtraso, fechaCubierta, pagosAplicados };
+    // Una cuota negativa (saldo a favor) se MUESTRA en 0: el cliente no debe pagar nada más. El valor original se conserva para el total del plan.
+    return { ...c, valorPlan: Math.max(0, c.valorPlan), valorPlanOriginal: c.valorPlan, cubierto, estado, atrasada, diasAtraso, fechaCubierta, pagosAplicados };
   });
 
-  const totalPlan = cuotas.reduce((s, c) => s + c.valorPlan, 0);
+  const totalPlan = cuotas.reduce((s, c) => s + c.valorPlanOriginal, 0);
   const enMora = cuotas.filter((c) => c.atrasada);
   const maxDiasAtraso = enMora.length > 0 ? Math.max(...enMora.map((c) => c.diasAtraso ?? 0)) : 0;
   const saldoContraentrega = cuotas.length > 0 ? cuotas[cuotas.length - 1] : null;

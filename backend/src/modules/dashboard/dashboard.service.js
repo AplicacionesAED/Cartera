@@ -181,7 +181,7 @@ async function construirFilasCompletas() {
       const cuotaInicialFiducia = cuotaInicialFiduciaKey ? parseMonto(negocio.datos[cuotaInicialFiduciaKey]) : NaN;
       if (!isNaN(cuotaInicialFiducia)) {
         valorCuotaInicial = cuotaInicialFiducia;
-        if (valorVenta != null && !isNaN(valorVenta)) valorSaldoContraentrega = valorVenta - cuotaInicialFiducia;
+        if (valorVenta != null && !isNaN(valorVenta)) valorSaldoContraentrega = Math.max(0, valorVenta - cuotaInicialFiducia); // nunca negativo: si ya pagó de más, no debe nada
       }
 
       totalAbonado = resumen.totalPagado;
