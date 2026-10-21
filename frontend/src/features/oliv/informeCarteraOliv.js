@@ -3,7 +3,7 @@
 // RECAUDO como FÓRMULAS de Excel (no valores fijos), más las dos notas al pie. Sin la columna ESTADO (se dejó
 // fuera a propósito por ahora).
 //
-//   VALOR M2        = VALOR VENTA / ÁREA
+//   VALOR M2        = el del inmueble en HubSpot, tal cual (valor, no fórmula)
 //   CRÉDITO         = VALOR VENTA - CUOTA INICIAL
 //   % DE RECAUDO    = VALOR ABONADO / VALOR VENTA
 import ExcelJS from 'exceljs';
@@ -37,7 +37,8 @@ const COLUMNAS = [
   { key: 'fechaContrato', header: 'FECHA CONTRATO', width: 16, numFmt: 'dd/mm/yyyy', valor: (f) => aFecha(f.fechaContrato) },
   { key: 'fechaUltPago', header: 'FECHA ULT. PAGO', width: 16, numFmt: 'dd/mm/yyyy', valor: (f) => aFecha(f.fechaSaldoContraentrega) },
   { key: 'valorVenta', header: 'VALOR VENTA', width: 18, numFmt: '#,##0', valor: (f) => num(f.valorInmueble) },
-  { key: 'valorM2', header: 'VALOR M2', width: 16, numFmt: '#,##0', formula: (c, r) => `IFERROR(${c.valorVenta}${r}/${c.area}${r},"")` },
+  // VALOR VENTA y VALOR M2 son los del inmueble en HubSpot, tal cual (no se calculan en el Excel).
+  { key: 'valorM2', header: 'VALOR M2', width: 16, numFmt: '#,##0', valor: (f) => num(f.valorM2) },
   { key: 'cuotaInicial', header: 'CUOTA INICIAL', width: 16, numFmt: '#,##0', valor: (f) => num(f.valorCuotaInicial) },
   { key: 'credito', header: 'CRÉDITO', width: 16, numFmt: '#,##0', formula: (c, r) => `${c.valorVenta}${r}-${c.cuotaInicial}${r}` },
   { key: 'valorAbonado', header: 'VALOR ABONADO', width: 16, numFmt: '#,##0', valor: (f) => num(f.totalAbonado) ?? 0 },
@@ -90,7 +91,7 @@ export async function descargarInformeCarteraOliv(filas, nombreArchivo) {
       if (c.formula) {
         // El resultado en caché permite verlo bien aun antes de que Excel recalcule.
         const venta = num(fila.valorInmueble);
-        const resultado = c.key === 'valorM2' ? num(fila.valorM2) : c.key === 'credito' ? num(fila.credito) : num(fila.pctRecaudo) != null ? num(fila.pctRecaudo) / 100 : null;
+        const resultado = c.key === 'credito' ? num(fila.credito) : num(fila.pctRecaudo) != null ? num(fila.pctRecaudo) / 100 : null;
         cell.value = { formula: c.formula(letras, r), result: venta == null ? '' : resultado ?? '' };
       } else {
         cell.value = c.valor(fila) ?? '';

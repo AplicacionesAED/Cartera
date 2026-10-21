@@ -200,6 +200,9 @@ async function construirFilasCompletas() {
       // Informe de Cartera (Cartera en Gestión): vista y área privada del inmueble, y la fecha de contrato =
       // fecha en que la oportunidad entró a Etapa 8 (como día calendario de Bogotá, 'AAAA-MM-DD').
       vista: inmueble?.tipo_vista ?? null,
+      // Valores del INMUEBLE tal cual están en HubSpot (Cartera en Gestión: valor venta y valor m²), sin el plan de pagos.
+      valorComercial: inmueble?.valor_comercial != null && !Number.isNaN(Number(inmueble.valor_comercial)) ? Number(inmueble.valor_comercial) : null,
+      valorM2Hubspot: inmueble?.valor_m2 != null && !Number.isNaN(Number(inmueble.valor_m2)) ? Number(inmueble.valor_m2) : null,
       area: inmueble?.area_construida != null && !Number.isNaN(Number(inmueble.area_construida)) ? Number(inmueble.area_construida) : null, // área CONSTRUIDA (antes tomaba la privada)
       fechaContrato: diaBogota(oportunidad?.propiedades?.[`hs_v2_date_entered_${ETAPA_8_STAGE_ID}`]),
       _tieneMovimientos: tieneMovimientos,
@@ -499,15 +502,20 @@ async function obtenerCarteraMora({ search, torre, estadoInmueble, rango, vista,
   const totalEsperadoAFecha = filas.reduce((s, f) => s + (f.esperadoAFecha ?? 0), 0);
   const pctMoraPortafolio = totalEsperadoAFecha > 0 ? (totalMontoEnMora / totalEsperadoAFecha) * 100 : null;
 
-  // Derivados del Informe de Cartera (mismas fórmulas de la plantilla): valor m² = venta / área, crédito = venta -
-  // cuota inicial, % de recaudo = abonado / venta (en puntos porcentuales, como `pctEnMora`).
-  filas = filas.map((f) => ({
-    ...f,
-    pctEnMora: f.esperadoAFecha > 0 ? (f.montoEnMora / f.esperadoAFecha) * 100 : null,
-    valorM2: f.valorInmueble != null && f.area > 0 ? f.valorInmueble / f.area : null,
-    credito: f.valorInmueble != null && f.valorCuotaInicial != null ? f.valorInmueble - f.valorCuotaInicial : null,
-    pctRecaudo: f.valorInmueble > 0 && f.totalAbonado != null ? (f.totalAbonado / f.valorInmueble) * 100 : null,
-  }));
+  // Informe de Cartera: el VALOR VENTA es el valor del inmueble en HubSpot (sin parqueadero ni lo demás que trae el plan de
+  // pagos) y el VALOR M² el que trae el inmueble en HubSpot, tal cual. Crédito = venta - cuota inicial y % de recaudo =
+  // abonado / venta (en puntos porcentuales, como `pctEnMora`).
+  filas = filas.map((f) => {
+    const venta = f.valorComercial;
+    return {
+      ...f,
+      valorInmueble: venta,
+      pctEnMora: f.esperadoAFecha > 0 ? (f.montoEnMora / f.esperadoAFecha) * 100 : null,
+      valorM2: f.valorM2Hubspot,
+      credito: venta != null && f.valorCuotaInicial != null ? venta - f.valorCuotaInicial : null,
+      pctRecaudo: venta > 0 && f.totalAbonado != null ? (f.totalAbonado / venta) * 100 : null,
+    };
+  });
   filas = ordenarCarteraMora(filas, sortBy, sortDir);
 
   const total = filas.length;
