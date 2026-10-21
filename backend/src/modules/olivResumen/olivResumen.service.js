@@ -200,7 +200,7 @@ async function construirFilasCompletas() {
       // Informe de Cartera (Cartera en Gestión): vista y área privada del inmueble, y la fecha de contrato =
       // fecha en que la oportunidad entró a Etapa 8 (como día calendario de Bogotá, 'AAAA-MM-DD').
       vista: inmueble?.tipo_vista ?? null,
-      area: inmueble?.area_privada != null && !Number.isNaN(Number(inmueble.area_privada)) ? Number(inmueble.area_privada) : null,
+      area: inmueble?.area_construida != null && !Number.isNaN(Number(inmueble.area_construida)) ? Number(inmueble.area_construida) : null, // área CONSTRUIDA (antes tomaba la privada)
       fechaContrato: diaBogota(oportunidad?.propiedades?.[`hs_v2_date_entered_${ETAPA_8_STAGE_ID}`]),
       _tieneMovimientos: tieneMovimientos,
       porMes,
