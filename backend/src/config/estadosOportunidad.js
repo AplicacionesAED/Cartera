@@ -28,10 +28,10 @@ function elegirOportunidadVigente(candidatas) {
 }
 
 // Etapas cuyas oportunidades NO se guardan en la base (Jefe Gabriel, 2026-10-21): la sincronización las descarta y, si ya
-// estaban guardadas, las borra. Se comparan sin distinguir mayúsculas ni espacios repetidos (Zoho escribe
+// estaban guardadas, las borra. Se comparan sin distinguir mayúsculas, tildes ni espacios repetidos (Zoho escribe
 // "4.1 EN ESTUDIO  DEMORADO" con dos espacios).
-const ETAPAS_EXCLUIDAS = new Set(['BACKOUT', '4.1 EN ESTUDIO DEMORADO']);
-const normalizarEtapa = (stage) => String(stage ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
+const ETAPAS_EXCLUIDAS = new Set(['BACKOUT', '4.1 EN ESTUDIO DEMORADO', 'NO INTERESADO', 'RECONTACTAR EN EL FUTURO']);
+const normalizarEtapa = (stage) => String(stage ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 const esEtapaExcluida = (stage) => ETAPAS_EXCLUIDAS.has(normalizarEtapa(stage));
 
 module.exports = { ESTADOS_DESISTIDOS, ETAPAS_EXCLUIDAS, esEtapaDesistida, esEtapaExcluida, elegirOportunidadVigente };
