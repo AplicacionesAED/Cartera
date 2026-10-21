@@ -799,6 +799,7 @@ async function obtenerResumenStats() {
 }
 
 module.exports = {
+  resolverValorVenta,
   precalentarCache: obtenerCache,
   resolverNegociosYOportunidades,
   obtenerDashboardRecaudo,

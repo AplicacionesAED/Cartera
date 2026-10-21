@@ -226,11 +226,29 @@ async function resolverNegocioIdDesdeInmueble(inmueble) {
 // 'GENERADO POR VENTA UNIDAD' y contando solo desde el último desistimiento/ajuste que cancela), con EXACTAMENTE el mismo
 // cálculo de la pestaña Conciliación y de Cartera/Dashboard. El 'Saldo Actual' que trae el Excel de la fiducia no sirve
 // para esto: en cientos de negocios dice 0 aunque ya hayan pagado.
-async function totalPagadoDeNegocio(negocioId) {
-  const { normalizarPagos } = require('../dashboard/conciliacion');
-  const movs = await NegocioMovimiento.findAll({ where: { negocio_id: negocioId }, attributes: ['id_movimiento', 'fecha_contable', 'datos'], raw: true });
+async function totalPagadoDeNegocio(negocio, etapa = null) {
+  const { normalizarPagos, construirPlan, saldoAFavorDelPlan } = require('../dashboard/conciliacion');
+  const { resolverValorVenta } = require('../dashboard/dashboard.service');
+  const movs = await NegocioMovimiento.findAll({ where: { negocio_id: negocio.id }, attributes: ['id_movimiento', 'fecha_contable', 'datos'], raw: true });
   const pagos = normalizarPagos(movs.map((m) => ({ idMovimiento: m.id_movimiento, fechaContable: m.fecha_contable, datos: m.datos })));
-  return pagos.reduce((s, p) => s + p.valor, 0);
+  const pagado = pagos.reduce((s, p) => s + p.valor, 0);
+
+  // Saldo a favor del plan (cuota negativa): se suma al total pagado, igual que en la pestaña Conciliación.
+  let saldoAFavor = 0;
+  const opps = negocio.referencia
+    ? await Oportunidad.findAll({ where: { referencia_recaudo: negocio.referencia }, attributes: ['id', 'stage', 'fecha_inicio_plan_pagos', 'propuesta_pago', 'forma_pago'], raw: true })
+    : [];
+  const opp = elegirOportunidadVigente(opps);
+  if (opp) {
+    const esPlanNegociado = !!opp.propuesta_pago?.length;
+    const plan = construirPlan(esPlanNegociado ? opp.propuesta_pago : opp.forma_pago || [], opp.fecha_inicio_plan_pagos, { esPlanNegociado });
+    const valorVenta = resolverValorVenta(negocio, etapa);
+    if (valorVenta != null && !Number.isNaN(valorVenta) && plan.length >= 2) {
+      plan[plan.length - 1].valorPlan = valorVenta - plan.slice(0, -1).reduce((s, c) => s + c.valorPlan, 0);
+    }
+    if (plan.length > 0) saldoAFavor = saldoAFavorDelPlan(plan);
+  }
+  return pagado + saldoAFavor;
 }
 
 const INCLUDE_NEGOCIO_DETALLE = [{ model: NegocioComprador, as: 'compradores', separate: true, order: [['orden', 'ASC']] }];
@@ -246,7 +264,8 @@ async function getById(id) {
     const negocioId = await resolverNegocioIdDesdeInmueble(inmueble);
     const negocio = negocioId ? await Negocio.findByPk(negocioId, { include: INCLUDE_NEGOCIO_DETALLE }) : null;
     const totalMovimientos = negocio ? await NegocioMovimiento.count({ where: { negocio_id: negocio.id } }) : 0;
-    const totalPagado = negocio ? await totalPagadoDeNegocio(negocio.id) : null;
+    const etapaNegocio = info ? obtenerEtapaTorre(inmueble.datos.Proyecto_Torre) : null;
+    const totalPagado = negocio ? await totalPagadoDeNegocio(negocio, etapaNegocio) : null;
 
     const oportunidad = await findOportunidadByReferencia(negocio?.referencia ?? null);
     const info = parseProyectoTorre(inmueble.datos?.Proyecto_Torre);
@@ -279,7 +298,7 @@ async function getById(id) {
     const negocio = await Negocio.findByPk(negocioId, { include: INCLUDE_NEGOCIO_DETALLE });
     if (!negocio) return null;
     const totalMovimientos = await NegocioMovimiento.count({ where: { negocio_id: negocio.id } });
-    const totalPagado = await totalPagadoDeNegocio(negocio.id);
+    const totalPagado = await totalPagadoDeNegocio(negocio, null);
     const oportunidad = await findOportunidadByReferencia(negocio.referencia);
     return {
       id,

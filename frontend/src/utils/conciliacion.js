@@ -134,33 +134,16 @@ function pagosEnTramo(prefijos, desde, hasta) {
 
 // Cascada acumulada. Una cuota no pagada cuya fecha estimada ya venció queda
 // marcada "atrasada".
-// Una cuota con valor NEGATIVO (típico: el Saldo Contraentrega recalculado como Valor Venta - resto del plan cuando el resto del
-// plan suma MÁS que el valor de venta) no es una deuda sino un saldo a favor: se resta de la cuota anterior (y de las
-// anteriores, si no alcanza) y la cuota negativa queda en 0. El total del plan no cambia; solo deja de parecer que se debe
-// algo cuando el cliente ya pagó todo. Cada cuota afectada guarda cuánto se aplicó (`ajusteSaldoAFavor` en la que lo
-// recibe, `saldoAFavorAplicado` en la negativa) para poder mostrarlo.
-export function absorberSaldosNegativos(cuotasPlan) {
-  const cuotas = cuotasPlan.map((c) => ({ ...c }));
-  for (let i = cuotas.length - 1; i >= 0; i--) {
-    if (!(cuotas[i].valorPlan < 0)) continue;
-    let pendiente = -cuotas[i].valorPlan;
-    cuotas[i].saldoAFavorAplicado = pendiente;
-    cuotas[i].valorPlan = 0;
-    for (let j = i - 1; j >= 0 && pendiente > 0; j--) {
-      const disponible = cuotas[j].valorPlan;
-      if (!(disponible > 0)) continue;
-      const aplicado = Math.min(disponible, pendiente);
-      cuotas[j].valorPlan = disponible - aplicado;
-      cuotas[j].ajusteSaldoAFavor = (cuotas[j].ajusteSaldoAFavor ?? 0) + aplicado;
-      pendiente -= aplicado;
-    }
-  }
-  return cuotas;
+// Una cuota con valor NEGATIVO (típico: el Saldo Contraentrega recalculado como Valor Venta - resto del plan cuando el resto
+// del plan suma MÁS que el valor de venta) no es una deuda sino un SALDO A FAVOR: se suma al TOTAL PAGADO para que la cuota
+// anterior (la que el cliente consignó completa) quede cubierta y no parezca que se debe algo. El total del plan no cambia.
+export function saldoAFavorDelPlan(cuotasPlan) {
+  return cuotasPlan.reduce((s, c) => s + (c.valorPlan < 0 ? -c.valorPlan : 0), 0);
 }
 
-export function conciliar(cuotasPlanOriginal, pagos) {
-  const cuotasPlan = absorberSaldosNegativos(cuotasPlanOriginal);
-  const totalPagado = pagos.reduce((s, p) => s + p.valor, 0);
+export function conciliar(cuotasPlan, pagos) {
+  const saldoAFavorPlan = saldoAFavorDelPlan(cuotasPlan);
+  const totalPagado = pagos.reduce((s, p) => s + p.valor, 0) + saldoAFavorPlan;
   let acumuladoPago = 0;
   const prefijos = pagos.map((p) => ({ id: p.id, fecha: p.fecha, valor: p.valor, acumulado: (acumuladoPago += p.valor) }));
 
@@ -176,7 +159,7 @@ export function conciliar(cuotasPlanOriginal, pagos) {
     const estado = c.valorPlan - cubierto < 1 ? 'pagada' : cubierto > 0 ? 'parcial' : 'pendiente';
     let fechaCubierta = null;
     if (estado === 'pagada') {
-      const p = prefijos.find((x) => x.acumulado >= requerido);
+      const p = prefijos.find((x) => x.acumulado >= requerido) ?? (saldoAFavorPlan > 0 ? prefijos[prefijos.length - 1] : undefined);
       fechaCubierta = p ? p.fecha : null;
     }
     const atrasada = estado !== 'pagada' && c.fechaEstimada != null && c.fechaEstimada < hoy;
