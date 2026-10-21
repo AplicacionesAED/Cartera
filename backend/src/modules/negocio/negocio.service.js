@@ -264,7 +264,8 @@ async function getById(id) {
     const negocioId = await resolverNegocioIdDesdeInmueble(inmueble);
     const negocio = negocioId ? await Negocio.findByPk(negocioId, { include: INCLUDE_NEGOCIO_DETALLE }) : null;
     const totalMovimientos = negocio ? await NegocioMovimiento.count({ where: { negocio_id: negocio.id } }) : 0;
-    const etapaNegocio = info ? obtenerEtapaTorre(inmueble.datos.Proyecto_Torre) : null;
+    const infoProyecto = parseProyectoTorre(inmueble.datos?.Proyecto_Torre);
+    const etapaNegocio = infoProyecto ? obtenerEtapaTorre(inmueble.datos.Proyecto_Torre) : null;
     const totalPagado = negocio ? await totalPagadoDeNegocio(negocio, etapaNegocio) : null;
 
     const oportunidad = await findOportunidadByReferencia(negocio?.referencia ?? null);
