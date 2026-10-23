@@ -433,6 +433,8 @@ function mapMovimientoRow(m) {
     datos: m.datos,
     negocio: m.n_id != null
       ? {
+          // Ruta del negocio en el frontend: por su inmueble si está vinculado, si no por el negocio mismo.
+          enlaceId: m.v_inventario_id != null ? `inv-${m.v_inventario_id}` : `neg-${m.n_id}`,
           estado: m.n_estado,
           fideicomiso: m.n_datos?.Fideicomiso ?? null,
           nomenclatura: m.n_datos?.Nomenclatura ?? null,
@@ -447,6 +449,7 @@ const SELECT_MOVIMIENTOS = `
   SELECT
     m.id, m.referencia, m.fecha_contable, m.datos,
     n.id AS n_id, n.estado AS n_estado, n.datos AS n_datos,
+    (SELECT v.inventario_id FROM vinculos_negocio_inmueble v WHERE v.referencia = n.referencia LIMIT 1) AS v_inventario_id,
     COALESCE((
       SELECT jsonb_agg(jsonb_build_object('id', comp.id, 'nombre', comp.nombre, 'nroId', comp.nro_id, 'porcentaje', comp.porcentaje, 'orden', comp.orden) ORDER BY comp.orden)
       FROM negocio_compradores comp WHERE comp.negocio_id = n.id

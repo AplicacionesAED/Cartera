@@ -8,6 +8,7 @@
 // con el grid completo de campos crudos, y la misma exportación a Excel
 // estilizada (ExcelJS -- xlsx/SheetJS no permite estilos en su build libre),
 // con el color de marca de Cartera en vez del teal de Baía Kristal.
+import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, ChevronRight, Download } from 'lucide-react';
 import ExcelJS from 'exceljs';
@@ -102,7 +103,11 @@ function MovimientoRow({ mov }) {
         <td style={{ whiteSpace: 'nowrap' }}>{fecha ?? <span className={base.muted}>—</span>}</td>
         <td>
           <div className={base.celdaTitulo}>
-            <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
+            {neg?.enlaceId ? (
+              <Link to={`/negocios/${neg.enlaceId}`} className={base.nombre} onClick={(e) => e.stopPropagation()} title="Abrir el negocio">{neg.nomenclatura ?? 'Ver negocio'}</Link>
+            ) : (
+              <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
+            )}
             {proyecto && <span className={base.detalleSec}>{proyecto}</span>}
           </div>
         </td>
