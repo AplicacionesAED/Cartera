@@ -4,8 +4,8 @@ const service = require('./inventario.service');
 const { syncInventario, getSyncStatus } = require('./inventario.sync');
 
 const list = asyncHandler(async (req, res) => {
-  const { search, proyecto, categoria, estado, etapa, frente, torre, page, limit } = req.query;
-  ok(res, await service.list({ search, proyecto, categoria, estado, etapa, frente, torre, page, limit }));
+  const { search, proyecto, categoria, estado, estadoFiducia, etapa, frente, torre, page, limit } = req.query;
+  ok(res, await service.list({ search, proyecto, categoria, estado, estadoFiducia, etapa, frente, torre, page, limit }));
 });
 
 const getById = asyncHandler(async (req, res) => ok(res, await service.getById(req.params.id)));

@@ -13,6 +13,7 @@ import { Search, RefreshCw, Layers, MapPin, Building, Download } from 'lucide-re
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
+import { EstadoFiduciaBadge } from '../../components/ui/EstadoFiduciaBadge.jsx';
 import { Field, TextInput } from '../../components/ui/Field.jsx';
 import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
@@ -26,7 +27,7 @@ import { InventarioDetalleContenido } from './InventarioDetalleContenido.jsx';
 import styles from '../negocios/NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', categoria: [], estado: [], etapa: [], frente: [], torre: [] };
+const FILTROS_VACIOS = { search: '', categoria: [], estado: [], estadoFiducia: [], etapa: [], frente: [], torre: [] };
 
 // El campo `torre` de Zoho ya trae el proyecto ('Isla Laguna - Torre 1'): no repetirlo.
 function proyectoTorre(item) {
@@ -52,7 +53,7 @@ function InventarioLista() {
   const debouncedSearch = useDebounce(searchInput);
 
   const [opciones, setOpciones] = useState({
-    categorias: [], estados: [], etapasDisponibles: [], frentesDisponibles: [], frentesPorEtapa: {}, torresPorFrente: {}, torresPorEtapaFrente: {},
+    categorias: [], estados: [], estadosFiducia: [], etapasDisponibles: [], frentesDisponibles: [], frentesPorEtapa: {}, torresPorFrente: {}, torresPorEtapaFrente: {},
   });
 
   useEffect(() => {
@@ -70,6 +71,7 @@ function InventarioLista() {
       setOpciones((prev) => ({
         categorias: res.data.categorias ?? prev.categorias,
         estados: res.data.estados ?? prev.estados,
+        estadosFiducia: res.data.estadosFiducia ?? prev.estadosFiducia,
         etapasDisponibles: res.data.etapasDisponibles ?? prev.etapasDisponibles,
         frentesDisponibles: res.data.frentesDisponibles ?? prev.frentesDisponibles,
         frentesPorEtapa: res.data.frentesPorEtapa ?? prev.frentesPorEtapa,
@@ -217,6 +219,13 @@ function InventarioLista() {
             )}
           </Field>
         )}
+        {opciones.estadosFiducia.length > 0 && (
+          <Field label="Estado fiducia">
+            {(p) => (
+              <MultiSelect {...p} options={opciones.estadosFiducia.map((e) => ({ value: e, label: e.replace(/_/g, ' ') }))} value={filtros.estadoFiducia ?? []} onChange={(v) => actualizarFiltro('estadoFiducia', v)} placeholder="Todos los estados" />
+            )}
+          </Field>
+        )}
         {hayFiltros && (
           <button type="button" className={styles.limpiar} onClick={limpiarFiltros}>
             Limpiar filtros
@@ -239,16 +248,17 @@ function InventarioLista() {
                   <th>Proyecto · Torre</th>
                   <th>Categoría</th>
                   <th>Estado</th>
+                  <th>Estado fiducia</th>
                 </tr>
               </thead>
               <tbody>
                 {cargando ? (
                   <tr>
-                    <td colSpan={4} className={styles.mensaje}>Cargando…</td>
+                    <td colSpan={5} className={styles.mensaje}>Cargando…</td>
                   </tr>
                 ) : filas.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className={styles.mensaje}>Sin resultados para los filtros aplicados.</td>
+                    <td colSpan={5} className={styles.mensaje}>Sin resultados para los filtros aplicados.</td>
                   </tr>
                 ) : (
                   filas.map((item) => (
@@ -262,6 +272,7 @@ function InventarioLista() {
                       <td>{proyectoTorre(item) || <span className={styles.muted}>—</span>}</td>
                       <td>{item.categoria || <span className={styles.muted}>—</span>}</td>
                       <td><EstadoInventarioBadge estado={item.estado} /></td>
+                      <td><EstadoFiduciaBadge estado={item.estadoFiducia} libreSinVinculo={item.libreSinVinculo} /></td>
                     </tr>
                   ))
                 )}

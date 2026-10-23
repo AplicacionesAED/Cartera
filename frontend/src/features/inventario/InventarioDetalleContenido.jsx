@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
+import { EstadoFiduciaBadge } from '../../components/ui/EstadoFiduciaBadge.jsx';
 import { getInventarioItem } from '../../api/inventario.js';
 import styles from './InventarioDetallePage.module.css';
 import { Vinculados } from '../../components/Vinculados.jsx';
@@ -261,6 +262,7 @@ export function InventarioDetalleContenido({ id }) {
       >
         <HeroBadges>
           <EstadoInventarioBadge estado={item.estado} />
+          <EstadoFiduciaBadge estado={item.estadoFiducia} libreSinVinculo={item.libreSinVinculo} />
         </HeroBadges>
       </DetalleHero>
 
