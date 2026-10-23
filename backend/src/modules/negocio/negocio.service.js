@@ -344,14 +344,19 @@ async function getMovimientos(id, { page = 1, limit = 50 }) {
 
   if (!negocioId) return { data: [], pagination: { total: 0, page: pageNum, limit: limitNum, totalPages: 0 } };
 
-  const { rows, count } = await NegocioMovimiento.findAndCountAll({
-    where: { negocio_id: negocioId },
-    offset: (pageNum - 1) * limitNum,
-    limit: limitNum,
-    order: [sequelize.literal('fecha_contable DESC NULLS LAST'), ['creado_en', 'DESC']],
-  });
+  // Misma forma de fila que la grilla general de Movimientos (mapMovimientoRow), acotada al negocio.
+  const [movimientos, totalRows] = await Promise.all([
+    sequelize.query(
+      `${SELECT_MOVIMIENTOS} WHERE m.negocio_id = $1 ORDER BY m.fecha_contable DESC NULLS LAST, m.creado_en DESC LIMIT $2 OFFSET $3`,
+      { bind: [negocioId, limitNum, (pageNum - 1) * limitNum], type: QueryTypes.SELECT }
+    ),
+    sequelize.query(`SELECT COUNT(*)::int AS total FROM negocio_movimientos m WHERE m.negocio_id = $1`, { bind: [negocioId], type: QueryTypes.SELECT }),
+  ]);
+  const total = totalRows[0]?.total ?? 0;
 
-  return { data: rows, pagination: { total: count, page: pageNum, limit: limitNum, totalPages: Math.ceil(count / limitNum) } };
+  // fecha_contable/id_movimiento: la conciliación y el estado de cuenta (PDF) los leen en crudo.
+  const data = movimientos.map((m) => ({ ...mapMovimientoRow(m), fecha_contable: m.fecha_contable, id_movimiento: m.id_movimiento }));
+  return { data, pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) } };
 }
 
 // Construye el WHERE de negocio_movimientos a partir de los mismos filtros
@@ -447,7 +452,7 @@ function mapMovimientoRow(m) {
 
 const SELECT_MOVIMIENTOS = `
   SELECT
-    m.id, m.referencia, m.fecha_contable, m.datos,
+    m.id, m.id_movimiento, m.referencia, m.fecha_contable, m.datos,
     n.id AS n_id, n.estado AS n_estado, n.datos AS n_datos,
     (SELECT v.inventario_id FROM vinculos_negocio_inmueble v WHERE v.referencia = n.referencia LIMIT 1) AS v_inventario_id,
     COALESCE((

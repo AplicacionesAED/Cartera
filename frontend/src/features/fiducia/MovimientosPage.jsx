@@ -8,22 +8,20 @@
 // con el grid completo de campos crudos, y la misma exportación a Excel
 // estilizada (ExcelJS -- xlsx/SheetJS no permite estilos en su build libre),
 // con el color de marca de Cartera en vez del teal de Baía Kristal.
-import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, ChevronRight, Download } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { Button } from '../../components/ui/Button.jsx';
-import { ConceptoHint } from '../../components/ui/ConceptoHint.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { listMovimientosNegocios, exportMovimientosNegocios } from '../../api/negocios.js';
-import { formatExcelDate } from '../../utils/format.js';
 import { filtrarKeysMovimiento } from '../../utils/columnasExcluidas.js';
 import { descripcionProyecto, obtenerProyecto } from '../../utils/proyectos.js';
 import { etiquetaCampoMovimiento, valorCampoMovimiento } from '../../utils/movimientoCampos.js';
 import base from '../negocios/NegociosPage.module.css';
 import styles from './MovimientosPage.module.css';
+import { MovimientosTabla, formatCell, cleanNombre, shortFideicomiso } from './MovimientosTabla.jsx';
 
 function useDebounce(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -34,131 +32,12 @@ function useDebounce(value, delay = 350) {
   return debounced;
 }
 
-function formatCOP(val) {
-  if (val == null || val === '') return null;
-  const n = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
-  if (isNaN(n)) return null;
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
-}
-
-function formatCell(key, value) {
-  if (value == null || value === '') return null;
-  const k = (key || '').toLowerCase();
-  if (k.includes('fecha')) {
-    const f = formatExcelDate(value);
-    return f !== '—' ? f : String(value);
-  }
-  if (k.includes('valor') || k.includes('monto') || k.includes('saldo') || k.includes('cuota') || k.includes('capital') ||
-      k.includes('abono') || k.includes('descuento') || k.includes('credito') || k.includes('crédito') ||
-      k.includes('aporte') || k.includes('importe') || k.includes('acreditacion') || k.includes('acreditación') ||
-      k.includes('anticipo') || k.includes('canje')) {
-    const cop = formatCOP(value);
-    return cop !== null ? cop : String(value);
-  }
-  return String(value);
-}
-
-function cleanNombre(nombre) {
-  if (!nombre) return null;
-  return nombre.replace(/^\d+\s+/, '').replace(/\s*\(\d+\.?\d*%\)\s*$/, '');
-}
-
-function shortFideicomiso(raw) {
-  if (!raw) return null;
-  return String(raw).replace(/^\d+[\s-]+/, '').replace(/^P\.?A\.?\s*/i, '').trim();
-}
-
 const PRESETS = [
   { label: 'Último mes', months: 1 },
   { label: 'Últimos 3 meses', months: 3 },
   { label: 'Últimos 6 meses', months: 6 },
   { label: 'Último año', months: 12 },
 ];
-
-function iniciales(nombre = '') {
-  const partes = nombre.trim().split(/\s+/).filter(Boolean);
-  return `${partes[0]?.[0] ?? ''}${partes.length > 1 ? partes[partes.length - 1][0] : ''}`.toUpperCase() || '?';
-}
-
-function MovimientoRow({ mov }) {
-  const [expanded, setExpanded] = useState(false);
-  const datos = mov.datos || {};
-  const neg = mov.negocio;
-
-  const fecha = datos['Fecha Contable'] ? formatExcelDate(datos['Fecha Contable']) : null;
-  const tipo = datos['Tipo Movimiento'] || datos['Concepto'] || null;
-  const valor = datos['Valor'] ? formatCOP(datos['Valor']) : null;
-
-  const compradorPrincipal = cleanNombre(neg?.compradores?.[0]?.nombre);
-  const extraCompradores = (neg?.compradores?.length ?? 0) - 1;
-  const allFields = filtrarKeysMovimiento(Object.keys(datos));
-  const proyecto = neg?.fideicomiso ? shortFideicomiso(neg.fideicomiso) : null;
-
-  return (
-    <>
-      <tr className={base.filaClicable} onClick={() => setExpanded((e) => !e)}>
-        <td className={styles.chevronCol}>
-          <ChevronRight size={14} strokeWidth={2.25} className={`${styles.chevron} ${expanded ? styles.chevronAbierto : ''}`} aria-hidden="true" />
-        </td>
-        <td style={{ whiteSpace: 'nowrap' }}>{fecha ?? <span className={base.muted}>—</span>}</td>
-        <td>
-          {neg?.enlaceId ? (
-            <Link to={`/negocios/${neg.enlaceId}`} className={styles.referencia} onClick={(e) => e.stopPropagation()} title="Abrir el negocio">{mov.referencia}</Link>
-          ) : (
-            <span className={styles.referencia}>{mov.referencia}</span>
-          )}
-        </td>
-        <td>
-          {compradorPrincipal ? (
-            <div className={base.persona}>
-              <span className={base.avatar}>{iniciales(compradorPrincipal)}</span>
-              <div className={base.celdaTitulo}>
-                <span className={styles.nombreLargo}>
-                  {compradorPrincipal}
-                  {extraCompradores > 0 && <span className={styles.extra}>+{extraCompradores}</span>}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <span className={base.muted}>—</span>
-          )}
-        </td>
-        <td>
-          <div className={base.celdaTitulo}>
-            <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
-            {proyecto && <span className={base.detalleSec}>{proyecto}</span>}
-          </div>
-        </td>
-        <td>{tipo ? <span className={styles.tipo} title={tipo}>{tipo}</span> : <span className={base.muted}>—</span>}</td>
-        <td className={base.derecha}><span className={styles.valor}>{valor ?? '—'}</span></td>
-      </tr>
-      {expanded && (
-        <tr className={styles.filaExpandida}>
-          <td colSpan={7}>
-            <div className={styles.detalle}>
-              <p className={styles.detalleTitulo}>Detalle del movimiento</p>
-              <div className={styles.gridExpandido}>
-                {allFields.map((col) => {
-                  const v = valorCampoMovimiento(col, datos[col]);
-                  const display = v != null && v !== '' ? (formatCell(col, v) ?? String(v)) : null;
-                  return (
-                    <div key={col}>
-                      <p className={styles.miniLabel}>
-                        {etiquetaCampoMovimiento(col)}
-                        <ConceptoHint columna={col} hoja="movimiento" />
-                      </p>
-                      <p className={styles.miniValor}>{display ?? <span className={styles.sinDato}>—</span>}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
 
 export function MovimientosPage() {
   const [resultado, setResultado] = useState(null);
@@ -393,22 +272,7 @@ export function MovimientosPage() {
           </div>
         ) : (
           <>
-            <table className={base.table}>
-              <thead>
-                <tr>
-                  <th className={styles.chevronCol} />
-                  <th><span>Fecha<ConceptoHint columna="Fecha Contable" hoja="movimiento" /></span></th>
-                  <th><span>Referencia de recaudo</span></th>
-                  <th><span>Comprador<ConceptoHint columna="Propietario" hoja="movimiento" /></span></th>
-                  <th><span>Unidad<ConceptoHint columna="Nomenclatura" hoja="movimiento" /></span></th>
-                  <th><span>Tipo de movimiento<ConceptoHint columna="Tipo Movimiento" hoja="movimiento" /></span></th>
-                  <th className={base.derecha}><span>Valor<ConceptoHint columna="Valor" hoja="movimiento" /></span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimientos.map((mov) => <MovimientoRow key={mov.id} mov={mov} />)}
-              </tbody>
-            </table>
+            <MovimientosTabla movimientos={movimientos} />
             {pagination && <Pagination page={pagina} pageSize={pagination.limit} total={pagination.total} onPageChange={cargar} />}
           </>
         )}

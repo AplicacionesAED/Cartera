@@ -9,17 +9,17 @@ import { Badge } from '../../components/ui/Badge.jsx';
 import { Accordion } from '../../components/ui/Accordion.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
-import { ConceptoHint } from '../../components/ui/ConceptoHint.jsx';
 import { ListaInfo, ListaFinanciera } from '../../components/ui/DatosFinancieros.jsx';
 import { getNegocio, getMovimientosNegocio } from '../../api/negocios.js';
+import { MovimientosTabla } from '../fiducia/MovimientosTabla.jsx';
+import base from './NegociosPage.module.css';
 import { getSubformsOportunidad, refrescarSubformsOportunidad } from '../../api/oportunidades.js';
 import { Button } from '../../components/ui/Button.jsx';
-import { filtrarDatosResumen, filtrarKeysMovimiento } from '../../utils/columnasExcluidas.js';
+import { filtrarDatosResumen } from '../../utils/columnasExcluidas.js';
 import { ordenarFinanciero } from '../../utils/ordenColumnas.js';
 import { estadoToken } from '../../utils/estados.js';
 import { addFechaEstimada, formatFechaUTC } from '../../utils/planDePagos.js';
 import { obtenerProyecto, desglosarPiso } from '../../utils/proyectos.js';
-import { etiquetaCampoMovimiento, valorCampoMovimiento } from '../../utils/movimientoCampos.js';
 import { separarUnidadesAdicionales } from '../../utils/unidadesAdicionales.js';
 import { obtenerConciliacionCompleta } from './obtenerConciliacionCompleta.js';
 import { exportarEstadoCuenta } from './estadoCuentaPdf.js';
@@ -261,50 +261,6 @@ function PlanDePagosZoho({ oportunidad }) {
 
 // ── Movimientos ──────────────────────────────────────────────────────────
 
-function MovimientoRow({ mov, fields }) {
-  const [expanded, setExpanded] = useState(false);
-  const datos = mov.datos || {};
-  const fecha = datos['Fecha Contable'] ? formatExcelDate(datos['Fecha Contable']) : null;
-  const tipo = datos['Tipo Movimiento'] || datos['Concepto'] || null;
-  const valor = datos['Valor'] ? formatCOP(datos['Valor']) : null;
-
-  return (
-    <>
-      <tr className={styles.filaClicable} onClick={() => setExpanded((e) => !e)}>
-        <td className={styles.colChevron}>
-          <svg className={`${styles.chevronRow} ${expanded ? styles.chevronRowOpen : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </td>
-        <td className={styles.nowrap}>{fecha ?? <span className={styles.vacio}>—</span>}</td>
-        <td className={styles.truncCell}>{tipo ?? <span className={styles.vacio}>—</span>}</td>
-        <td className={`${styles.nowrap} ${styles.right} ${styles.strong}`}>{valor ?? <span className={styles.vacio}>—</span>}</td>
-      </tr>
-      {expanded && (
-        <tr className={styles.filaExpandida}>
-          <td colSpan={4}>
-            <div className={styles.gridExpandido}>
-              {fields.map((col) => {
-                const v = valorCampoMovimiento(col, datos[col]);
-                const display = v != null && v !== '' ? (formatCell(col, v) ?? String(v)) : null;
-                return (
-                  <div key={col}>
-                    <p className={styles.miniLabel}>
-                      {etiquetaCampoMovimiento(col)}
-                      <ConceptoHint columna={col} hoja="movimiento" />
-                    </p>
-                    <p className={styles.miniValor}>{display ?? <span className={styles.vacio}>—</span>}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
-
 function MovimientosSection({ id }) {
   const [movimientos, setMovimientos] = useState(null);
   const [page, setPage] = useState(1);
@@ -327,34 +283,14 @@ function MovimientosSection({ id }) {
 
   useEffect(() => { load(1); }, [load]);
 
-  const fields = movimientos && movimientos.length > 0 ? filtrarKeysMovimiento(Object.keys(movimientos[0].datos || {})) : [];
-
   return (
     <div>
       {loading && <p className={styles.cargando}>Cargando movimientos...</p>}
       {!loading && movimientos && movimientos.length === 0 && <p className={styles.sinDatosPad}>Sin movimientos registrados</p>}
       {!loading && movimientos && movimientos.length > 0 && (
         <>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.colChevron} />
-                  <th>
-                    <span className={styles.thConcepto}>Fecha<ConceptoHint columna="Fecha Contable" hoja="movimiento" /></span>
-                  </th>
-                  <th>
-                    <span className={styles.thConcepto}>Tipo movimiento<ConceptoHint columna="Tipo Movimiento" hoja="movimiento" /></span>
-                  </th>
-                  <th className={styles.right}>
-                    <span className={styles.thConcepto}>Valor<ConceptoHint columna="Valor" hoja="movimiento" /></span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimientos.map((mov) => <MovimientoRow key={mov.id} mov={mov} fields={fields} />)}
-              </tbody>
-            </table>
+          <div className={base.tableWrap}>
+            <MovimientosTabla movimientos={movimientos} />
           </div>
           {pagination && (
             <Pagination page={page} pageSize={pagination.limit} total={pagination.total} onPageChange={load} />
