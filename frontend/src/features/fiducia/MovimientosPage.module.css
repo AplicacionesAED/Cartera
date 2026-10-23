@@ -39,6 +39,16 @@
   color: var(--color-ink-muted);
 }
 
+a.referencia {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a.referencia:hover {
+  color: var(--color-primary-hover, var(--color-primary));
+}
+
 .tipo {
   display: inline-block;
   max-width: 260px;

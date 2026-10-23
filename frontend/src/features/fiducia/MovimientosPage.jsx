@@ -103,11 +103,7 @@ function MovimientoRow({ mov }) {
         <td style={{ whiteSpace: 'nowrap' }}>{fecha ?? <span className={base.muted}>—</span>}</td>
         <td>
           <div className={base.celdaTitulo}>
-            {neg?.enlaceId ? (
-              <Link to={`/negocios/${neg.enlaceId}`} className={base.nombre} onClick={(e) => e.stopPropagation()} title="Abrir el negocio">{neg.nomenclatura ?? 'Ver negocio'}</Link>
-            ) : (
-              <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
-            )}
+            <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
             {proyecto && <span className={base.detalleSec}>{proyecto}</span>}
           </div>
         </td>
@@ -120,9 +116,15 @@ function MovimientoRow({ mov }) {
                   {compradorPrincipal}
                   {extraCompradores > 0 && <span className={styles.extra}>+{extraCompradores}</span>}
                 </span>
-                <span className={styles.referencia}>{mov.referencia}</span>
               </div>
             </div>
+          ) : (
+            <span className={base.muted}>—</span>
+          )}
+        </td>
+        <td>
+          {neg?.enlaceId ? (
+            <Link to={`/negocios/${neg.enlaceId}`} className={styles.referencia} onClick={(e) => e.stopPropagation()} title="Abrir el negocio">{mov.referencia}</Link>
           ) : (
             <span className={styles.referencia}>{mov.referencia}</span>
           )}
@@ -132,7 +134,7 @@ function MovimientoRow({ mov }) {
       </tr>
       {expanded && (
         <tr className={styles.filaExpandida}>
-          <td colSpan={6}>
+          <td colSpan={7}>
             <div className={styles.detalle}>
               <p className={styles.detalleTitulo}>Detalle del movimiento</p>
               <div className={styles.gridExpandido}>
@@ -398,6 +400,7 @@ export function MovimientosPage() {
                   <th><span>Fecha<ConceptoHint columna="Fecha Contable" hoja="movimiento" /></span></th>
                   <th><span>Unidad<ConceptoHint columna="Nomenclatura" hoja="movimiento" /></span></th>
                   <th><span>Comprador<ConceptoHint columna="Propietario" hoja="movimiento" /></span></th>
+                  <th><span>Referencia de recaudo</span></th>
                   <th><span>Tipo de movimiento<ConceptoHint columna="Tipo Movimiento" hoja="movimiento" /></span></th>
                   <th className={base.derecha}><span>Valor<ConceptoHint columna="Valor" hoja="movimiento" /></span></th>
                 </tr>
