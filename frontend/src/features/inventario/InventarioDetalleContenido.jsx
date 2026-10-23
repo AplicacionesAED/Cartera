@@ -5,7 +5,7 @@ import { EstadoFiduciaBadge } from '../../components/ui/EstadoFiduciaBadge.jsx';
 import { getInventarioItem } from '../../api/inventario.js';
 import styles from './InventarioDetallePage.module.css';
 import { Vinculados } from '../../components/Vinculados.jsx';
-import { DetalleHero, HeroBadges } from '../../components/layout/DetalleHero.jsx';
+import { DetalleHero } from '../../components/layout/DetalleHero.jsx';
 import { Warehouse } from 'lucide-react';
 import { formatCOP } from '../../utils/format.js';
 
@@ -231,6 +231,8 @@ export function InventarioDetalleContenido({ id }) {
     ['Torre', item.torre],
     ['Piso', item.piso],
     ['Categoría', item.categoria],
+    ['Estado CRM', item.estado ? <EstadoInventarioBadge estado={item.estado} /> : null],
+    ['Estado fiducia', item.estadoFiducia ? <EstadoFiduciaBadge estado={item.estadoFiducia} libreSinVinculo={item.libreSinVinculo} /> : null],
   ].filter(
     ([, valor]) => valor != null && valor !== ''
   );
@@ -259,12 +261,7 @@ export function InventarioDetalleContenido({ id }) {
             ? `Ref. recaudo: ${item.referenciaRecaudo}`
             : undefined
         }
-      >
-        <HeroBadges>
-          <EstadoInventarioBadge estado={item.estado} />
-          <EstadoFiduciaBadge estado={item.estadoFiducia} libreSinVinculo={item.libreSinVinculo} />
-        </HeroBadges>
-      </DetalleHero>
+      />
 
       <Vinculados
         proyecto="baia"

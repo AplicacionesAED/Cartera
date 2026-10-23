@@ -213,7 +213,7 @@ function InventarioLista() {
           </Field>
         )}
         {opciones.estados.length > 0 && (
-          <Field label="Estado">
+          <Field label="Estado CRM">
             {(p) => (
               <MultiSelect {...p} options={opciones.estados} value={filtros.estado} onChange={(v) => actualizarFiltro('estado', v)} placeholder="Todos los estados" />
             )}
@@ -247,7 +247,7 @@ function InventarioLista() {
                   <th>Inmueble</th>
                   <th>Proyecto · Torre</th>
                   <th>Categoría</th>
-                  <th>Estado</th>
+                  <th>Estado CRM</th>
                   <th>Estado fiducia</th>
                 </tr>
               </thead>
