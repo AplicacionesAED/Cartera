@@ -124,24 +124,6 @@ function OlivInventarioLista() {
 
       {syncError && <p className={styles.syncError}>{syncError}</p>}
 
-      {opciones.estados.length > 0 && (
-        <div className={styles.chips} role="group" aria-label="Filtrar por estado">
-          <button type="button" className={`${styles.chip} ${filtros.estado.length === 0 ? styles.chipActivo : ''}`} onClick={() => actualizarFiltro('estado', [])}>
-            Todos
-          </button>
-          {opciones.estados.map((estado) => (
-            <button
-              key={estado}
-              type="button"
-              className={`${styles.chip} ${filtros.estado.includes(estado) ? styles.chipActivo : ''}`}
-              aria-pressed={filtros.estado.includes(estado)}
-              onClick={() => actualizarFiltro('estado', filtros.estado.includes(estado) ? filtros.estado.filter((x) => x !== estado) : [...filtros.estado, estado])}
-            >
-              {estado}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className={styles.filtros}>
         <div className={styles.filtroBusqueda}>
@@ -174,6 +156,13 @@ function OlivInventarioLista() {
           <Field label="Categoría">
             {(p) => (
               <MultiSelect {...p} options={opciones.categorias} value={filtros.categoria} onChange={(v) => actualizarFiltro('categoria', v)} placeholder="Todas las categorías" />
+            )}
+          </Field>
+        )}
+        {opciones.estados.length > 0 && (
+          <Field label="Estado">
+            {(p) => (
+              <MultiSelect {...p} options={opciones.estados} value={filtros.estado} onChange={(v) => actualizarFiltro('estado', v)} placeholder="Todos los estados" />
             )}
           </Field>
         )}
