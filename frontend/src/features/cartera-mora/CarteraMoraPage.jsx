@@ -226,7 +226,7 @@ export function CarteraMoraPage() {
   }
 
   function actualizarCascada(campo, valor) {
-    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(meta, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
@@ -318,8 +318,8 @@ export function CarteraMoraPage() {
   const porRangoMora = meta.porRangoMora ?? [];
   const conteos = meta.conteos ?? {};
   const maxMontoRango = Math.max(0, ...porRangoMora.map((r) => r.monto || 0));
-  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
-  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
+  const frenteOptions = frentesDisponibles(meta, filtros.etapa);
+  const torreOptions = torresDisponibles(meta, filtros.etapa, filtros.frente);
   const hasFilters = filtros.search || filtros.etapa.length || filtros.frente.length || filtros.torre.length || filtros.rango || filtros.tramite;
 
   function clearFilters() {

@@ -178,7 +178,7 @@ export function DashboardPage() {
   // nueva etapa (y Torre se limpia con el); cambiar Frente siempre limpia
   // Torre -- mismo criterio de cascada que Resumen/Negocios/Inventario.
   function actualizarCascada(campo, valor) {
-    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(meta, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
@@ -222,8 +222,8 @@ export function DashboardPage() {
   const meses = meta.meses ?? [];
   const mesesFiltrados = filtrarRangoMeses(meses, filtros.mesDesde, filtros.mesHasta);
   const totalesActivos = alcancePlan === 'inicial' ? meta.totalesInicial : alcancePlan === 'contraentrega' ? meta.totalesContraentrega : meta.totales;
-  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
-  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
+  const frenteOptions = frentesDisponibles(meta, filtros.etapa);
+  const torreOptions = torresDisponibles(meta, filtros.etapa, filtros.frente);
   const hasFilters = filtros.search || filtros.etapa.length || filtros.frente.length || filtros.torre.length || filtros.conMovimientos
     || filtros.mesDesde || filtros.mesHasta || vistaMeses !== 'ambos' || alcancePlan !== 'ambos';
 
