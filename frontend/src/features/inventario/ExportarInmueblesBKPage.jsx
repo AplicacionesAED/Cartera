@@ -8,7 +8,7 @@ const CONFIG = {
   volverA: '/inventario',
   volverTexto: 'Inmuebles',
   filtrosKey: 'inventario-list:filtros',
-  filtrosVacios: { search: '', categoria: '', estado: '', etapa: '', frente: '', torre: '' },
+  filtrosVacios: { search: '', categoria: [], estado: [], estadoFiducia: [], etapa: [], frente: [], torre: [] },
   cargarDatos: cargarInmueblesBK,
   construirGrupos: construirGruposBK,
   exportar: exportarInmueblesBK,

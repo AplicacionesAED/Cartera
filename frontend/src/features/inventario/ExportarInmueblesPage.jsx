@@ -21,7 +21,7 @@ export function ExportarInmueblesPage({ config }) {
   const { titulo, volverA, volverTexto, filtrosKey, filtrosVacios, cargarDatos, construirGrupos, exportar, seleccionInicial, subtitulo } = config;
   const navigate = useNavigate();
   const [filtros] = usePersistentState(filtrosKey, filtrosVacios);
-  const hayFiltros = Object.values(filtros).some((v) => v !== '');
+  const hayFiltros = Object.values(filtros).some((v) => (Array.isArray(v) ? v.length > 0 : v !== ''));
 
   const [items, setItems] = useState(null);
   const [grupos, setGrupos] = useState([]);
