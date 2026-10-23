@@ -18,12 +18,15 @@
 // utils/formatCelda.js) -- antes se mostraban sin ningún formato.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, Download } from 'lucide-react';
+import { Button } from '../../components/ui/Button.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { listMovimientosOliv } from '../../api/oliv.js';
 import { formatCOP, formatDate } from '../../utils/format.js';
 import { formatCelda } from '../../utils/formatCelda.js';
+import { traerTodasLasPaginas } from '../../utils/exportarExcelColumnas.js';
+import { exportarMovimientosOlivExcel } from './movimientosOlivExport.js';
 import base from '../negocios/NegociosPage.module.css';
 import styles from '../fiducia/MovimientosPage.module.css';
 
@@ -114,6 +117,7 @@ export function OlivMovimientosPage() {
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [pagina, setPagina] = useState(1);
+  const [exportando, setExportando] = useState(false);
 
   const [search, setSearch] = useState('');
   const [hojaFilter, setHojaFilter] = useState('');
@@ -131,6 +135,20 @@ export function OlivMovimientosPage() {
   }, []);
 
   useEffect(() => { cargar(1); }, [debouncedSearch, hojaFilter, cargar]);
+
+  async function handleExport() {
+    const { debouncedSearch: s, hojaFilter: h } = filtrosRef.current;
+    setExportando(true);
+    try {
+      const filas = await traerTodasLasPaginas(listMovimientosOliv, { search: s, hoja: h });
+      if (filas.length === 0) return;
+      await exportarMovimientosOlivExcel(filas);
+    } catch (err) {
+      window.alert(`Error al exportar los movimientos: ${err.message}`);
+    } finally {
+      setExportando(false);
+    }
+  }
 
   function clearAll() {
     setSearch('');
@@ -150,6 +168,14 @@ export function OlivMovimientosPage() {
           <p className={base.subtitle}>
             Movimientos importados de los Excel de Encargos{pagination ? ` · ${pagination.total.toLocaleString('es-CO')} resultados` : ''}
           </p>
+        </div>
+        <div className={base.acciones}>
+          <Button variant="secondary" onClick={handleExport} disabled={exportando || !pagination || pagination.total === 0}>
+            <span className={base.botonInterior}>
+              <Download size={14} aria-hidden="true" />
+              {exportando ? 'Exportando…' : 'Exportar a Excel'}
+            </span>
+          </Button>
         </div>
       </div>
 

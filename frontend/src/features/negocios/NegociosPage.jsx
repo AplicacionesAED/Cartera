@@ -7,9 +7,9 @@
 //                          NegocioDetalleContenido.jsx).
 // Una sola ruta (`NegociosPage`) decide cuál mostrar según haya `:id` -- así
 // Dashboard y Cartera en Gestión siguen enlazando directo a `/negocios/${id}`.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, CircleDot, Layers, MapPin, Building, Download, RefreshCw, Link2 } from 'lucide-react';
+import { Search, CircleDot, Layers, MapPin, Building, RefreshCw, Link2 } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
@@ -18,6 +18,7 @@ import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { ExportMenu } from '../../components/ui/ExportMenu.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { getStats } from '../../api/dashboard.js';
 import { listNegocios, iniciarBackfillNegocios, getBackfillStatusNegocios } from '../../api/negocios.js';
@@ -62,53 +63,6 @@ function useDebounce(value, delay = 350) {
     return () => clearTimeout(t);
   }, [value, delay]);
   return debounced;
-}
-
-function ExportMenu({ onExport, disabled }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    function close(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  return (
-    <div className={styles.exportWrap} ref={ref}>
-      <Button variant="secondary" onClick={() => setOpen((o) => !o)} disabled={disabled}>
-        <span className={styles.botonInterior}>
-          <Download size={14} aria-hidden="true" />
-          Exportar
-        </span>
-      </Button>
-      {open && (
-        <div className={styles.exportMenu} role="menu">
-          {[
-            ['Excel (.xlsx)', 'xlsx'],
-            ['CSV', 'csv'],
-            ['PDF', 'pdf'],
-          ].map(([label, fmt]) => (
-            <button
-              key={fmt}
-              type="button"
-              role="menuitem"
-              className={styles.exportOption}
-              onClick={() => {
-                setOpen(false);
-                onExport(fmt);
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function Resumen({ stats }) {

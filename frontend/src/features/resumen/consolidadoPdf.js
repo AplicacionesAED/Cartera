@@ -39,7 +39,22 @@ async function cargarLogo() {
   }
 }
 
-export async function exportarConsolidadoPdf({ datos, columnas, grupos, tonos, etiquetaEtapa }) {
+const NOTA_BAIA_KRISTAL =
+  'Réplica del Excel "CONSOLIDADO DE CARTERA" que arma Gerencia cada mes, calculada sobre la conciliación real. ' +
+  'Vendidas (FIDU): negocios de la fiducia en estado Prometido, Opcionado, Vendido o Escritura autorizada. ' +
+  'Vendidas CRM: inmuebles Vendido, Reservado o Separado en Zoho. Disponibles: unidades sin negocio vendido en la fiducia.';
+
+// Por defecto arma el consolidado por ETAPA de Baía Kristal; Oliv (consolidado por TORRE) pasa `titulo`,
+// `encabezadoPrimera`, `filasDatos`, `etiquetaFila`, `nota` y `prefijoArchivo`.
+export async function exportarConsolidadoPdf({
+  datos, columnas, grupos, tonos, etiquetaEtapa,
+  titulo = 'Consolidado de Cartera por Etapa — Baía Kristal',
+  encabezadoPrimera = 'ETAPA',
+  filasDatos = datos.etapas,
+  etiquetaFila = (fila) => etiquetaEtapa(fila.etapa),
+  nota: textoNota = NOTA_BAIA_KRISTAL,
+  prefijoArchivo = 'Consolidado Cartera',
+}) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const ancho = doc.internal.pageSize.getWidth();
   const margen = 8;
@@ -59,7 +74,7 @@ export async function exportarConsolidadoPdf({ datos, columnas, grupos, tonos, e
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(30, 41, 59);
-  doc.text('Consolidado de Cartera por Etapa — Baía Kristal', xTitulo, 10.5);
+  doc.text(titulo, xTitulo, 10.5);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
@@ -70,7 +85,7 @@ export async function exportarConsolidadoPdf({ datos, columnas, grupos, tonos, e
   const colorGrupo = (g) => hexARgb(tonos[g.tono].bg);
   const tintaGrupo = (g) => hexARgb(tonos[g.tono].ink);
   const filaGrupos = [
-    { content: 'ETAPA', rowSpan: 2, styles: { halign: 'left', valign: 'middle', fillColor: [241, 245, 249], textColor: [30, 41, 59] } },
+    { content: encabezadoPrimera, rowSpan: 2, styles: { halign: 'left', valign: 'middle', fillColor: [241, 245, 249], textColor: [30, 41, 59] } },
     ...grupos.map((g) => ({
       content: g.label.toUpperCase(),
       colSpan: g.span,
@@ -83,11 +98,11 @@ export async function exportarConsolidadoPdf({ datos, columnas, grupos, tonos, e
     return { content: col.label.replace(/\+/g, ' + '), styles: { halign: 'center', valign: 'middle', fillColor: colorGrupo(g), textColor: tintaGrupo(g), fontSize: 5.2, cellPadding: 0.8 } };
   });
 
-  const filas = [...datos.etapas, datos.total];
+  const filas = [...filasDatos, datos.total];
   const cuerpo = filas.map((fila, idx) => {
     const esTotal = idx === filas.length - 1;
     return [
-      { content: esTotal ? 'TOTAL GENERAL' : etiquetaEtapa(fila.etapa), styles: { fontStyle: 'bold', halign: 'left', fillColor: esTotal ? [238, 241, 245] : [255, 255, 255] } },
+      { content: esTotal ? 'TOTAL GENERAL' : etiquetaFila(fila), styles: { fontStyle: 'bold', halign: 'left', fillColor: esTotal ? [238, 241, 245] : [255, 255, 255] } },
       ...columnas.map((col) => {
         const g = grupos[col.grupo];
         return {
@@ -119,13 +134,8 @@ export async function exportarConsolidadoPdf({ datos, columnas, grupos, tonos, e
   const yFin = doc.lastAutoTable?.finalY ?? 60;
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  const nota = doc.splitTextToSize(
-    'Réplica del Excel "CONSOLIDADO DE CARTERA" que arma Gerencia cada mes, calculada sobre la conciliación real. ' +
-      'Vendidas (FIDU): negocios de la fiducia en estado Prometido, Opcionado, Vendido o Escritura autorizada. ' +
-      'Vendidas CRM: inmuebles Vendido, Reservado o Separado en Zoho. Disponibles: unidades sin negocio vendido en la fiducia.',
-    ancho - margen * 2
-  );
+  const nota = doc.splitTextToSize(textoNota, ancho - margen * 2);
   doc.text(nota, margen, yFin + 5);
 
-  doc.save(nombreArchivoConsolidadoPdf(datos.etiqueta, ahora));
+  doc.save(nombreArchivoConsolidadoPdf(datos.etiqueta, ahora, prefijoArchivo));
 }

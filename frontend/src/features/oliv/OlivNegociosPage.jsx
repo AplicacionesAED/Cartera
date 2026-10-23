@@ -1,7 +1,7 @@
 // Negocios de Oliv -- mismo rediseño que Baía Kristal (ver negocios/NegociosPage.jsx):
 //   - `/oliv/negocios`      -> página de lista a ancho completo (filtros + tabla);
 //   - `/oliv/negocios/:id`  -> detalle como ruta propia (banner + pestañas).
-// Sin resumen de KPIs ni exportar/reconstruir: Negocios de Oliv es una vista
+// Sin resumen de KPIs ni reconstruir (sí exporta, igual que Baía Kristal): Negocios de Oliv es una vista
 // compuesta en vivo sobre Oportunidad+Inmueble, no algo que se sincronice aparte
 // (ver backend/src/modules/olivNegocio/olivNegocio.service.js), y todavía no hay
 // endpoint de estadísticas para Oliv. La lista va dirigida por inmueble: la
@@ -16,9 +16,12 @@ import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge
 import { Field, TextInput } from '../../components/ui/Field.jsx';
 import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { ExportMenu } from '../../components/ui/ExportMenu.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listNegociosOliv } from '../../api/oliv.js';
 import { formatCOP } from '../../utils/format.js';
+import { traerTodasLasPaginas } from '../../utils/exportarExcelColumnas.js';
+import { exportNegociosOlivCsv, exportNegociosOlivExcel, exportNegociosOlivPdf } from './negociosOlivExport.js';
 import { OlivNegocioDetalleContenido } from './OlivNegocioDetalleContenido.jsx';
 import styles from '../negocios/NegociosPage.module.css';
 
@@ -48,6 +51,7 @@ function OlivNegociosLista() {
   const [searchInput, setSearchInput] = useState(filtros.search);
   const debouncedSearch = useDebounce(searchInput);
   const [opciones, setOpciones] = useState({ estados: [], torres: [], estadosInmueble: [] });
+  const [exportando, setExportando] = useState(false);
 
   useEffect(() => {
     if (debouncedSearch === filtros.search) return;
@@ -80,6 +84,21 @@ function OlivNegociosLista() {
     setPagina(1);
   }
 
+  async function handleExport(fmt) {
+    setExportando(true);
+    try {
+      const filas = await traerTodasLasPaginas(listNegociosOliv, filtros);
+      const nombre = `oliv-negocios-${new Date().toISOString().slice(0, 10)}`;
+      if (fmt === 'xlsx') exportNegociosOlivExcel(filas, `${nombre}.xlsx`);
+      else if (fmt === 'pdf') exportNegociosOlivPdf(filas, `${nombre}.pdf`);
+      else exportNegociosOlivCsv(filas, `${nombre}.csv`);
+    } catch (err) {
+      window.alert(`Error al exportar los negocios: ${err.message}`);
+    } finally {
+      setExportando(false);
+    }
+  }
+
   function limpiarFiltros() {
     setSearchInput('');
     setFiltros(FILTROS_VACIOS);
@@ -98,6 +117,9 @@ function OlivNegociosLista() {
         <div>
           <h1 className={styles.title}>Negocios</h1>
           <p className={styles.subtitle}>Inmuebles y negocios de Oliv{total !== undefined && !sinNegocios ? ` · ${total.toLocaleString('es-CO')} resultados` : ''}</p>
+        </div>
+        <div className={styles.acciones}>
+          <ExportMenu onExport={handleExport} disabled={exportando || cargando || sinNegocios} />
         </div>
       </div>
 

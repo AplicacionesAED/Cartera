@@ -36,6 +36,7 @@ import { formatDateTime } from '../../utils/format.js';
 import { EsperadoRecaudadoChart, fmtDia, fmtMes } from '../dashboard/charts/EsperadoRecaudadoChart.jsx';
 import { TorreRecaudoChart } from '../dashboard/charts/TorreRecaudoChart.jsx';
 import { KpiBloque } from '../resumen/KpiBloque.jsx';
+import { exportarConsolidadoPdf } from '../resumen/consolidadoPdf.js';
 import dashStyles from '../dashboard/Dashboard.module.css';
 import styles from '../resumen/ResumenPage.module.css';
 
@@ -241,6 +242,7 @@ export function OlivResumenPage() {
   const [error, setError] = useState(null);
   const [cerrando, setCerrando] = useState(false);
   const [exportandoConsolidado, setExportandoConsolidado] = useState(false);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   // KPIs + tendencia (mismo backend que alimentaría un futuro "Dashboard
   // Plan vs. Recaudo" de Oliv, si llega a existir)
@@ -415,6 +417,27 @@ export function OlivResumenPage() {
       setError(err.message);
     } finally {
       setCerrando(false);
+    }
+  }
+
+  // PDF horizontal del consolidado por torre del mes que se está viendo (mismo formato que el de Baía Kristal).
+  async function handleExportConsolidadoPdf() {
+    if (!datos) return;
+    setExportandoPdf(true);
+    try {
+      await exportarConsolidadoPdf({
+        datos, columnas: COLUMNAS, grupos: GRUPOS, tonos: TONOS_EXCEL,
+        titulo: 'Consolidado de Cartera por Torre — Oliv',
+        encabezadoPrimera: 'TORRE',
+        filasDatos: datos.torres,
+        etiquetaFila: (fila) => fila.torre,
+        nota: 'Consolidado de cartera de Oliv calculado sobre la conciliación real de sus negocios.',
+        prefijoArchivo: 'Consolidado Cartera Oliv',
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExportandoPdf(false);
     }
   }
 
@@ -672,6 +695,9 @@ export function OlivResumenPage() {
           {datos?.enVivo && <Badge variant="info">En vivo</Badge>}
           <Button variant="secondary" className={styles.exportarConsolidado} onClick={handleExportConsolidado} disabled={!datos || exportandoConsolidado}>
             {exportandoConsolidado ? 'Exportando…' : 'Exportar Consolidado (Excel)'}
+          </Button>
+          <Button variant="secondary" onClick={handleExportConsolidadoPdf} disabled={!datos || exportandoPdf}>
+            {exportandoPdf ? 'Exportando…' : 'Exportar Consolidado (PDF)'}
           </Button>
         </div>
         <ConsolidadoCarteraTorre data={datos} />
