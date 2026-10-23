@@ -102,10 +102,11 @@ function MovimientoRow({ mov }) {
         </td>
         <td style={{ whiteSpace: 'nowrap' }}>{fecha ?? <span className={base.muted}>—</span>}</td>
         <td>
-          <div className={base.celdaTitulo}>
-            <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
-            {proyecto && <span className={base.detalleSec}>{proyecto}</span>}
-          </div>
+          {neg?.enlaceId ? (
+            <Link to={`/negocios/${neg.enlaceId}`} className={styles.referencia} onClick={(e) => e.stopPropagation()} title="Abrir el negocio">{mov.referencia}</Link>
+          ) : (
+            <span className={styles.referencia}>{mov.referencia}</span>
+          )}
         </td>
         <td>
           {compradorPrincipal ? (
@@ -123,11 +124,10 @@ function MovimientoRow({ mov }) {
           )}
         </td>
         <td>
-          {neg?.enlaceId ? (
-            <Link to={`/negocios/${neg.enlaceId}`} className={styles.referencia} onClick={(e) => e.stopPropagation()} title="Abrir el negocio">{mov.referencia}</Link>
-          ) : (
-            <span className={styles.referencia}>{mov.referencia}</span>
-          )}
+          <div className={base.celdaTitulo}>
+            <span className={base.nombre}>{neg?.nomenclatura ?? '—'}</span>
+            {proyecto && <span className={base.detalleSec}>{proyecto}</span>}
+          </div>
         </td>
         <td>{tipo ? <span className={styles.tipo} title={tipo}>{tipo}</span> : <span className={base.muted}>—</span>}</td>
         <td className={base.derecha}><span className={styles.valor}>{valor ?? '—'}</span></td>
@@ -398,9 +398,9 @@ export function MovimientosPage() {
                 <tr>
                   <th className={styles.chevronCol} />
                   <th><span>Fecha<ConceptoHint columna="Fecha Contable" hoja="movimiento" /></span></th>
-                  <th><span>Unidad<ConceptoHint columna="Nomenclatura" hoja="movimiento" /></span></th>
-                  <th><span>Comprador<ConceptoHint columna="Propietario" hoja="movimiento" /></span></th>
                   <th><span>Referencia de recaudo</span></th>
+                  <th><span>Comprador<ConceptoHint columna="Propietario" hoja="movimiento" /></span></th>
+                  <th><span>Unidad<ConceptoHint columna="Nomenclatura" hoja="movimiento" /></span></th>
                   <th><span>Tipo de movimiento<ConceptoHint columna="Tipo Movimiento" hoja="movimiento" /></span></th>
                   <th className={base.derecha}><span>Valor<ConceptoHint columna="Valor" hoja="movimiento" /></span></th>
                 </tr>
