@@ -13,7 +13,9 @@ import { Search, CircleDot, Layers, MapPin, Building, Download, RefreshCw, Link2
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
+import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
@@ -29,7 +31,13 @@ import { NegocioDetalleContenido } from './NegocioDetalleContenido.jsx';
 import styles from './NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', estado: '', etapa: '', frente: '', torre: '', vinculacion: '' };
+const VINCULACION_OPCIONES = [
+  { value: 'nomenclatura', label: 'Por nomenclatura y categoría' },
+  { value: 'referencia', label: 'Por referencia de recaudo' },
+  { value: 'sin', label: 'Sin inmueble vinculado' },
+];
+
+const FILTROS_VACIOS = { search: '', estado: [], etapa: [], frente: [], torre: [], vinculacion: [] };
 
 function cleanNombre(nombre) {
   if (!nombre) return null;
@@ -178,23 +186,9 @@ function NegociosLista() {
     setPagina(1);
   }
 
-  function handleEtapaChange(value) {
-    setFiltros((prev) => {
-      const { frentesPorEtapa, torresPorEtapaFrente } = opciones;
-      let { frente, torre } = prev;
-      if (value && frente && !(frentesPorEtapa[value] || []).includes(frente)) {
-        frente = '';
-        torre = '';
-      } else if (value && frente && torre && !(torresPorEtapaFrente[`${value}||${frente}`] || []).includes(torre)) {
-        torre = '';
-      }
-      return { ...prev, etapa: value, frente, torre };
-    });
-    setPagina(1);
-  }
-
-  function handleFrenteChange(value) {
-    setFiltros((prev) => ({ ...prev, frente: value, torre: '' }));
+  // Cambiar etapas o frentes poda lo que ya no está disponible en los niveles de abajo.
+  function actualizarCascada(campo, valor) {
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
@@ -231,12 +225,10 @@ function NegociosLista() {
 
   const meta = resultado ?? {};
   const filas = meta.data ?? [];
-  const hayFiltros = Object.values(filtros).some((valor) => valor !== '' && valor !== false);
+  const hayFiltros = Object.values(filtros).some((valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== '' && valor !== false));
   const sinNegocios = !cargando && meta.total === 0 && !hayFiltros;
-  const frenteOptions = filtros.etapa ? (opciones.frentesPorEtapa?.[filtros.etapa] || []) : (opciones.frentesDisponibles ?? []);
-  const torreOptions = filtros.frente
-    ? (filtros.etapa ? (opciones.torresPorEtapaFrente?.[`${filtros.etapa}||${filtros.frente}`] || []) : (opciones.torresPorFrente?.[filtros.frente] || []))
-    : [];
+  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
+  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
 
   return (
     <div className={styles.page}>
@@ -291,10 +283,7 @@ function NegociosLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.estado} onChange={(e) => actualizarFiltro('estado', e.target.value)}>
-                <option value="">Todos los estados</option>
-                {opciones.estados.map((v) => <option key={v} value={v}>{v}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.estados} value={filtros.estado} onChange={(v) => actualizarFiltro('estado', v)} placeholder="Todos los estados" />
             )}
           </Field>
         )}
@@ -308,12 +297,13 @@ function NegociosLista() {
           }
         >
           {(p) => (
-            <Select {...p} value={filtros.vinculacion ?? ''} onChange={(e) => actualizarFiltro('vinculacion', e.target.value)}>
-              <option value="">Todas</option>
-              <option value="nomenclatura">Por nomenclatura y categoría</option>
-              <option value="referencia">Por referencia de recaudo</option>
-              <option value="sin">Sin inmueble vinculado</option>
-            </Select>
+            <MultiSelect
+              {...p}
+              options={VINCULACION_OPCIONES}
+              value={filtros.vinculacion}
+              onChange={(v) => actualizarFiltro('vinculacion', v)}
+              placeholder="Todas"
+            />
           )}
         </Field>
         {opciones.etapasDisponibles.length > 0 && (
@@ -327,10 +317,7 @@ function NegociosLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.etapa} onChange={(e) => handleEtapaChange(e.target.value)}>
-                <option value="">Todas las etapas</option>
-                {opciones.etapasDisponibles.map((et) => <option key={et} value={et}>{etiquetaEtapa(et)}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.etapasDisponibles.map((et) => ({ value: et, label: etiquetaEtapa(et) }))} value={filtros.etapa} onChange={(v) => actualizarCascada('etapa', v)} placeholder="Todas las etapas" />
             )}
           </Field>
         )}
@@ -345,14 +332,11 @@ function NegociosLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.frente} onChange={(e) => handleFrenteChange(e.target.value)}>
-                <option value="">Todos los frentes</option>
-                {frenteOptions.map((fr) => <option key={fr} value={fr}>{fr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={frenteOptions} value={filtros.frente} onChange={(v) => actualizarCascada('frente', v)} placeholder="Todos los frentes" />
             )}
           </Field>
         )}
-        {filtros.frente && torreOptions.length > 0 && (
+        {filtros.frente.length > 0 && torreOptions.length > 0 && (
           <Field
             label={
               <span className={styles.labelConIcono}>
@@ -363,10 +347,7 @@ function NegociosLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {torreOptions.map((tr) => <option key={tr} value={tr}>Torre {tr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={torreOptions.map((tr) => ({ value: tr, label: `Torre ${tr}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}

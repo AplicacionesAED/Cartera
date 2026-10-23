@@ -7,6 +7,7 @@
 // confirmadas una por una en producción, no UI, así que no se simplifica.
 const { QueryTypes, Op } = require('sequelize');
 const sequelize = require('../../config/db');
+const { lista, filtrarCascadaEnMemoria } = require('../../utils/filtros');
 const { PRIORIDAD_ESTADO_SQL } = require('../vinculo/vinculoResolver');
 const InventarioItem = require('../inventario/inventarioItem.model');
 const Negocio = require('../negocio/negocio.model');
@@ -330,9 +331,7 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
     const s = search.toLowerCase();
     filas = filas.filter((f) => f.nomenclatura?.toLowerCase().includes(s) || `${f.frente ?? ''} ${f.torre ?? ''}`.toLowerCase().includes(s));
   }
-  if (etapa) filas = filas.filter((f) => f.etapa === etapa);
-  if (frente && torre) filas = filas.filter((f) => f.frente === frente && f.torre === torre);
-  else if (frente) filas = filas.filter((f) => f.frente === frente);
+  filas = filtrarCascadaEnMemoria(filas, { etapa, frente, torre });
   if (conMovimientos === 'true') filas = filas.filter((f) => f._tieneMovimientos);
   filas = ordenarDashboard(filas, sortBy, sortDir);
 
@@ -526,9 +525,7 @@ async function obtenerCarteraMora({ search, etapa, frente, torre, rango, vista, 
   }
   if (tramite === 'en_tramite') filas = filas.filter((f) => f.enTramite);
   else if (tramite === 'no_en_tramite') filas = filas.filter((f) => !f.enTramite);
-  if (etapa) filas = filas.filter((f) => f.etapa === etapa);
-  if (frente && torre) filas = filas.filter((f) => f.frente === frente && f.torre === torre);
-  else if (frente) filas = filas.filter((f) => f.frente === frente);
+  filas = filtrarCascadaEnMemoria(filas, { etapa, frente, torre });
 
   const porRangoMoraMap = new Map(RANGOS_MORA.map((r) => [r.key, { count: 0, monto: 0 }]));
   for (const f of filas) {
@@ -538,7 +535,8 @@ async function obtenerCarteraMora({ search, etapa, frente, torre, rango, vista, 
   }
   const porRangoMora = RANGOS_MORA.map((r) => ({ rango: r.key, label: r.label, ...porRangoMoraMap.get(r.key) }));
 
-  if (rango) filas = filas.filter((f) => claveRangoMora(f.maxDiasAtraso) === rango);
+  const rangos = lista(rango);
+  if (rangos.length) filas = filas.filter((f) => rangos.includes(claveRangoMora(f.maxDiasAtraso)));
 
   const totalCuotasEnMora = filas.reduce((s, f) => s + f.cuotasEnMora, 0);
   const totalMontoEnMora = filas.reduce((s, f) => s + f.montoEnMora, 0);

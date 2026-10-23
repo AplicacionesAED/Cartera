@@ -28,7 +28,8 @@ import { useNavigate } from 'react-router-dom';
 import { Search, ListFilter, Building } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
 import { StageBadge } from '../../components/ui/StageBadge.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SortHeader } from '../../components/ui/SortHeader.jsx';
 import { useSortableTable, ariaSort } from '../../hooks/useSortableTable.js';
@@ -106,7 +107,7 @@ function SyncStatusBar({ onTerminado }) {
 
 export function OlivOportunidadesPage() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = usePersistentState('oliv-oportunidades:filtros', { search: '', stage: '', torre: '', estadoInmueble: '' });
+  const [filtros, setFiltros] = usePersistentState('oliv-oportunidades:filtros', { search: '', stage: [], torre: [], estadoInmueble: [] });
   const [pagina, setPagina] = usePersistentState('oliv-oportunidades:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [stages, setStages] = useState([]);
@@ -161,9 +162,9 @@ export function OlivOportunidadesPage() {
   }
 
   const meta = resultado ?? {};
-  const hayFiltros = Object.values(filtros).some((valor) => valor !== '');
+  const hayFiltros = Object.values(filtros).some((valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== ''));
   const limpiarFiltros = () => {
-    setFiltros({ search: '', stage: '', torre: '', estadoInmueble: '' });
+    setFiltros({ search: '', stage: [], torre: [], estadoInmueble: [] });
     setPagina(1);
   };
 
@@ -206,10 +207,7 @@ export function OlivOportunidadesPage() {
           }
         >
           {(p) => (
-            <Select {...p} value={filtros.stage} onChange={(e) => actualizarFiltro('stage', e.target.value)}>
-              <option value="">Todas las etapas</option>
-              {stages.map((v) => <option key={v} value={v}>{v}</option>)}
-            </Select>
+            <MultiSelect {...p} options={stages} value={filtros.stage} onChange={(v) => actualizarFiltro('stage', v)} placeholder="Todas las etapas" />
           )}
         </Field>
         {opciones.torresDisponibles.length > 0 && (
@@ -223,10 +221,7 @@ export function OlivOportunidadesPage() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {opciones.torresDisponibles.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.torresDisponibles} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}
@@ -241,10 +236,7 @@ export function OlivOportunidadesPage() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.estadoInmueble} onChange={(e) => actualizarFiltro('estadoInmueble', e.target.value)}>
-                <option value="">Todos los estados</option>
-                {opciones.estadosInmuebleDisponibles.map((e) => <option key={e} value={e}>{e}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.estadosInmuebleDisponibles} value={filtros.estadoInmueble} onChange={(v) => actualizarFiltro('estadoInmueble', v)} placeholder="Todos los estados" />
             )}
           </Field>
         )}

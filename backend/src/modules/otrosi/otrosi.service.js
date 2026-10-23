@@ -10,11 +10,13 @@
 const axios = require('axios');
 const { Op } = require('sequelize');
 const { ordenSequelize } = require('../../utils/ordenamiento');
+const { lista } = require('../../utils/filtros');
 const {
   valoresProyectoTorre,
   compararEtapas,
   esFrenteSeleccionable,
   SIN_PROYECTO,
+  whereReferenciaPorFiltros,
   inmueblesPorReferencia,
   inmuebleDeFila,
   referenciasConOportunidadVigente,
@@ -82,28 +84,16 @@ async function listOtrosi({ search, requerido, stage, sortBy, sortDir, etapa, fr
   // EXITOSA', ...). Match EXACTO, mismo criterio que `stage` en Oportunidades;
   // los valores salen de `listStages()`. OJO: NO es la columna `etapa` (etapa de
   // construcción), que queda como dato interno y NO se expone.
-  if (stage) where.stage = stage;
+  const stages = lista(stage);
+  if (stages.length) where.stage = { [Op.in]: stages };
 
   // Filtro en cascada Etapa -> Frente -> Torre. Si el usuario NO filtra por
   // ninguno, los otrosíes sin inmueble asociado (null) siguen apareciendo igual
   // que ahora; si filtra por cualquiera de los 3, quedan excluidos (mismo
   // criterio que en Negocios).
   const valores = await valoresProyectoTorre();
-  if (etapa || frente || torre) {
-    if (etapa === SIN_PROYECTO) {
-      const sinProyecto = await referenciasSinProyecto();
-      const conProyecto = await referenciasPorProyectoTorre([...valores.porEtapa.values()].flat());
-      where.referencia_recaudo = { [Op.or]: [{ [Op.is]: null }, { [Op.notIn]: conProyecto }, { [Op.in]: sinProyecto }] };
-    } else {
-      let proyectosTorre = [];
-      if (frente && torre) proyectosTorre = valores.porFrenteTorre.get(`${frente}||${torre}`) || [];
-      else if (frente) proyectosTorre = valores.porFrente.get(frente) || [];
-      else if (etapa) proyectosTorre = valores.porEtapa.get(etapa) || [];
-      // Lista vacía -> `IN ()` deja el listado sin filas, que es lo correcto: el
-      // usuario pidió una rama de la cascada que no tiene inmuebles.
-      where.referencia_recaudo = { [Op.in]: await referenciasPorProyectoTorre(proyectosTorre) };
-    }
-  }
+  const condRef = await whereReferenciaPorFiltros(valores, { etapas: lista(etapa), frentes: lista(frente), torres: lista(torre) });
+  if (condRef) where.referencia_recaudo = condRef;
 
   // Filtro DURO y permanente (Jefe Gabriel, 2026-09-23): el listado expuesto al
   // frontend SOLO muestra los registros con archivo=true, siempre -- sin

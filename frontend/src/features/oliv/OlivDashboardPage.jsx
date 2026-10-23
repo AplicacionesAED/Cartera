@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, Fragment } from 'react';
 import ExcelJS from 'exceljs';
 import { Search, Building2, MapPin, X, Download, CalendarRange, Maximize2, Minimize2, History, Briefcase, Warehouse, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Wallet, Hourglass, AlertTriangle, TrendingUp } from 'lucide-react';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
@@ -101,7 +102,7 @@ const COLOR_EXCEL = {
 
 export function OlivDashboardPage() {
   const [filtros, setFiltros] = usePersistentState('oliv-dashboard-recaudo:filtros', {
-    search: '', torre: '', estadoInmueble: '', conMovimientos: false, mesDesde: '', mesHasta: '',
+    search: '', torre: [], estadoInmueble: [], conMovimientos: false, mesDesde: '', mesHasta: '',
   });
   const [vistaMeses, setVistaMeses] = usePersistentState('oliv-dashboard-recaudo:vista', 'ambos');
   const [alcancePlan, setAlcancePlan] = usePersistentState('oliv-dashboard-recaudo:plan', 'ambos');
@@ -178,11 +179,11 @@ export function OlivDashboardPage() {
   const meses = meta.meses ?? [];
   const mesesFiltrados = filtrarRangoMeses(meses, filtros.mesDesde, filtros.mesHasta);
   const totalesActivos = alcancePlan === 'inicial' ? meta.totalesInicial : alcancePlan === 'contraentrega' ? meta.totalesContraentrega : meta.totales;
-  const hasFilters = filtros.search || filtros.torre || filtros.estadoInmueble || filtros.conMovimientos
+  const hasFilters = filtros.search || filtros.torre.length || filtros.estadoInmueble.length || filtros.conMovimientos
     || filtros.mesDesde || filtros.mesHasta || vistaMeses !== 'ambos' || alcancePlan !== 'ambos';
 
   function clearFilters() {
-    setFiltros({ search: '', torre: '', estadoInmueble: '', conMovimientos: false, mesDesde: '', mesHasta: '' });
+    setFiltros({ search: '', torre: [], estadoInmueble: [], conMovimientos: false, mesDesde: '', mesHasta: '' });
     setVistaMeses('ambos');
     setAlcancePlan('ambos');
     setPagina(1);
@@ -417,20 +418,14 @@ export function OlivDashboardPage() {
         {(meta.torresDisponibles?.length ?? 0) > 0 && (
           <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><Building2 size={13} />Torre</span>}>
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {meta.torresDisponibles.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Select>
+              <MultiSelect {...p} options={meta.torresDisponibles} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}
         {(meta.estadosInmuebleDisponibles?.length ?? 0) > 0 && (
           <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><MapPin size={13} />Estado del inmueble</span>}>
             {(p) => (
-              <Select {...p} value={filtros.estadoInmueble} onChange={(e) => actualizarFiltro('estadoInmueble', e.target.value)}>
-                <option value="">Todos los estados</option>
-                {meta.estadosInmuebleDisponibles.map((e) => <option key={e} value={e}>{e}</option>)}
-              </Select>
+              <MultiSelect {...p} options={meta.estadosInmuebleDisponibles} value={filtros.estadoInmueble} onChange={(v) => actualizarFiltro('estadoInmueble', v)} placeholder="Todos los estados" />
             )}
           </Field>
         )}

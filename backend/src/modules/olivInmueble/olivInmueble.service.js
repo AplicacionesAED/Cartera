@@ -2,6 +2,7 @@
 // jerarquía Etapa→Frente→Torre: el objeto "Unidades" de HubSpot ya trae
 // `torre` como propiedad plana (no una expresión JSONB compuesta como
 // `Proyecto_Torre` en Zoho), así que los filtros son directos.
+const { lista } = require('../../utils/filtros');
 const { Op } = require('sequelize');
 const ApiError = require('../../utils/ApiError');
 const OlivInmueble = require('./olivInmueble.model');
@@ -38,9 +39,9 @@ function _mapDetalle(row) {
 
 async function list({ search, torre, categoria, estado, page = 1, limit = 50 }) {
   const where = {};
-  if (torre) where.torre = torre;
-  if (categoria) where.categoria = categoria;
-  if (estado) where.estado = estado;
+  if (lista(torre).length) where.torre = { [Op.in]: lista(torre) };
+  if (lista(categoria).length) where.categoria = { [Op.in]: lista(categoria) };
+  if (lista(estado).length) where.estado = { [Op.in]: lista(estado) };
   if (search) {
     const like = `%${String(search).replace(/[\\%_]/g, (o) => `\\${o}`)}%`;
     where[Op.or] = [{ codigo_unidad: { [Op.iLike]: like } }, { torre: { [Op.iLike]: like } }];
@@ -49,7 +50,7 @@ async function list({ search, torre, categoria, estado, page = 1, limit = 50 }) 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
 
-  const noFiltros = !search && !torre && !categoria && !estado;
+  const noFiltros = !search && !lista(torre).length && !lista(categoria).length && !lista(estado).length;
 
   const [{ rows, count }, torres, categorias, estados] = await Promise.all([
     OlivInmueble.findAndCountAll({

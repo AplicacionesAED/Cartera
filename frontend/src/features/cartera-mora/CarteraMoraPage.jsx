@@ -13,7 +13,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ExcelJS from 'exceljs';
 import { AlertTriangle, Search, Layers, MapPin, Building, X, Briefcase, Warehouse, ExternalLink, Clock, Repeat, Check, Download, Banknote, Percent, CheckCircle2 } from 'lucide-react';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
+import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { SortHeader } from '../../components/ui/SortHeader.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
@@ -143,7 +145,7 @@ function cumpleFiltroTramite(fila, tramite) {
 }
 
 export function CarteraMoraPage() {
-  const [filtros, setFiltros] = usePersistentState('cartera-mora:filtros', { search: '', etapa: '', frente: '', torre: '', tramite: '', vista: 'inicial', rango: '' });
+  const [filtros, setFiltros] = usePersistentState('cartera-mora:filtros', { search: '', etapa: [], frente: [], torre: [], tramite: '', vista: 'inicial', rango: '' });
   const [pagina, setPagina] = usePersistentState('cartera-mora:pagina', 1);
 
   // Enlaces desde Inicio (?vista=&rango=): aplican esos filtros una vez y limpian la URL.
@@ -155,7 +157,7 @@ export function CarteraMoraPage() {
     const buscar = searchParams.get('buscar');
     const tramite = searchParams.get('tramite');
     if (!vista && !rango && !buscar) return;
-    setFiltros(() => ({ search: buscar ?? '', etapa: '', frente: '', torre: '', tramite: tramite ?? '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
+    setFiltros(() => ({ search: buscar ?? '', etapa: [], frente: [], torre: [], tramite: tramite ?? '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
     setPagina(1);
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -223,23 +225,8 @@ export function CarteraMoraPage() {
     setPagina(1);
   }
 
-  function handleEtapaChange(value) {
-    setFiltros((prev) => {
-      const frentesPorEtapa = resultado?.frentesPorEtapa ?? {};
-      const torresPorEtapaFrente = resultado?.torresPorEtapaFrente ?? {};
-      if (value && prev.frente && !(frentesPorEtapa[value] || []).includes(prev.frente)) {
-        return { ...prev, etapa: value, frente: '', torre: '' };
-      }
-      if (value && prev.frente && prev.torre && !(torresPorEtapaFrente[`${value}||${prev.frente}`] || []).includes(prev.torre)) {
-        return { ...prev, etapa: value, torre: '' };
-      }
-      return { ...prev, etapa: value };
-    });
-    setPagina(1);
-  }
-
-  function handleFrenteChange(value) {
-    setFiltros((prev) => ({ ...prev, frente: value, torre: '' }));
+  function actualizarCascada(campo, valor) {
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
@@ -331,14 +318,12 @@ export function CarteraMoraPage() {
   const porRangoMora = meta.porRangoMora ?? [];
   const conteos = meta.conteos ?? {};
   const maxMontoRango = Math.max(0, ...porRangoMora.map((r) => r.monto || 0));
-  const frenteOptions = filtros.etapa ? (meta.frentesPorEtapa?.[filtros.etapa] ?? []) : (meta.frentesDisponibles ?? []);
-  const torreOptions = filtros.frente
-    ? (filtros.etapa ? (meta.torresPorEtapaFrente?.[`${filtros.etapa}||${filtros.frente}`] ?? []) : (meta.torresPorFrente?.[filtros.frente] ?? []))
-    : [];
-  const hasFilters = filtros.search || filtros.etapa || filtros.frente || filtros.torre || filtros.rango || filtros.tramite;
+  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
+  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
+  const hasFilters = filtros.search || filtros.etapa.length || filtros.frente.length || filtros.torre.length || filtros.rango || filtros.tramite;
 
   function clearFilters() {
-    setFiltros((prev) => ({ ...prev, search: '', etapa: '', frente: '', torre: '', rango: '', tramite: '' }));
+    setFiltros((prev) => ({ ...prev, search: '', etapa: [], frente: [], torre: [], rango: '', tramite: '' }));
     setPagina(1);
   }
 
@@ -436,30 +421,21 @@ export function CarteraMoraPage() {
               {(meta.etapasDisponibles?.length ?? 0) > 0 && (
                 <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><Layers size={13} />Etapa</span>}>
                   {(p) => (
-                    <Select {...p} value={filtros.etapa} onChange={(e) => handleEtapaChange(e.target.value)}>
-                      <option value="">Todas las etapas</option>
-                      {meta.etapasDisponibles.map((v) => <option key={v} value={v}>{etiquetaEtapa(v)}</option>)}
-                    </Select>
+                    <MultiSelect {...p} options={meta.etapasDisponibles.map((v) => ({ value: v, label: etiquetaEtapa(v) }))} value={filtros.etapa} onChange={(v) => actualizarCascada('etapa', v)} placeholder="Todas las etapas" />
                   )}
                 </Field>
               )}
               {(meta.frentesDisponibles?.length ?? 0) > 0 && (
                 <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><MapPin size={13} />Frente</span>}>
                   {(p) => (
-                    <Select {...p} value={filtros.frente} onChange={(e) => handleFrenteChange(e.target.value)}>
-                      <option value="">Todos los frentes</option>
-                      {frenteOptions.map((v) => <option key={v} value={v}>{v}</option>)}
-                    </Select>
+                    <MultiSelect {...p} options={frenteOptions} value={filtros.frente} onChange={(v) => actualizarCascada('frente', v)} placeholder="Todos los frentes" />
                   )}
                 </Field>
               )}
-              {filtros.frente && torreOptions.length > 0 && (
+              {filtros.frente.length > 0 && torreOptions.length > 0 && (
                 <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><Building size={13} />Torre</span>}>
                   {(p) => (
-                    <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                      <option value="">Todas las torres</option>
-                      {torreOptions.map((v) => <option key={v} value={v}>Torre {v}</option>)}
-                    </Select>
+                    <MultiSelect {...p} options={torreOptions.map((v) => ({ value: v, label: `Torre ${v}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
                   )}
                 </Field>
               )}

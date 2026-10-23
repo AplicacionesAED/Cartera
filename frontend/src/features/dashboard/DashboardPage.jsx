@@ -23,7 +23,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, Fragment } from 'react';
 import ExcelJS from 'exceljs';
 import { Search, Layers, MapPin, Building, X, Download, CalendarRange, Maximize2, Minimize2, History, Briefcase, Warehouse, ExternalLink, ChevronUp, ChevronDown, ChevronsUpDown, Building2, Wallet, Hourglass, AlertTriangle, TrendingUp } from 'lucide-react';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
+import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { Button } from '../../components/ui/Button.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
@@ -134,7 +136,7 @@ const COLOR_EXCEL = {
 
 export function DashboardPage() {
   const [filtros, setFiltros] = usePersistentState('dashboard-recaudo:filtros', {
-    search: '', etapa: '', frente: '', torre: '', conMovimientos: false, mesDesde: '', mesHasta: '',
+    search: '', etapa: [], frente: [], torre: [], conMovimientos: false, mesDesde: '', mesHasta: '',
   });
   const [vistaMeses, setVistaMeses] = usePersistentState('dashboard-recaudo:vista', 'ambos'); // 'ambos' | 'esperado' | 'recaudado'
   const [alcancePlan, setAlcancePlan] = usePersistentState('dashboard-recaudo:plan', 'ambos'); // 'ambos' | 'inicial' | 'contraentrega'
@@ -175,23 +177,8 @@ export function DashboardPage() {
   // Cambiar Etapa limpia el Frente elegido solo si ya no pertenece a la
   // nueva etapa (y Torre se limpia con el); cambiar Frente siempre limpia
   // Torre -- mismo criterio de cascada que Resumen/Negocios/Inventario.
-  function handleEtapaChange(value) {
-    setFiltros((prev) => {
-      const frentesPorEtapa = resultado?.frentesPorEtapa ?? {};
-      const torresPorEtapaFrente = resultado?.torresPorEtapaFrente ?? {};
-      if (value && prev.frente && !(frentesPorEtapa[value] || []).includes(prev.frente)) {
-        return { ...prev, etapa: value, frente: '', torre: '' };
-      }
-      if (value && prev.frente && prev.torre && !(torresPorEtapaFrente[`${value}||${prev.frente}`] || []).includes(prev.torre)) {
-        return { ...prev, etapa: value, torre: '' };
-      }
-      return { ...prev, etapa: value };
-    });
-    setPagina(1);
-  }
-
-  function handleFrenteChange(value) {
-    setFiltros((prev) => ({ ...prev, frente: value, torre: '' }));
+  function actualizarCascada(campo, valor) {
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
@@ -235,15 +222,13 @@ export function DashboardPage() {
   const meses = meta.meses ?? [];
   const mesesFiltrados = filtrarRangoMeses(meses, filtros.mesDesde, filtros.mesHasta);
   const totalesActivos = alcancePlan === 'inicial' ? meta.totalesInicial : alcancePlan === 'contraentrega' ? meta.totalesContraentrega : meta.totales;
-  const frenteOptions = filtros.etapa ? (meta.frentesPorEtapa?.[filtros.etapa] ?? []) : (meta.frentesDisponibles ?? []);
-  const torreOptions = filtros.frente
-    ? (filtros.etapa ? (meta.torresPorEtapaFrente?.[`${filtros.etapa}||${filtros.frente}`] ?? []) : (meta.torresPorFrente?.[filtros.frente] ?? []))
-    : [];
-  const hasFilters = filtros.search || filtros.etapa || filtros.frente || filtros.torre || filtros.conMovimientos
+  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
+  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
+  const hasFilters = filtros.search || filtros.etapa.length || filtros.frente.length || filtros.torre.length || filtros.conMovimientos
     || filtros.mesDesde || filtros.mesHasta || vistaMeses !== 'ambos' || alcancePlan !== 'ambos';
 
   function clearFilters() {
-    setFiltros({ search: '', etapa: '', frente: '', torre: '', conMovimientos: false, mesDesde: '', mesHasta: '' });
+    setFiltros({ search: '', etapa: [], frente: [], torre: [], conMovimientos: false, mesDesde: '', mesHasta: '' });
     setVistaMeses('ambos');
     setAlcancePlan('ambos');
     setPagina(1);
@@ -483,30 +468,21 @@ export function DashboardPage() {
         {(meta.etapasDisponibles?.length ?? 0) > 0 && (
           <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><Layers size={13} />Etapa</span>}>
             {(p) => (
-              <Select {...p} value={filtros.etapa} onChange={(e) => handleEtapaChange(e.target.value)}>
-                <option value="">Todas las etapas</option>
-                {meta.etapasDisponibles.map((et) => <option key={et} value={et}>{etiquetaEtapa(et)}</option>)}
-              </Select>
+              <MultiSelect {...p} options={meta.etapasDisponibles.map((et) => ({ value: et, label: etiquetaEtapa(et) }))} value={filtros.etapa} onChange={(v) => actualizarCascada('etapa', v)} placeholder="Todas las etapas" />
             )}
           </Field>
         )}
         {(meta.frentesDisponibles?.length ?? 0) > 0 && (
           <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><MapPin size={13} />Frente</span>}>
             {(p) => (
-              <Select {...p} value={filtros.frente} onChange={(e) => handleFrenteChange(e.target.value)}>
-                <option value="">Todos los frentes</option>
-                {frenteOptions.map((fr) => <option key={fr} value={fr}>{fr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={frenteOptions} value={filtros.frente} onChange={(v) => actualizarCascada('frente', v)} placeholder="Todos los frentes" />
             )}
           </Field>
         )}
-        {filtros.frente && torreOptions.length > 0 && (
+        {filtros.frente.length > 0 && torreOptions.length > 0 && (
           <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><Building size={13} />Torre</span>}>
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {torreOptions.map((tr) => <option key={tr} value={tr}>Torre {tr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={torreOptions.map((tr) => ({ value: tr, label: `Torre ${tr}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}

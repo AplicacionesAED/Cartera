@@ -8,7 +8,8 @@ const { QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 const ApiError = require('../../utils/ApiError');
 const InventarioItem = require('./inventarioItem.model');
-const { PROYECTO_TORRE_EXCLUIDOS, valoresProyectoTorre, compararEtapas, esFrenteSeleccionable } = require('./inventarioTorres.service');
+const { lista } = require('../../utils/filtros');
+const { PROYECTO_TORRE_EXCLUIDOS, proyectosTorreDeFiltros, valoresProyectoTorre, compararEtapas, esFrenteSeleccionable } = require('./inventarioTorres.service');
 
 function _mapItem(row) {
   return {
@@ -35,40 +36,18 @@ async function list({ search, proyecto, categoria, estado, etapa, frente, torre,
     conditions.push(`(datos->>'Proyecto_Torre' IS NULL OR datos->>'Proyecto_Torre' NOT IN (:excluidos))`);
     replacements.excluidos = [...PROYECTO_TORRE_EXCLUIDOS];
   }
-  if (proyecto) {
-    conditions.push('proyecto = :proyecto');
-    replacements.proyecto = proyecto;
-  }
-  if (categoria) {
-    conditions.push('categoria = :categoria');
-    replacements.categoria = categoria;
-  }
-  if (estado) {
-    conditions.push('estado = :estado');
-    replacements.estado = estado;
-  }
-  if (etapa) {
-    const lista = valores.porEtapa.get(etapa) || [];
-    if (lista.length > 0) {
-      conditions.push(`datos->>'Proyecto_Torre' IN (:etapaLista)`);
-      replacements.etapaLista = lista;
-    } else {
-      conditions.push('1 = 0');
+  for (const [campo, valor] of [['proyecto', proyecto], ['categoria', categoria], ['estado', estado]]) {
+    const vals = lista(valor);
+    if (vals.length) {
+      conditions.push(`${campo} IN (:${campo}Lista)`);
+      replacements[`${campo}Lista`] = vals;
     }
   }
-  if (frente && torre) {
-    const lista = valores.porFrenteTorre.get(`${frente}||${torre}`) || [];
-    if (lista.length > 0) {
-      conditions.push(`datos->>'Proyecto_Torre' IN (:frenteTorreLista)`);
-      replacements.frenteTorreLista = lista;
-    } else {
-      conditions.push('1 = 0');
-    }
-  } else if (frente) {
-    const lista = valores.porFrente.get(frente) || [];
-    if (lista.length > 0) {
-      conditions.push(`datos->>'Proyecto_Torre' IN (:frenteLista)`);
-      replacements.frenteLista = lista;
+  const proy = proyectosTorreDeFiltros(valores, { etapas: lista(etapa), frentes: lista(frente), torres: lista(torre) });
+  if (proy) {
+    if (proy.lista.length > 0) {
+      conditions.push(`datos->>'Proyecto_Torre' IN (:proyTorreLista)`);
+      replacements.proyTorreLista = proy.lista;
     } else {
       conditions.push('1 = 0');
     }
@@ -79,7 +58,7 @@ async function list({ search, proyecto, categoria, estado, etapa, frente, torre,
   }
 
   const whereSql = `WHERE ${conditions.join(' AND ')}`;
-  const noFilters = !search && !proyecto && !categoria && !estado && !etapa && !frente && !torre;
+  const noFilters = !search && ![proyecto, categoria, estado, etapa, frente, torre].some((v) => lista(v).length);
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
 

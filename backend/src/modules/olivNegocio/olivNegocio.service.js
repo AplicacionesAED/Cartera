@@ -29,6 +29,7 @@
 // necesario ahí por volumen), ahí el cruce se hace en JS: Oliv tiene ~100
 // inmuebles y ~20-50 negocios calificados, un volumen donde no hace falta
 // esa complejidad solo por rendimiento.
+const { lista } = require('../../utils/filtros');
 const { Op } = require('sequelize');
 const ApiError = require('../../utils/ApiError');
 const centroAplicacionesDb = require('../../utils/centroAplicacionesDb');
@@ -131,9 +132,12 @@ async function list({ search, estado, torre, estadoInmueble, page = 1, limit = 5
   const torresDisponibles = [...new Set(inmuebles.map((im) => im.torre).filter(Boolean))].sort();
   const estadosInmuebleDisponibles = [...new Set(inmuebles.map((im) => im.estado).filter(Boolean))].sort();
 
-  if (estado) filas = filas.filter((f) => f.estado === estado);
-  if (torre) filas = filas.filter((f) => f.torre === torre);
-  if (estadoInmueble) filas = filas.filter((f) => f.estadoInmueble === estadoInmueble);
+  const estados = lista(estado);
+  const torres = lista(torre);
+  const estadosInm = lista(estadoInmueble);
+  if (estados.length) filas = filas.filter((f) => estados.includes(f.estado));
+  if (torres.length) filas = filas.filter((f) => torres.includes(f.torre));
+  if (estadosInm.length) filas = filas.filter((f) => estadosInm.includes(f.estadoInmueble));
   if (search) {
     const q = search.toLowerCase();
     filas = filas.filter((f) => [f.referencia, f.comprador, f.unidad, f.torre].some((v) => v && String(v).toLowerCase().includes(q)));

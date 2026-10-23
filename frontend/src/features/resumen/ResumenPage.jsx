@@ -23,6 +23,8 @@ import ExcelJS from 'exceljs';
 import { exportarConsolidadoPdf } from './consolidadoPdf.js';
 import { Maximize2, Minimize2, Layers, MapPin, Building, X, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Building2, Wallet, AlertTriangle, Hourglass, Target, KeyRound } from 'lucide-react';
 import { Field, Select } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
+import { frentesDisponibles as frentesDisponiblesCascada, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
@@ -265,9 +267,9 @@ export function ResumenPage() {
   const [etapaAbierta, setEtapaAbierta] = useState(false);
   const [enfocado, toggleEnfocado] = useModoEnfocado();
 
-  const [etapaFilter, setEtapaFilter] = useState('');
-  const [frenteFilter, setFrenteFilter] = useState('');
-  const [torreFilter, setTorreFilter] = useState('');
+  const [etapaFilter, setEtapaFilter] = useState([]);
+  const [frenteFilter, setFrenteFilter] = useState([]);
+  const [torreFilter, setTorreFilter] = useState([]);
   const [etapasDisponibles, setEtapasDisponibles] = useState([]);
   const [frentesDisponibles, setFrentesDisponibles] = useState([]);
   const [frentesPorEtapa, setFrentesPorEtapa] = useState({});
@@ -292,7 +294,7 @@ export function ResumenPage() {
 
   useEffect(() => {
     let vigente = true;
-    getDashboardRecaudo({ etapa: etapaFilter || undefined, frente: frenteFilter || undefined, torre: torreFilter || undefined, page: 1, limit: 1 })
+    getDashboardRecaudo({ etapa: etapaFilter, frente: frenteFilter, torre: torreFilter, page: 1, limit: 1 })
       .then((res) => {
         if (!vigente) return;
         setPlanRecaudo(res.data);
@@ -305,28 +307,22 @@ export function ResumenPage() {
     return () => { vigente = false; };
   }, [etapaFilter, frenteFilter, torreFilter]);
 
-  const handleEtapaChange = useCallback((value) => {
-    setEtapaFilter(value);
-    setFrenteFilter((prevFrente) => {
-      if (value && prevFrente && !(frentesPorEtapa[value] || []).includes(prevFrente)) {
-        setTorreFilter('');
-        return '';
-      }
-      return prevFrente;
-    });
-  }, [frentesPorEtapa]);
+  // Cambiar etapas o frentes poda lo que ya no está disponible en los niveles de abajo.
+  const opcionesCascada = useMemo(
+    () => ({ frentesDisponibles, frentesPorEtapa, torresPorFrente, torresPorEtapaFrente }),
+    [frentesDisponibles, frentesPorEtapa, torresPorFrente, torresPorEtapaFrente],
+  );
+  const actualizarCascada = useCallback((campo, valor) => {
+    const sel = podarSeleccion(opcionesCascada, { etapa: etapaFilter, frente: frenteFilter, torre: torreFilter, [campo]: valor });
+    setEtapaFilter(sel.etapa);
+    setFrenteFilter(sel.frente);
+    setTorreFilter(sel.torre);
+  }, [opcionesCascada, etapaFilter, frenteFilter, torreFilter]);
 
-  const handleFrenteChange = useCallback((value) => {
-    setFrenteFilter(value);
-    setTorreFilter('');
-  }, []);
-
-  const frenteOptions = etapaFilter ? (frentesPorEtapa[etapaFilter] || []) : frentesDisponibles;
-  const torreOptions = frenteFilter
-    ? (etapaFilter ? (torresPorEtapaFrente[`${etapaFilter}||${frenteFilter}`] || []) : (torresPorFrente[frenteFilter] || []))
-    : [];
-  const hayFiltrosUbicacion = etapaFilter || frenteFilter || torreFilter;
-  const limpiarFiltrosUbicacion = () => { setEtapaFilter(''); setFrenteFilter(''); setTorreFilter(''); };
+  const frenteOptions = frentesDisponiblesCascada(opcionesCascada, etapaFilter);
+  const torreOptions = torresDisponibles(opcionesCascada, etapaFilter, frenteFilter);
+  const hayFiltrosUbicacion = etapaFilter.length > 0 || frenteFilter.length > 0 || torreFilter.length > 0;
+  const limpiarFiltrosUbicacion = () => { setEtapaFilter([]); setFrenteFilter([]); setTorreFilter([]); };
 
   const aniosDisponibles = useMemo(() => {
     const anios = new Set((planRecaudo?.meses ?? []).map((m) => Number(m.slice(0, 4))));
@@ -582,30 +578,21 @@ export function ResumenPage() {
         {etapasDisponibles.length > 0 && (
           <Field className={dashStyles.fieldSm} label={<span className={styles.labelConIcono}><Layers size={13} />Etapa</span>}>
             {(p) => (
-              <Select {...p} value={etapaFilter} onChange={(e) => handleEtapaChange(e.target.value)}>
-                <option value="">Todas las etapas</option>
-                {etapasDisponibles.map((et) => <option key={et} value={et}>{etiquetaEtapa(et)}</option>)}
-              </Select>
+              <MultiSelect {...p} options={etapasDisponibles.map((et) => ({ value: et, label: etiquetaEtapa(et) }))} value={etapaFilter} onChange={(v) => actualizarCascada('etapa', v)} placeholder="Todas las etapas" />
             )}
           </Field>
         )}
         {frentesDisponibles.length > 0 && (
           <Field className={dashStyles.fieldSm} label={<span className={styles.labelConIcono}><MapPin size={13} />Frente</span>}>
             {(p) => (
-              <Select {...p} value={frenteFilter} onChange={(e) => handleFrenteChange(e.target.value)}>
-                <option value="">Todos los frentes</option>
-                {frenteOptions.map((fr) => <option key={fr} value={fr}>{fr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={frenteOptions} value={frenteFilter} onChange={(v) => actualizarCascada('frente', v)} placeholder="Todos los frentes" />
             )}
           </Field>
         )}
-        {frenteFilter && torreOptions.length > 0 && (
+        {frenteFilter.length > 0 && torreOptions.length > 0 && (
           <Field className={dashStyles.fieldSm} label={<span className={styles.labelConIcono}><Building size={13} />Torre</span>}>
             {(p) => (
-              <Select {...p} value={torreFilter} onChange={(e) => setTorreFilter(e.target.value)}>
-                <option value="">Todas las torres</option>
-                {torreOptions.map((tr) => <option key={tr} value={tr}>Torre {tr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={torreOptions.map((tr) => ({ value: tr, label: `Torre ${tr}` }))} value={torreFilter} onChange={(v) => setTorreFilter(v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}

@@ -7,7 +7,9 @@ const ApiError = require('../../utils/ApiError');
 const { getAccessToken } = require('../../utils/zohoAuth');
 const zohoConfig = require('../../config/zoho');
 const { ordenSequelize } = require('../../utils/ordenamiento');
+const { lista } = require('../../utils/filtros');
 const {
+  whereReferenciaPorFiltros,
   valoresProyectoTorre,
   compararEtapas,
   esFrenteSeleccionable,
@@ -82,24 +84,12 @@ function _mapDetalle(row) {
 // Proyecto/Torre, así que se resuelve indirecto vía `referencia_recaudo`.
 async function list({ stage, search, etapa, frente, torre, sortBy, sortDir, page = 1, limit = 20 }) {
   const where = {};
-  if (stage) where.stage = stage;
+  const stages = lista(stage);
+  if (stages.length) where.stage = { [Op.in]: stages };
 
   const valores = await valoresProyectoTorre();
-  if (etapa || frente || torre) {
-    if (etapa === SIN_PROYECTO) {
-      const sinProyecto = await referenciasSinProyecto();
-      const conProyecto = await referenciasPorProyectoTorre([...valores.porEtapa.values()].flat());
-      where.referencia_recaudo = { [Op.or]: [{ [Op.is]: null }, { [Op.notIn]: conProyecto }, { [Op.in]: sinProyecto }] };
-    } else {
-      let proyectosTorre = [];
-      if (frente && torre) proyectosTorre = valores.porFrenteTorre.get(`${frente}||${torre}`) || [];
-      else if (frente) proyectosTorre = valores.porFrente.get(frente) || [];
-      else if (etapa) proyectosTorre = valores.porEtapa.get(etapa) || [];
-      // Lista vacía -> `IN ()` deja el listado sin filas, que es lo correcto: el
-      // usuario pidió una rama de la cascada que no tiene inmuebles.
-      where.referencia_recaudo = { [Op.in]: await referenciasPorProyectoTorre(proyectosTorre) };
-    }
-  }
+  const condRef = await whereReferenciaPorFiltros(valores, { etapas: lista(etapa), frentes: lista(frente), torres: lista(torre) });
+  if (condRef) where.referencia_recaudo = condRef;
 
   if (search) {
     const like = `%${String(search).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;

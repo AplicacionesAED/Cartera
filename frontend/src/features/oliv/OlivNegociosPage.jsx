@@ -13,7 +13,8 @@ import { Search, CircleDot, Building } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listNegociosOliv } from '../../api/oliv.js';
@@ -22,7 +23,7 @@ import { OlivNegocioDetalleContenido } from './OlivNegocioDetalleContenido.jsx';
 import styles from '../negocios/NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', estado: '', torre: '', estadoInmueble: '' };
+const FILTROS_VACIOS = { search: '', estado: [], torre: [], estadoInmueble: [] };
 
 function iniciales(nombre = '') {
   const partes = nombre.trim().split(/\s+/).filter(Boolean);
@@ -88,7 +89,7 @@ function OlivNegociosLista() {
   const meta = resultado ?? {};
   const filas = meta.data ?? [];
   const total = meta.pagination?.total;
-  const hayFiltros = Object.values(filtros).some((valor) => valor !== '');
+  const hayFiltros = Object.values(filtros).some((valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== ''));
   const sinNegocios = !cargando && total === 0 && !hayFiltros;
 
   return (
@@ -123,20 +124,14 @@ function OlivNegociosLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {opciones.torres.map((t) => <option key={t} value={t}>Torre {t}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.torres.map((t) => ({ value: t, label: `Torre ${t}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}
         {opciones.estadosInmueble.length > 0 && (
           <Field label="Estado del inmueble">
             {(p) => (
-              <Select {...p} value={filtros.estadoInmueble} onChange={(e) => actualizarFiltro('estadoInmueble', e.target.value)}>
-                <option value="">Todos los estados</option>
-                {opciones.estadosInmueble.map((e) => <option key={e} value={e}>{e}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.estadosInmueble} value={filtros.estadoInmueble} onChange={(v) => actualizarFiltro('estadoInmueble', v)} placeholder="Todos los estados" />
             )}
           </Field>
         )}
@@ -150,10 +145,7 @@ function OlivNegociosLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.estado} onChange={(e) => actualizarFiltro('estado', e.target.value)}>
-                <option value="">Todos los estados</option>
-                {opciones.estados.map((v) => <option key={v} value={v}>{v}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.estados} value={filtros.estado} onChange={(v) => actualizarFiltro('estado', v)} placeholder="Todos los estados" />
             )}
           </Field>
         )}

@@ -14,7 +14,8 @@ const Negocio = require('./negocio.model');
 const NegocioComprador = require('./negocioComprador.model');
 const { invalidarCacheDashboard } = require('../dashboard/dashboardCache');
 const NegocioMovimiento = require('./negocioMovimiento.model');
-const { PROYECTO_TORRE_EXCLUIDOS, valoresProyectoTorre, compararEtapas, esFrenteSeleccionable, parseProyectoTorre, formatearProyectoTorre, obtenerEtapaTorre, parsePisoNumero, nomenclaturaCompleta, nomenclaturaCompletaSQL } = require('../inventario/inventarioTorres.service');
+const { lista } = require('../../utils/filtros');
+const { PROYECTO_TORRE_EXCLUIDOS, proyectosTorreDeFiltros, valoresProyectoTorre, compararEtapas, esFrenteSeleccionable, parseProyectoTorre, formatearProyectoTorre, obtenerEtapaTorre, parsePisoNumero, nomenclaturaCompleta, nomenclaturaCompletaSQL } = require('../inventario/inventarioTorres.service');
 const { elegirOportunidadVigente } = require('../../config/estadosOportunidad');
 const Oportunidad = require('../oportunidad/oportunidad.model');
 
@@ -82,14 +83,20 @@ async function construirFiltroCombinado({ search, estado, etapa, frente, torre, 
   const condiciones = [];
   let idx = bind.length + 1;
 
-  // Forma en que el negocio quedó vinculado a su inmueble (ver vinculoResolver.js).
-  if (vinculacion === 'nomenclatura') condiciones.push(`c.vinculo_metodo = 'nomenclatura'`);
-  else if (vinculacion === 'referencia') condiciones.push(`c.vinculo_metodo = 'referencia'`);
-  else if (vinculacion === 'sin') condiciones.push(`c.negocio_id IS NOT NULL AND c.inventario_datos IS NULL`);
+  // Forma en que el negocio quedó vinculado a su inmueble (ver vinculoResolver.js). Varias = OR.
+  const vincs = lista(vinculacion);
+  if (vincs.length) {
+    const ors = [];
+    if (vincs.includes('nomenclatura')) ors.push(`c.vinculo_metodo = 'nomenclatura'`);
+    if (vincs.includes('referencia')) ors.push(`c.vinculo_metodo = 'referencia'`);
+    if (vincs.includes('sin')) ors.push(`(c.negocio_id IS NOT NULL AND c.inventario_datos IS NULL)`);
+    if (ors.length) condiciones.push(`(${ors.join(' OR ')})`);
+  }
 
-  if (estado) {
-    condiciones.push(`c.estado ILIKE $${idx++}`);
-    bind.push(`%${estado}%`);
+  const estados = lista(estado);
+  if (estados.length) {
+    condiciones.push(`c.estado ILIKE ANY($${idx++}::text[])`);
+    bind.push(estados.map((e) => `%${e}%`));
   }
   if (search) {
     condiciones.push(`(
@@ -107,23 +114,12 @@ async function construirFiltroCombinado({ search, estado, etapa, frente, torre, 
     bind.push(`%${search}%`);
     idx++;
   }
-  if (etapa) {
-    if (etapa === SIN_PROYECTO) {
-      condiciones.push(`c.inventario_datos IS NULL`);
-    } else {
-      const lista = valores.porEtapa.get(etapa) || [];
-      condiciones.push(`c.inventario_datos->>'Proyecto_Torre' = ANY($${idx++}::text[])`);
-      bind.push(lista);
-    }
-  }
-  if (frente && torre) {
-    const lista = valores.porFrenteTorre.get(`${frente}||${torre}`) || [];
-    condiciones.push(`c.inventario_datos->>'Proyecto_Torre' = ANY($${idx++}::text[])`);
-    bind.push(lista);
-  } else if (frente) {
-    const lista = valores.porFrente.get(frente) || [];
-    condiciones.push(`c.inventario_datos->>'Proyecto_Torre' = ANY($${idx++}::text[])`);
-    bind.push(lista);
+  const proy = proyectosTorreDeFiltros(valores, { etapas: lista(etapa), frentes: lista(frente), torres: lista(torre) });
+  if (proy) {
+    const partes = [`c.inventario_datos->>'Proyecto_Torre' = ANY($${idx++}::text[])`];
+    bind.push(proy.lista);
+    if (proy.sinProyecto) partes.push(`c.inventario_datos IS NULL`);
+    condiciones.push(`(${partes.join(' OR ')})`);
   }
 
   return { whereSQL: condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '', idx };
@@ -133,7 +129,7 @@ async function list({ search, estado, etapa, frente, torre, vinculacion, page = 
   const valores = await valoresProyectoTorre();
   const bind = [[...PROYECTO_TORRE_EXCLUIDOS], PATRON_NOMBRE_EXCLUIDO];
   const { whereSQL, idx } = await construirFiltroCombinado({ search, estado, etapa, frente, torre, vinculacion, valores, bind });
-  const noFilters = !search && !estado && !etapa && !frente && !torre && !vinculacion;
+  const noFilters = !search && !lista(estado).length && !lista(etapa).length && !lista(frente).length && !lista(torre).length && !lista(vinculacion).length;
 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(9999, Math.max(1, Number(limit) || 50));
@@ -368,13 +364,15 @@ async function resolverMovimientosWhere({ search, fideicomiso, estado, tipoMovim
   const negocioConds = [];
   const negBind = [];
   let ni = 1;
-  if (estado) {
-    negocioConds.push(`estado ILIKE $${ni++}`);
-    negBind.push(`%${estado}%`);
+  const estados = lista(estado);
+  if (estados.length) {
+    negocioConds.push(`estado ILIKE ANY($${ni++}::text[])`);
+    negBind.push(estados.map((e) => `%${e}%`));
   }
-  if (fideicomiso) {
-    negocioConds.push(`datos->>'Fideicomiso' LIKE $${ni++}`);
-    negBind.push(`%${fideicomiso}%`);
+  const fideicomisos = lista(fideicomiso);
+  if (fideicomisos.length) {
+    negocioConds.push(`datos->>'Fideicomiso' LIKE ANY($${ni++}::text[])`);
+    negBind.push(fideicomisos.map((f) => `%${f}%`));
   }
   if (search) {
     negocioConds.push(`(
@@ -408,9 +406,10 @@ async function resolverMovimientosWhere({ search, fideicomiso, estado, tipoMovim
 
   const movConds = [];
   if (orParts.length > 0) movConds.push(`(${orParts.join(' OR ')})`);
-  if (tipoMovimiento) {
-    movConds.push(`m.datos->>'Tipo Movimiento' = $${mi++}`);
-    movBind.push(tipoMovimiento);
+  const tiposMov = lista(tipoMovimiento);
+  if (tiposMov.length) {
+    movConds.push(`m.datos->>'Tipo Movimiento' = ANY($${mi++}::text[])`);
+    movBind.push(tiposMov);
   }
   if (fechaDesde) {
     movConds.push(`m.fecha_contable >= $${mi++}`);

@@ -13,7 +13,9 @@ import { useNavigate } from 'react-router-dom';
 import { Search, ListFilter, RefreshCw, Layers, MapPin, Building } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
 import { StageBadge } from '../../components/ui/StageBadge.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
+import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SortHeader } from '../../components/ui/SortHeader.jsx';
@@ -107,7 +109,7 @@ export function OportunidadesListPage() {
   // Deliberadamente useState normal (NO usePersistentState) -- pedido explícito
   // del usuario: a diferencia del resto de listados del proyecto, este módulo
   // no debe recordar filtros/página entre visitas, deben arrancar limpios.
-  const [filtros, setFiltros] = useState({ search: '', stage: '', etapa: '', frente: '', torre: '' });
+  const [filtros, setFiltros] = useState({ search: '', stage: [], etapa: [], frente: [], torre: [] });
   const [pagina, setPagina] = useState(1);
   const [resultado, setResultado] = useState(null);
   const [stages, setStages] = useState([]);
@@ -174,39 +176,18 @@ export function OportunidadesListPage() {
   // Mismo criterio en cascada que OtrosiesPage.jsx: elegir una etapa limpia
   // el frente/torre si dejan de pertenecer a ella; elegir un frente limpia
   // la torre.
-  function handleEtapaChange(value) {
-    setFiltros((prev) => {
-      const { frentesPorEtapa, torresPorEtapaFrente } = opciones;
-      let { frente, torre } = prev;
-      if (value && frente && !(frentesPorEtapa[value] || []).includes(frente)) {
-        frente = '';
-        torre = '';
-      } else if (value && frente && torre && !(torresPorEtapaFrente[`${value}||${frente}`] || []).includes(torre)) {
-        torre = '';
-      }
-      return { ...prev, etapa: value, frente, torre };
-    });
+  function actualizarCascada(campo, valor) {
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
-  function handleFrenteChange(value) {
-    setFiltros((prev) => ({ ...prev, frente: value, torre: '' }));
-    setPagina(1);
-  }
-
-  const frenteOptions = filtros.etapa
-    ? (opciones.frentesPorEtapa?.[filtros.etapa] || [])
-    : (opciones.frentesDisponibles ?? []);
-  const torreOptions = filtros.frente
-    ? (filtros.etapa
-      ? (opciones.torresPorEtapaFrente?.[`${filtros.etapa}||${filtros.frente}`] || [])
-      : (opciones.torresPorFrente?.[filtros.frente] || []))
-    : [];
+  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
+  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
 
   const meta = resultado ?? {};
-  const hayFiltros = Object.values(filtros).some((valor) => valor !== '');
+  const hayFiltros = Object.values(filtros).some((valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== ''));
   const limpiarFiltros = () => {
-    setFiltros({ search: '', stage: '', etapa: '', frente: '', torre: '' });
+    setFiltros({ search: '', stage: [], etapa: [], frente: [], torre: [] });
     setPagina(1);
   };
 
@@ -251,10 +232,7 @@ export function OportunidadesListPage() {
           }
         >
           {(p) => (
-            <Select {...p} value={filtros.stage} onChange={(e) => actualizarFiltro('stage', e.target.value)}>
-              <option value="">Todas las etapas</option>
-              {stages.map((v) => <option key={v} value={v}>{v}</option>)}
-            </Select>
+            <MultiSelect {...p} options={stages} value={filtros.stage} onChange={(v) => actualizarFiltro('stage', v)} placeholder="Todas las etapas" />
           )}
         </Field>
         {opciones.etapasDisponibles.length > 0 && (
@@ -269,10 +247,7 @@ export function OportunidadesListPage() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.etapa ?? ''} onChange={(e) => handleEtapaChange(e.target.value)}>
-                <option value="">Todas las etapas</option>
-                {opciones.etapasDisponibles.map((et) => <option key={et} value={et}>{etiquetaEtapa(et)}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.etapasDisponibles.map((et) => ({ value: et, label: etiquetaEtapa(et) }))} value={filtros.etapa} onChange={(v) => actualizarCascada('etapa', v)} placeholder="Todas las etapas" />
             )}
           </Field>
         )}
@@ -288,14 +263,11 @@ export function OportunidadesListPage() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.frente ?? ''} onChange={(e) => handleFrenteChange(e.target.value)}>
-                <option value="">Todos los frentes</option>
-                {frenteOptions.map((fr) => <option key={fr} value={fr}>{fr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={frenteOptions} value={filtros.frente} onChange={(v) => actualizarCascada('frente', v)} placeholder="Todos los frentes" />
             )}
           </Field>
         )}
-        {filtros.frente && torreOptions.length > 0 && (
+        {filtros.frente.length > 0 && torreOptions.length > 0 && (
           <Field
             className={styles.fieldSm}
             label={
@@ -307,10 +279,7 @@ export function OportunidadesListPage() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.torre ?? ''} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {torreOptions.map((tr) => <option key={tr} value={tr}>Torre {tr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={torreOptions.map((tr) => ({ value: tr, label: `Torre ${tr}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}

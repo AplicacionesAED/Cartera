@@ -13,7 +13,9 @@ import { Search, RefreshCw, Layers, MapPin, Building, Download } from 'lucide-re
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
+import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
@@ -24,7 +26,7 @@ import { InventarioDetalleContenido } from './InventarioDetalleContenido.jsx';
 import styles from '../negocios/NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', categoria: '', estado: '', etapa: '', frente: '', torre: '' };
+const FILTROS_VACIOS = { search: '', categoria: [], estado: [], etapa: [], frente: [], torre: [] };
 
 // El campo `torre` de Zoho ya trae el proyecto ('Isla Laguna - Torre 1'): no repetirlo.
 function proyectoTorre(item) {
@@ -96,23 +98,8 @@ function InventarioLista() {
     setPagina(1);
   }
 
-  function handleEtapaChange(value) {
-    setFiltros((prev) => {
-      const { frentesPorEtapa, torresPorEtapaFrente } = opciones;
-      let { frente, torre } = prev;
-      if (value && frente && !(frentesPorEtapa[value] || []).includes(frente)) {
-        frente = '';
-        torre = '';
-      } else if (value && frente && torre && !(torresPorEtapaFrente[`${value}||${frente}`] || []).includes(torre)) {
-        torre = '';
-      }
-      return { ...prev, etapa: value, frente, torre };
-    });
-    setPagina(1);
-  }
-
-  function handleFrenteChange(value) {
-    setFiltros((prev) => ({ ...prev, frente: value, torre: '' }));
+  function actualizarCascada(campo, valor) {
+    setFiltros((prev) => ({ ...prev, ...podarSeleccion(opciones, { etapa: prev.etapa, frente: prev.frente, torre: prev.torre, [campo]: valor }) }));
     setPagina(1);
   }
 
@@ -126,12 +113,10 @@ function InventarioLista() {
   const meta = resultado ?? {};
   const filas = meta.data ?? [];
   const total = meta.pagination?.total;
-  const hayFiltros = Object.values(filtros).some((valor) => valor !== '');
+  const hayFiltros = Object.values(filtros).some((valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== ''));
   const sinInventario = !cargando && total === 0 && !hayFiltros;
-  const frenteOptions = filtros.etapa ? (opciones.frentesPorEtapa?.[filtros.etapa] || []) : (opciones.frentesDisponibles ?? []);
-  const torreOptions = filtros.frente
-    ? (filtros.etapa ? (opciones.torresPorEtapaFrente?.[`${filtros.etapa}||${filtros.frente}`] || []) : (opciones.torresPorFrente?.[filtros.frente] || []))
-    : [];
+  const frenteOptions = frentesDisponibles(opciones, filtros.etapa);
+  const torreOptions = torresDisponibles(opciones, filtros.etapa, filtros.frente);
 
   return (
     <div className={styles.page}>
@@ -164,15 +149,16 @@ function InventarioLista() {
 
       {opciones.estados.length > 0 && (
         <div className={styles.chips} role="group" aria-label="Filtrar por estado">
-          <button type="button" className={`${styles.chip} ${filtros.estado === '' ? styles.chipActivo : ''}`} onClick={() => actualizarFiltro('estado', '')}>
+          <button type="button" className={`${styles.chip} ${filtros.estado.length === 0 ? styles.chipActivo : ''}`} onClick={() => actualizarFiltro('estado', [])}>
             Todos
           </button>
           {opciones.estados.map((estado) => (
             <button
               key={estado}
               type="button"
-              className={`${styles.chip} ${filtros.estado === estado ? styles.chipActivo : ''}`}
-              onClick={() => actualizarFiltro('estado', filtros.estado === estado ? '' : estado)}
+              className={`${styles.chip} ${filtros.estado.includes(estado) ? styles.chipActivo : ''}`}
+              aria-pressed={filtros.estado.includes(estado)}
+              onClick={() => actualizarFiltro('estado', filtros.estado.includes(estado) ? filtros.estado.filter((x) => x !== estado) : [...filtros.estado, estado])}
             >
               {estado}
             </button>
@@ -203,10 +189,7 @@ function InventarioLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.etapa} onChange={(e) => handleEtapaChange(e.target.value)}>
-                <option value="">Todas las etapas</option>
-                {opciones.etapasDisponibles.map((et) => <option key={et} value={et}>{etiquetaEtapa(et)}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.etapasDisponibles.map((et) => ({ value: et, label: etiquetaEtapa(et) }))} value={filtros.etapa} onChange={(v) => actualizarCascada('etapa', v)} placeholder="Todas las etapas" />
             )}
           </Field>
         )}
@@ -220,14 +203,11 @@ function InventarioLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.frente} onChange={(e) => handleFrenteChange(e.target.value)}>
-                <option value="">Todos los frentes</option>
-                {frenteOptions.map((fr) => <option key={fr} value={fr}>{fr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={frenteOptions} value={filtros.frente} onChange={(v) => actualizarCascada('frente', v)} placeholder="Todos los frentes" />
             )}
           </Field>
         )}
-        {filtros.frente && torreOptions.length > 0 && (
+        {filtros.frente.length > 0 && torreOptions.length > 0 && (
           <Field
             label={
               <span className={styles.labelConIcono}>
@@ -237,20 +217,14 @@ function InventarioLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {torreOptions.map((tr) => <option key={tr} value={tr}>Torre {tr}</option>)}
-              </Select>
+              <MultiSelect {...p} options={torreOptions.map((tr) => ({ value: tr, label: `Torre ${tr}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}
         {opciones.categorias.length > 0 && (
           <Field label="Categoría">
             {(p) => (
-              <Select {...p} value={filtros.categoria} onChange={(e) => actualizarFiltro('categoria', e.target.value)}>
-                <option value="">Todas las categorías</option>
-                {opciones.categorias.map((c) => <option key={c} value={c}>{c}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.categorias} value={filtros.categoria} onChange={(v) => actualizarFiltro('categoria', v)} placeholder="Todas las categorías" />
             )}
           </Field>
         )}

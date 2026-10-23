@@ -1,13 +1,5 @@
 import client from './client';
-
-function toQuery(params) {
-  const qs = new URLSearchParams();
-  for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== undefined && value !== null && value !== '') qs.set(key, value);
-  }
-  const str = qs.toString();
-  return str ? `?${str}` : '';
-}
+import { toQuery } from './toQuery.js';
 
 export function listNegocios(params) {
   return client.get(`/negocios${toQuery(params)}`);

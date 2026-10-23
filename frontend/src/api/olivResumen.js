@@ -2,15 +2,7 @@
 // Kristal), renombrados de "-etapas" a "-torres" (ver
 // backend/olivResumen.routes.js) porque Oliv agrupa por Torre, no por Etapa.
 import client from './client';
-
-function toQuery(params) {
-  const qs = new URLSearchParams();
-  for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== undefined && value !== null && value !== '') qs.set(key, value);
-  }
-  const str = qs.toString();
-  return str ? `?${str}` : '';
-}
+import { toQuery } from './toQuery.js';
 
 export function getResumenStatsOliv() {
   return client.get('/oliv/resumen/resumen-stats');

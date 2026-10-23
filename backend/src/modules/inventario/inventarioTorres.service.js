@@ -7,7 +7,7 @@
 // `configuracionFrente.service.js` para enriquecer su lista con el árbol
 // completo de frentes/torres/pisos (antes solo devolvía lo ya configurado).
 const sequelize = require('../../config/db');
-const { QueryTypes } = require('sequelize');
+const { QueryTypes, Op } = require('sequelize');
 const { PROYECTO_TORRE_EXCLUIDOS } = require('../../config/inventarioExcluido');
 const { esEtapaDesistida, ESTADOS_DESISTIDOS } = require('../../config/estadosOportunidad');
 
@@ -335,7 +335,45 @@ async function pisosPorFrenteTorre() {
   return resultado;
 }
 
+// Filtro en cascada Etapa -> Frente -> Torre con selección MÚLTIPLE: OR dentro de cada nivel, y cada nivel acota al anterior.
+// Devuelve null si no hay filtro; si no, { sinProyecto, lista } con los Proyecto_Torre permitidos (sinProyecto = incluir los sin inmueble/proyecto).
+// Las torres solo aplican junto a frentes (una torre sola es ambigua entre frentes).
+function proyectosTorreDeFiltros(valores, { etapas = [], frentes = [], torres = [] } = {}) {
+  if (!etapas.length && !frentes.length) return null;
+  const sinProyecto = etapas.includes(SIN_PROYECTO);
+  const etapasReales = etapas.filter((e) => e !== SIN_PROYECTO);
+  const union = (claves, mapa) => [...new Set(claves.flatMap((c) => mapa.get(c) || []))];
+  let lista;
+  if (frentes.length) {
+    lista = torres.length
+      ? union(frentes.flatMap((f) => torres.map((t) => `${f}||${t}`)), valores.porFrenteTorre)
+      : union(frentes, valores.porFrente);
+    if (etapasReales.length) {
+      const deEtapas = new Set(union(etapasReales, valores.porEtapa));
+      lista = lista.filter((x) => deEtapas.has(x));
+    }
+  } else {
+    lista = union(etapasReales, valores.porEtapa);
+  }
+  return { sinProyecto: sinProyecto && !frentes.length, lista };
+}
+
+// Condición Sequelize sobre `referencia_recaudo` para el filtro en cascada múltiple (oportunidades y otrosíes).
+// Devuelve null si no hay filtro. Lista vacía de proyectos -> `IN ()` = sin filas (la rama pedida no tiene inmuebles).
+async function whereReferenciaPorFiltros(valores, filtros) {
+  const proy = proyectosTorreDeFiltros(valores, filtros);
+  if (!proy) return null;
+  const ors = [{ [Op.in]: await referenciasPorProyectoTorre(proy.lista) }];
+  if (proy.sinProyecto) {
+    const conProyecto = await referenciasPorProyectoTorre([...valores.porEtapa.values()].flat());
+    ors.push({ [Op.is]: null }, { [Op.notIn]: conProyecto }, { [Op.in]: await referenciasSinProyecto() });
+  }
+  return ors.length === 1 ? ors[0] : { [Op.or]: ors };
+}
+
 module.exports = {
+  whereReferenciaPorFiltros,
+  proyectosTorreDeFiltros,
   ETAPA_POR_TORRE,
   SIN_PROYECTO,
   PROYECTO_TORRE_EXCLUIDOS,

@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import { Maximize2, Minimize2, MapPin, Building2, X, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Wallet, AlertTriangle, Hourglass, Target, KeyRound } from 'lucide-react';
 import { Field, Select } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
@@ -255,8 +256,8 @@ export function OlivResumenPage() {
 
   // Sin jerarquía Etapa->Frente->Torre (Oliv es un solo proyecto) -- Torre y
   // Estado del inmueble son filtros planos, sin cascada entre sí.
-  const [torreFilter, setTorreFilter] = useState('');
-  const [estadoInmuebleFilter, setEstadoInmuebleFilter] = useState('');
+  const [torreFilter, setTorreFilter] = useState([]);
+  const [estadoInmuebleFilter, setEstadoInmuebleFilter] = useState([]);
   const [torresDisponibles, setTorresDisponibles] = useState([]);
   const [estadosInmuebleDisponibles, setEstadosInmuebleDisponibles] = useState([]);
 
@@ -278,7 +279,7 @@ export function OlivResumenPage() {
 
   useEffect(() => {
     let vigente = true;
-    getDashboardRecaudoOliv({ torre: torreFilter || undefined, estadoInmueble: estadoInmuebleFilter || undefined, page: 1, limit: 1 })
+    getDashboardRecaudoOliv({ torre: torreFilter, estadoInmueble: estadoInmuebleFilter, page: 1, limit: 1 })
       .then((res) => {
         if (!vigente) return;
         setPlanRecaudo(res.data);
@@ -288,8 +289,8 @@ export function OlivResumenPage() {
     return () => { vigente = false; };
   }, [torreFilter, estadoInmuebleFilter]);
 
-  const hayFiltrosUbicacion = torreFilter || estadoInmuebleFilter;
-  const limpiarFiltrosUbicacion = useCallback(() => { setTorreFilter(''); setEstadoInmuebleFilter(''); }, []);
+  const hayFiltrosUbicacion = torreFilter.length > 0 || estadoInmuebleFilter.length > 0;
+  const limpiarFiltrosUbicacion = useCallback(() => { setTorreFilter([]); setEstadoInmuebleFilter([]); }, []);
 
   const aniosDisponibles = useMemo(() => {
     const anios = new Set((planRecaudo?.meses ?? []).map((m) => Number(m.slice(0, 4))));
@@ -525,20 +526,14 @@ export function OlivResumenPage() {
         {torresDisponibles.length > 0 && (
           <Field className={dashStyles.fieldSm} label={<span className={styles.labelConIcono}><Building2 size={13} />Torre</span>}>
             {(p) => (
-              <Select {...p} value={torreFilter} onChange={(e) => setTorreFilter(e.target.value)}>
-                <option value="">Todas las torres</option>
-                {torresDisponibles.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Select>
+              <MultiSelect {...p} options={torresDisponibles} value={torreFilter} onChange={setTorreFilter} placeholder="Todas las torres" />
             )}
           </Field>
         )}
         {estadosInmuebleDisponibles.length > 0 && (
           <Field className={dashStyles.fieldSm} label={<span className={styles.labelConIcono}><MapPin size={13} />Estado del inmueble</span>}>
             {(p) => (
-              <Select {...p} value={estadoInmuebleFilter} onChange={(e) => setEstadoInmuebleFilter(e.target.value)}>
-                <option value="">Todos los estados</option>
-                {estadosInmuebleDisponibles.map((e) => <option key={e} value={e}>{e}</option>)}
-              </Select>
+              <MultiSelect {...p} options={estadosInmuebleDisponibles} value={estadoInmuebleFilter} onChange={setEstadoInmuebleFilter} placeholder="Todos los estados" />
             )}
           </Field>
         )}

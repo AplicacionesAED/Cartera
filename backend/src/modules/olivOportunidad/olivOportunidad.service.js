@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { lista } = require('../../utils/filtros');
 const { ordenSequelize } = require('../../utils/ordenamiento');
 const ApiError = require('../../utils/ApiError');
 const { tokenConfigurado } = require('../../utils/hubspotClient');
@@ -101,7 +102,7 @@ async function _torresYEstadosDisponibles() {
 
 async function list({ search, stage, torre, estadoInmueble, sortBy, sortDir, page = 1, limit = 20 }) {
   const where = { stage_order: { [Op.gte]: ETAPA_MINIMA_ORDER } };
-  if (stage) where.stage = stage;
+  if (lista(stage).length) where.stage = { [Op.in]: lista(stage) };
   if (search) {
     const hubspotIdsInmueble = await _hubspotIdsPorInmueble(search);
     const like = `%${String(search).replace(/[\\%_]/g, (o) => `\\${o}`)}%`;
@@ -119,10 +120,10 @@ async function list({ search, stage, torre, estadoInmueble, sortBy, sortDir, pag
   // `required: true` (INNER JOIN) SOLO si se está filtrando por Torre/Estado
   // del inmueble -- sin filtro, sigue siendo LEFT JOIN (un Deal sin unidad
   // vinculada en HubSpot todavía debe seguir apareciendo, con `inmueble: null`).
-  const filtraPorInmueble = Boolean(torre || estadoInmueble);
+  const filtraPorInmueble = Boolean(lista(torre).length || lista(estadoInmueble).length);
   const inmuebleWhere = {};
-  if (torre) inmuebleWhere.torre = torre;
-  if (estadoInmueble) inmuebleWhere.estado = estadoInmueble;
+  if (lista(torre).length) inmuebleWhere.torre = { [Op.in]: lista(torre) };
+  if (lista(estadoInmueble).length) inmuebleWhere.estado = { [Op.in]: lista(estadoInmueble) };
 
   // 'inmueble' ordena por las columnas reales de la asociación (Torre, luego
   // Unidad) -- a diferencia de Baía Kristal, acá el cruce es una FK real

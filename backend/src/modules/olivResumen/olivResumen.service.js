@@ -34,6 +34,7 @@
 //     igual (`valorSaldoContraentrega`, `porMesContraentrega`, etc.) para
 //     poder reusar el MISMO frontend (`EsperadoRecaudadoChart`, tiles, etc.)
 //     sin reescribirlo; lo que cambia es solo el texto visible.
+const { lista } = require('../../utils/filtros');
 const { Op } = require('sequelize');
 const { conciliar, mesKey, diaKey, periodoVacio, acumularPorPeriodo } = require('../dashboard/conciliacion');
 const centroAplicacionesDb = require('../../utils/centroAplicacionesDb');
@@ -285,8 +286,8 @@ async function obtenerDashboardRecaudo({ search, torre, estadoInmueble, conMovim
     const s = search.toLowerCase();
     filas = filas.filter((f) => f.unidad?.toLowerCase().includes(s) || f.referencia?.toLowerCase().includes(s) || f.comprador?.toLowerCase().includes(s) || f.torre?.toLowerCase().includes(s));
   }
-  if (torre) filas = filas.filter((f) => f.torre === torre);
-  if (estadoInmueble) filas = filas.filter((f) => f.estadoInventario === estadoInmueble);
+  if (lista(torre).length) filas = filas.filter((f) => lista(torre).includes(f.torre));
+  if (lista(estadoInmueble).length) filas = filas.filter((f) => lista(estadoInmueble).includes(f.estadoInventario));
   if (conMovimientos === 'true') filas = filas.filter((f) => f._tieneMovimientos);
   filas = ordenar(filas, sortBy, sortDir);
 
@@ -483,8 +484,8 @@ async function obtenerCarteraMora({ search, torre, estadoInmueble, rango, vista,
     const s = search.toLowerCase();
     filas = filas.filter((f) => f.unidad?.toLowerCase().includes(s) || f.comprador?.toLowerCase().includes(s) || f.referencia?.toLowerCase().includes(s) || f.torre?.toLowerCase().includes(s));
   }
-  if (torre) filas = filas.filter((f) => f.torre === torre);
-  if (estadoInmueble) filas = filas.filter((f) => f.estadoInventario === estadoInmueble);
+  if (lista(torre).length) filas = filas.filter((f) => lista(torre).includes(f.torre));
+  if (lista(estadoInmueble).length) filas = filas.filter((f) => lista(estadoInmueble).includes(f.estadoInventario));
 
   const porRangoMoraMap = new Map(RANGOS_MORA.map((r) => [r.key, { count: 0, monto: 0 }]));
   for (const f of filas) {
@@ -494,7 +495,7 @@ async function obtenerCarteraMora({ search, torre, estadoInmueble, rango, vista,
   }
   const porRangoMora = RANGOS_MORA.map((r) => ({ rango: r.key, label: r.label, ...porRangoMoraMap.get(r.key) }));
 
-  if (rango) filas = filas.filter((f) => claveRangoMora(f.maxDiasAtraso) === rango);
+  if (lista(rango).length) filas = filas.filter((f) => lista(rango).includes(claveRangoMora(f.maxDiasAtraso)));
 
   const totalCuotasEnMora = filas.reduce((s, f) => s + f.cuotasEnMora, 0);
   const totalMontoEnMora = filas.reduce((s, f) => s + f.montoEnMora, 0);

@@ -14,6 +14,7 @@ import ExcelJS from 'exceljs';
 import { Button } from '../../components/ui/Button.jsx';
 import { ConceptoHint } from '../../components/ui/ConceptoHint.jsx';
 import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { listMovimientosNegocios, exportMovimientosNegocios } from '../../api/negocios.js';
 import { formatExcelDate } from '../../utils/format.js';
@@ -159,9 +160,9 @@ export function MovimientosPage() {
   const [exportando, setExportando] = useState(false);
 
   const [search, setSearch] = useState('');
-  const [fideicomisoFilter, setFideicomisoFilter] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState('');
-  const [tipoMovFilter, setTipoMovFilter] = useState('');
+  const [fideicomisoFilter, setFideicomisoFilter] = useState([]);
+  const [estadoFilter, setEstadoFilter] = useState([]);
+  const [tipoMovFilter, setTipoMovFilter] = useState([]);
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [datePreset, setDatePreset] = useState('');
@@ -181,9 +182,9 @@ export function MovimientosPage() {
   useEffect(() => { cargar(1); }, [debouncedSearch, fideicomisoFilter, estadoFilter, tipoMovFilter, fechaDesde, fechaHasta, cargar]);
 
   function clearAll() {
-    setSearch(''); setFideicomisoFilter(''); setEstadoFilter(''); setTipoMovFilter(''); setFechaDesde(''); setFechaHasta(''); setDatePreset('');
+    setSearch(''); setFideicomisoFilter([]); setEstadoFilter([]); setTipoMovFilter([]); setFechaDesde(''); setFechaHasta(''); setDatePreset('');
   }
-  const hasFilters = search || fideicomisoFilter || estadoFilter || tipoMovFilter || fechaDesde || fechaHasta;
+  const hasFilters = search || fideicomisoFilter.length || estadoFilter.length || tipoMovFilter.length || fechaDesde || fechaHasta;
 
   async function handleExport() {
     const { debouncedSearch: s, fideicomisoFilter: f, estadoFilter: e, tipoMovFilter: tm, fechaDesde: fd, fechaHasta: fh } = filtrosRef.current;
@@ -314,34 +315,31 @@ export function MovimientosPage() {
         {fideicomisos.length > 0 && (
           <Field label="Proyecto / Fideicomiso">
             {(p) => (
-              <Select {...p} value={fideicomisoFilter} onChange={(e) => setFideicomisoFilter(e.target.value)}>
-                <option value="">Todos los proyectos</option>
-                {fideicomisos.map((f) => {
+              <MultiSelect
+                {...p}
+                options={fideicomisos.map((f) => {
                   const match = String(f).match(/^(\d{4,6})/);
                   const desc = match ? descripcionProyecto(match[1]) : null;
-                  return <option key={f} value={f}>{desc || shortFideicomiso(f)}</option>;
+                  return { value: f, label: desc || shortFideicomiso(f) };
                 })}
-              </Select>
+                value={fideicomisoFilter}
+                onChange={setFideicomisoFilter}
+                placeholder="Todos los proyectos"
+              />
             )}
           </Field>
         )}
         {estados.length > 0 && (
           <Field label="Estado del negocio">
             {(p) => (
-              <Select {...p} value={estadoFilter} onChange={(e) => setEstadoFilter(e.target.value)}>
-                <option value="">Todos los estados</option>
-                {estados.map((e) => <option key={e} value={e}>{e}</option>)}
-              </Select>
+              <MultiSelect {...p} options={estados} value={estadoFilter} onChange={setEstadoFilter} placeholder="Todos los estados" />
             )}
           </Field>
         )}
         {tiposMov.length > 0 && (
           <Field label="Tipo de movimiento">
             {(p) => (
-              <Select {...p} value={tipoMovFilter} onChange={(e) => setTipoMovFilter(e.target.value)}>
-                <option value="">Todos los tipos</option>
-                {tiposMov.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Select>
+              <MultiSelect {...p} options={tiposMov} value={tipoMovFilter} onChange={setTipoMovFilter} placeholder="Todos los tipos" />
             )}
           </Field>
         )}

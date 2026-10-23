@@ -13,7 +13,8 @@ import { Search, Building, Download } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { EstadoInventarioBadge } from '../../components/ui/EstadoInventarioBadge.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
 import { SyncModoButton, MODOS_SYNC_OLIV } from '../../components/SyncModoButton.jsx';
@@ -25,7 +26,7 @@ import { OlivInventarioDetalleContenido } from './OlivInventarioDetalleContenido
 import styles from '../negocios/NegociosPage.module.css';
 
 const PAGE_SIZE = 50;
-const FILTROS_VACIOS = { search: '', torre: '', categoria: '', estado: '' };
+const FILTROS_VACIOS = { search: '', torre: [], categoria: [], estado: [] };
 
 function useDebounce(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -96,7 +97,7 @@ function OlivInventarioLista() {
   const meta = resultado ?? {};
   const filas = meta.data ?? [];
   const total = meta.pagination?.total;
-  const hayFiltros = Object.values(filtros).some((valor) => valor !== '');
+  const hayFiltros = Object.values(filtros).some((valor) => (Array.isArray(valor) ? valor.length > 0 : valor !== ''));
   const sinInventario = !cargando && total === 0 && !hayFiltros;
 
   return (
@@ -125,15 +126,16 @@ function OlivInventarioLista() {
 
       {opciones.estados.length > 0 && (
         <div className={styles.chips} role="group" aria-label="Filtrar por estado">
-          <button type="button" className={`${styles.chip} ${filtros.estado === '' ? styles.chipActivo : ''}`} onClick={() => actualizarFiltro('estado', '')}>
+          <button type="button" className={`${styles.chip} ${filtros.estado.length === 0 ? styles.chipActivo : ''}`} onClick={() => actualizarFiltro('estado', [])}>
             Todos
           </button>
           {opciones.estados.map((estado) => (
             <button
               key={estado}
               type="button"
-              className={`${styles.chip} ${filtros.estado === estado ? styles.chipActivo : ''}`}
-              onClick={() => actualizarFiltro('estado', filtros.estado === estado ? '' : estado)}
+              className={`${styles.chip} ${filtros.estado.includes(estado) ? styles.chipActivo : ''}`}
+              aria-pressed={filtros.estado.includes(estado)}
+              onClick={() => actualizarFiltro('estado', filtros.estado.includes(estado) ? filtros.estado.filter((x) => x !== estado) : [...filtros.estado, estado])}
             >
               {estado}
             </button>
@@ -164,20 +166,14 @@ function OlivInventarioLista() {
             }
           >
             {(p) => (
-              <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                <option value="">Todas las torres</option>
-                {opciones.torres.map((t) => <option key={t} value={t}>Torre {t}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.torres.map((t) => ({ value: t, label: `Torre ${t}` }))} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
             )}
           </Field>
         )}
         {opciones.categorias.length > 0 && (
           <Field label="Categoría">
             {(p) => (
-              <Select {...p} value={filtros.categoria} onChange={(e) => actualizarFiltro('categoria', e.target.value)}>
-                <option value="">Todas las categorías</option>
-                {opciones.categorias.map((c) => <option key={c} value={c}>{c}</option>)}
-              </Select>
+              <MultiSelect {...p} options={opciones.categorias} value={filtros.categoria} onChange={(v) => actualizarFiltro('categoria', v)} placeholder="Todas las categorías" />
             )}
           </Field>
         )}

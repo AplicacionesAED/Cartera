@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, FileSpreadsheet, Pencil, Trash2, Upload, X as XIcon } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { formatDate, formatDateTime } from '../../utils/format.js';
@@ -21,7 +22,7 @@ const PAGE_SIZE = 20;
 //           conProyecto, conFecha, avisoEliminar }
 export function EncargosLista({ config }) {
   const { titulo, subtitulo, claveFiltros, rutaBase, api, conProyecto = false, conFecha = false, avisoEliminar } = config;
-  const filtrosVacios = conProyecto ? { search: '', proyecto: '' } : { search: '' };
+  const filtrosVacios = conProyecto ? { search: '', proyecto: [] } : { search: '' };
   const [filtros, setFiltros] = usePersistentState(`${claveFiltros}:filtros`, filtrosVacios);
   const [pagina, setPagina] = usePersistentState(`${claveFiltros}:pagina`, 1);
   const [resultado, setResultado] = useState(null);
@@ -173,10 +174,7 @@ export function EncargosLista({ config }) {
         {conProyecto && (meta.codigos ?? []).length > 0 && (
           <Field label="Proyecto">
             {(p) => (
-              <Select {...p} value={filtros.proyecto} onChange={(e) => actualizarFiltro('proyecto', e.target.value)}>
-                <option value="">Todos los proyectos</option>
-                {meta.codigos.map((c) => <option key={c} value={c}>{descripcionProyecto(c) || c}</option>)}
-              </Select>
+              <MultiSelect {...p} options={meta.codigos.map((c) => ({ value: c, label: descripcionProyecto(c) || c }))} value={filtros.proyecto} onChange={(v) => actualizarFiltro('proyecto', v)} placeholder="Todos los proyectos" />
             )}
           </Field>
         )}

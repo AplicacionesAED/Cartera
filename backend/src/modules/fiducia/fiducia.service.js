@@ -5,6 +5,7 @@
 // existe, así que se agregan acá (mismo criterio que negocio.service.js
 // importando el modelo Oportunidad de otro módulo: la ruta vive en el
 // namespace de Fiducia, pero cruza datos de Negocio).
+const { lista } = require('../../utils/filtros');
 const { Op, QueryTypes } = require('sequelize');
 const sequelize = require('../../config/db');
 const ApiError = require('../../utils/ApiError');
@@ -25,7 +26,8 @@ async function listEncargos({ search, proyecto, page = 1, limit = 20 }) {
       { archivo_nombre: { [Op.iLike]: like } },
     ];
   }
-  if (proyecto) where.codigo = { [Op.iLike]: `%${proyecto}%` };
+  const proyectos = lista(proyecto);
+  if (proyectos.length) where.codigo = { [Op.iLike]: { [Op.any]: proyectos.map((p) => `%${p}%`) } };
 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));

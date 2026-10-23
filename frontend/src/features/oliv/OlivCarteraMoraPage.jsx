@@ -20,7 +20,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ExcelJS from 'exceljs';
 import { AlertTriangle, Search, Building2, MapPin, X, Briefcase, Warehouse, ExternalLink, Download, Layers, Banknote, Percent, CheckCircle2 } from 'lucide-react';
-import { Field, TextInput, Select } from '../../components/ui/Field.jsx';
+import { Field, TextInput } from '../../components/ui/Field.jsx';
+import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { SortHeader } from '../../components/ui/SortHeader.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
@@ -116,7 +117,7 @@ function fmtPct(v) {
 const LIMIT = 50;
 
 export function OlivCarteraMoraPage() {
-  const [filtros, setFiltros] = usePersistentState('oliv-cartera-mora:filtros', { search: '', torre: '', estadoInmueble: '', vista: 'inicial', rango: '' });
+  const [filtros, setFiltros] = usePersistentState('oliv-cartera-mora:filtros', { search: '', torre: [], estadoInmueble: [], vista: 'inicial', rango: '' });
   const [pagina, setPagina] = usePersistentState('oliv-cartera-mora:pagina', 1);
 
   // Enlaces desde Inicio (?vista=&rango=): aplican esos filtros una vez y limpian la URL.
@@ -127,7 +128,7 @@ export function OlivCarteraMoraPage() {
     const rango = searchParams.get('rango');
     const buscar = searchParams.get('buscar');
     if (!vista && !rango && !buscar) return;
-    setFiltros(() => ({ search: buscar ?? '', torre: '', estadoInmueble: '', vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
+    setFiltros(() => ({ search: buscar ?? '', torre: [], estadoInmueble: [], vista: vista === 'contraentrega' ? 'contraentrega' : 'inicial', rango: rango ?? '' }));
     setPagina(1);
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,10 +248,10 @@ export function OlivCarteraMoraPage() {
   const porRangoMora = meta.porRangoMora ?? [];
   const conteos = meta.conteos ?? {};
   const maxMontoRango = Math.max(0, ...porRangoMora.map((r) => r.monto || 0));
-  const hasFilters = filtros.search || filtros.torre || filtros.estadoInmueble || filtros.rango;
+  const hasFilters = filtros.search || filtros.torre.length || filtros.estadoInmueble.length || filtros.rango;
 
   function clearFilters() {
-    setFiltros((prev) => ({ ...prev, search: '', torre: '', estadoInmueble: '', rango: '' }));
+    setFiltros((prev) => ({ ...prev, search: '', torre: [], estadoInmueble: [], rango: '' }));
     setPagina(1);
   }
 
@@ -348,20 +349,14 @@ export function OlivCarteraMoraPage() {
               {(meta.torresDisponibles?.length ?? 0) > 0 && (
                 <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><Building2 size={13} />Torre</span>}>
                   {(p) => (
-                    <Select {...p} value={filtros.torre} onChange={(e) => actualizarFiltro('torre', e.target.value)}>
-                      <option value="">Todas las torres</option>
-                      {meta.torresDisponibles.map((v) => <option key={v} value={v}>{v}</option>)}
-                    </Select>
+                    <MultiSelect {...p} options={meta.torresDisponibles} value={filtros.torre} onChange={(v) => actualizarFiltro('torre', v)} placeholder="Todas las torres" />
                   )}
                 </Field>
               )}
               {(meta.estadosInmuebleDisponibles?.length ?? 0) > 0 && (
                 <Field className={styles.campoFiltro} label={<span className={styles.labelConIcono}><MapPin size={13} />Estado del inmueble</span>}>
                   {(p) => (
-                    <Select {...p} value={filtros.estadoInmueble} onChange={(e) => actualizarFiltro('estadoInmueble', e.target.value)}>
-                      <option value="">Todos los estados</option>
-                      {meta.estadosInmuebleDisponibles.map((v) => <option key={v} value={v}>{v}</option>)}
-                    </Select>
+                    <MultiSelect {...p} options={meta.estadosInmuebleDisponibles} value={filtros.estadoInmueble} onChange={(v) => actualizarFiltro('estadoInmueble', v)} placeholder="Todos los estados" />
                   )}
                 </Field>
               )}

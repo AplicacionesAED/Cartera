@@ -1,15 +1,7 @@
 // Módulo 'Otrosíes' (Baía Kristal, SOLO LECTURA). Ver
 // otrosi.service.js#listOtrosi para la forma exacta de la respuesta.
 import client, { API_BASE_URL } from './client';
-
-function toQuery(params) {
-  const qs = new URLSearchParams();
-  for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== undefined && value !== null && value !== '') qs.set(key, value);
-  }
-  const str = qs.toString();
-  return str ? `?${str}` : '';
-}
+import { toQuery } from './toQuery.js';
 
 export function listOtrosies(params) {
   const { archivo: _archivo, ...resto } = params ?? {};
