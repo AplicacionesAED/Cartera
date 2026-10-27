@@ -80,7 +80,8 @@ combinado AS (
 // trae los 2 parámetros base de BASE_CTE ($1 excluidos, $2 patrón nombre) --
 // esta función sigue numerando desde ahí.
 async function construirFiltroCombinado({ search, estado, etapa, frente, torre, vinculacion, valores, bind }) {
-  const condiciones = [];
+  // Negocios solo lista negocios reales: los inmuebles sin negocio vinculado no aparecen.
+  const condiciones = ['c.negocio_id IS NOT NULL'];
   let idx = bind.length + 1;
 
   // Forma en que el negocio quedó vinculado a su inmueble (ver vinculoResolver.js). Varias = OR.

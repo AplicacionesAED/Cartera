@@ -132,6 +132,9 @@ async function list({ search, estado, torre, estadoInmueble, page = 1, limit = 5
   const torresDisponibles = [...new Set(inmuebles.map((im) => im.torre).filter(Boolean))].sort();
   const estadosInmuebleDisponibles = [...new Set(inmuebles.map((im) => im.estado).filter(Boolean))].sort();
 
+  // Negocios solo lista negocios reales: los inmuebles sin negocio vinculado no aparecen.
+  filas = filas.filter((f) => f.tieneNegocio);
+
   const estados = lista(estado);
   const torres = lista(torre);
   const estadosInm = lista(estadoInmueble);
