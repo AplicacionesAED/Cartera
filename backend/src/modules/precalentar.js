@@ -20,8 +20,8 @@ async function ejecutar(nombre, cargar) {
   }
 }
 
-const precalentarBaiaKristal = () => ejecutar('Baía Kristal', () => require('./dashboard/dashboard.service'));
-const precalentarOliv = () => ejecutar('Oliv', () => require('./olivResumen/olivResumen.service'));
+const precalentarBaiaKristal = () => ejecutar('Baía Kristal', () => require('./baiaKristal/baiaDashboard/baiaDashboard.service'));
+const precalentarOliv = () => ejecutar('Oliv', () => require('./oliv/olivResumen/olivResumen.service'));
 
 // Uno tras otro (no en paralelo) para no duplicar el pico de CPU/BD al arrancar.
 async function precalentarTodo() {

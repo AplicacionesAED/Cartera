@@ -40,6 +40,11 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
 
 ## Arquitectura del backend (`backend/src`)
 
+- **Estructura de `modules/`** (oct 2026): `baiaKristal/` (carpetas y archivos con prefijo `baia`: `baiaNegocio`, `baiaInventario`,
+  `baiaOportunidad`, `baiaFiducia`, `baiaOtrosi`, `baiaDashboard`, `baiaVinculo`, `baiaConfiguracionFrente`), `oliv/` (prefijo
+  `oliv`: `olivEncargo`, `olivInmueble`, `olivNegocio`, `olivOportunidad`, `olivResumen`) y los compartidos sueltos (`auth`,
+  `usuario`, `rol`, `inicio`, `sync`, `precalentar.js`, `programador.js`). Las URLs `/api/*` no cambian. Un módulo nuevo va en la
+  carpeta de su proyecto con el prefijo de esa carpeta. Los comentarios de migraciones viejas todavía citan las rutas anteriores.
 - Módulos de 5 archivos (`model`, `schema` Zod, `service`, `controller`, `routes`); lógica **siempre** en el service; sin
   Prisma/Knex/TypeORM. Migraciones forward-only (`sequelize-cli`); `zDateOnly()` para `DATEONLY`.
 - Manejo de errores unificado de la familia (byte a byte igual en Solicitudes, Cartera, HRMS y Bases; **no se edita por

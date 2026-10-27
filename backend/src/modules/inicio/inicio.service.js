@@ -3,12 +3,12 @@
 // Dashboard / Cartera / Otrosíes (mismos caches, ninguna lógica financiera
 // nueva). Cada KPI y cada alerta se OMITE si el usuario no tiene el permiso
 // del módulo al que enlaza -- nunca se muestra un número que no puede abrir.
-const dashboardService = require('../dashboard/dashboard.service');
-const olivService = require('../olivResumen/olivResumen.service');
-const Otrosi = require('../otrosi/otrosi.model');
-const SyncLog = require('../oportunidad/syncLog.model');
-const OlivSyncLog = require('../olivOportunidad/olivSyncLog.model');
-const configuracionFrenteService = require('../configuracionFrente/configuracionFrente.service');
+const dashboardService = require('../baiaKristal/baiaDashboard/baiaDashboard.service');
+const olivService = require('../oliv/olivResumen/olivResumen.service');
+const Otrosi = require('../baiaKristal/baiaOtrosi/baiaOtrosi.model');
+const SyncLog = require('../baiaKristal/baiaOportunidad/syncLog.model');
+const OlivSyncLog = require('../oliv/olivOportunidad/olivSyncLog.model');
+const configuracionFrenteService = require('../baiaKristal/baiaConfiguracionFrente/baiaConfiguracionFrente.service');
 const { tienePermiso, getRolesPermisos } = require('../../utils/permisos');
 
 const HORAS_SYNC_DESACTUALIZADA = 36;

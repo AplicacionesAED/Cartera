@@ -63,10 +63,10 @@ async function ejecutarSincronizacionCompleta() {
   const resultados = [];
   try {
     console.log('[programador] Iniciando sincronización COMPLETA (todo)'); // eslint-disable-line no-console
-    resultados.push(await paso('Zoho · Inventario (todo)', () => require('./inventario/inventario.sync').syncInventario()));
-    resultados.push(await paso('Zoho · Oportunidades (todo, con planes de pago)', () => require('./oportunidad/oportunidad.sync').syncOportunidadesFromZoho(true)));
-    resultados.push(await paso('HubSpot · Oportunidades Oliv (todo)', () => require('./olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('todo')));
-    resultados.push(await paso('HubSpot · Inmuebles Oliv (todo)', () => require('./olivInmueble/olivInmueble.sync').syncInmueblesOliv('todo')));
+    resultados.push(await paso('Zoho · Inventario (todo)', () => require('./baiaKristal/baiaInventario/baiaInventario.sync').syncInventario()));
+    resultados.push(await paso('Zoho · Oportunidades (todo, con planes de pago)', () => require('./baiaKristal/baiaOportunidad/baiaOportunidad.sync').syncOportunidadesFromZoho(true)));
+    resultados.push(await paso('HubSpot · Oportunidades Oliv (todo)', () => require('./oliv/olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('todo')));
+    resultados.push(await paso('HubSpot · Inmuebles Oliv (todo)', () => require('./oliv/olivInmueble/olivInmueble.sync').syncInmueblesOliv('todo')));
     ultimaEjecucion = { tipo: 'completa', en: new Date().toISOString(), resultados };
     console.log('[programador] Sincronización completa terminada'); // eslint-disable-line no-console
     return ultimaEjecucion;
@@ -81,13 +81,13 @@ async function ejecutarSincronizaciones() {
   const resultados = [];
   try {
     console.log('[programador] Iniciando sincronizaciones diarias'); // eslint-disable-line no-console
-    resultados.push(await paso('Zoho · Inventario', () => require('./inventario/inventario.sync').syncInventario()));
-    resultados.push(await paso('Zoho · Oportunidades (cambios)', () => require('./oportunidad/oportunidad.sync').syncOportunidadesFromZoho(false)));
-    resultados.push(await paso('HubSpot · Oportunidades Oliv (cambios)', () => require('./olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('cambios')));
-    resultados.push(await paso('HubSpot · Inmuebles Oliv (cambios)', () => require('./olivInmueble/olivInmueble.sync').syncInmueblesOliv('cambios')));
-    resultados.push(await paso('Negocios desde la fiducia', () => require('./negocio/negocio.backfill').runBackfill()));
-    resultados.push(await paso('Cierre de mes · Baía Kristal', () => require('./dashboard/dashboard.service').cerrarMesAnteriorSiFalta()));
-    resultados.push(await paso('Cierre de mes · Oliv', () => require('./olivResumen/olivResumen.service').cerrarMesAnteriorSiFalta()));
+    resultados.push(await paso('Zoho · Inventario', () => require('./baiaKristal/baiaInventario/baiaInventario.sync').syncInventario()));
+    resultados.push(await paso('Zoho · Oportunidades (cambios)', () => require('./baiaKristal/baiaOportunidad/baiaOportunidad.sync').syncOportunidadesFromZoho(false)));
+    resultados.push(await paso('HubSpot · Oportunidades Oliv (cambios)', () => require('./oliv/olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('cambios')));
+    resultados.push(await paso('HubSpot · Inmuebles Oliv (cambios)', () => require('./oliv/olivInmueble/olivInmueble.sync').syncInmueblesOliv('cambios')));
+    resultados.push(await paso('Negocios desde la fiducia', () => require('./baiaKristal/baiaNegocio/baiaNegocio.backfill').runBackfill()));
+    resultados.push(await paso('Cierre de mes · Baía Kristal', () => require('./baiaKristal/baiaDashboard/baiaDashboard.service').cerrarMesAnteriorSiFalta()));
+    resultados.push(await paso('Cierre de mes · Oliv', () => require('./oliv/olivResumen/olivResumen.service').cerrarMesAnteriorSiFalta()));
     ultimaEjecucion = { tipo: 'diaria', en: new Date().toISOString(), resultados };
     console.log('[programador] Sincronizaciones diarias terminadas'); // eslint-disable-line no-console
     return ultimaEjecucion;
