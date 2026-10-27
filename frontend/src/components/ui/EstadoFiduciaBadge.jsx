@@ -15,7 +15,7 @@ export function EstadoFiduciaBadge({ estado, libreSinVinculo }) {
           alignItems: 'center',
           gap: 6,
           padding: '3px 10px',
-          borderRadius: 'var(--radius-full)',
+          borderRadius: 3,
           fontFamily: 'var(--font-body)',
           fontSize: 'var(--text-label-size)',
           fontWeight: 'var(--text-label-weight)',
