@@ -1,12 +1,12 @@
 // Un color por cada estado de fiducia (estado del negocio en la fiducia, más VIP del CRM y LIBRE). Se usa igual en
 // Negocios, Inmuebles y en los Excel exportados, para que el mismo estado se vea siempre del mismo color.
 const TONOS = {
-  LIBRE: { bg: '#ecfdf5', ink: '#047857' }, // esmeralda
-  OPCIONADO: { bg: '#fffbeb', ink: '#b45309' }, // ámbar
-  PROMETIDO: { bg: '#e8e9fd', ink: '#232bed' }, // azul de marca
-  VENDIDO: { bg: '#e0f7f4', ink: '#0f766e' }, // verde azulado
-  ESCRITURA_AUTORIZADA: { bg: '#dcfce7', ink: '#166534' }, // verde oscuro
-  EN_RETIRO: { bg: '#ffedd5', ink: '#c2410c' }, // naranja
+  LIBRE: { bg: '#dbeafe', ink: '#1d4ed8' }, // azul
+  OPCIONADO: { bg: '#d1fae5', ink: '#047857' }, // verde menta
+  PROMETIDO: { bg: '#ecfccb', ink: '#4d7c0f' }, // verde lima
+  VENDIDO: { bg: '#16a34a', ink: '#ffffff' }, // verde fuerte
+  ESCRITURA_AUTORIZADA: { bg: '#cffafe', ink: '#0e7490' }, // turquesa
+  EN_RETIRO: { bg: '#fed7aa', ink: '#c2410c' }, // naranja
   CEDIDO: { bg: '#fce7f3', ink: '#be185d' }, // rosa
   VIP: { bg: '#f3e8ff', ink: '#7c3aed' }, // violeta
 };
