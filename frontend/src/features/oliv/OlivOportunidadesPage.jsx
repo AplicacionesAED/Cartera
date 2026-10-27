@@ -34,6 +34,7 @@ import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SortHeader } from '../../components/ui/SortHeader.jsx';
 import { useSortableTable, ariaSort } from '../../hooks/useSortableTable.js';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import {
   listOportunidadesOliv,
   listStagesOportunidadesOliv,
@@ -107,8 +108,8 @@ function SyncStatusBar({ onTerminado }) {
 
 export function OlivOportunidadesPage() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = useState({ search: '', stage: [], torre: [], estadoInmueble: [] });
-  const [pagina, setPagina] = useState(1);
+  const [filtros, setFiltros] = useEstadoRetorno('oliv-oportunidades:filtros', { search: '', stage: [], torre: [], estadoInmueble: [] });
+  const [pagina, setPagina] = useEstadoRetorno('oliv-oportunidades:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [stages, setStages] = useState([]);
   const [opciones, setOpciones] = useState({ torresDisponibles: [], estadosInmuebleDisponibles: [] });

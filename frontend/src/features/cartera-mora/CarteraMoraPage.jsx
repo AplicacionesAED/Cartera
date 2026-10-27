@@ -21,6 +21,7 @@ import { Button } from '../../components/ui/Button.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { ariaSort } from '../../hooks/useSortableTable.js';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import { getCarteraMora } from '../../api/dashboard.js';
 import { updateFlagsNegocio } from '../../api/negocios.js';
 import { formatCOP, formatDate } from '../../utils/format.js';
@@ -144,8 +145,8 @@ function cumpleFiltroTramite(fila, tramite) {
 }
 
 export function CarteraMoraPage() {
-  const [filtros, setFiltros] = useState({ search: '', etapa: [], frente: [], torre: [], tramite: '', vista: 'inicial', rango: '' });
-  const [pagina, setPagina] = useState(1);
+  const [filtros, setFiltros] = useEstadoRetorno('cartera-mora:filtros', { search: '', etapa: [], frente: [], torre: [], tramite: '', vista: 'inicial', rango: '' });
+  const [pagina, setPagina] = useEstadoRetorno('cartera-mora:pagina', 1);
 
   // Enlaces desde Inicio (?vista=&rango=): aplican esos filtros una vez y limpian la URL.
   const navigate = useNavigate();
@@ -161,7 +162,7 @@ export function CarteraMoraPage() {
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [sort, setSort] = useState(ORDEN_POR_DEFECTO);
+  const [sort, setSort] = useEstadoRetorno('cartera-mora:sort-v3', ORDEN_POR_DEFECTO);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);

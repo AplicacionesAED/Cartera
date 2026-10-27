@@ -20,6 +20,7 @@ import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../uti
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import { listInventario, iniciarSyncInventario, getSyncStatusInventario } from '../../api/inventario.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
 import { InventarioDetalleContenido } from './InventarioDetalleContenido.jsx';
@@ -44,8 +45,8 @@ function useDebounce(value, delay = 350) {
 
 function InventarioLista() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
-  const [pagina, setPagina] = useState(1);
+  const [filtros, setFiltros] = useEstadoRetorno('inventario-list:filtros', FILTROS_VACIOS);
+  const [pagina, setPagina] = useEstadoRetorno('inventario-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [searchInput, setSearchInput] = useState(filtros.search);

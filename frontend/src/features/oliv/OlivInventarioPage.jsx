@@ -20,6 +20,7 @@ import { SyncProgreso } from '../../components/SyncProgreso.jsx';
 import { SyncModoButton, MODOS_SYNC_OLIV } from '../../components/SyncModoButton.jsx';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import { listInmueblesOliv, iniciarSyncInmueblesOliv, getSyncStatusInmueblesOliv } from '../../api/oliv.js';
 import { formatCOP } from '../../utils/format.js';
 import { OlivInventarioDetalleContenido } from './OlivInventarioDetalleContenido.jsx';
@@ -39,8 +40,8 @@ function useDebounce(value, delay = 350) {
 
 function OlivInventarioLista() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
-  const [pagina, setPagina] = useState(1);
+  const [filtros, setFiltros] = useEstadoRetorno('oliv-inventario-list:filtros', FILTROS_VACIOS);
+  const [pagina, setPagina] = useEstadoRetorno('oliv-inventario-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [searchInput, setSearchInput] = useState(filtros.search);

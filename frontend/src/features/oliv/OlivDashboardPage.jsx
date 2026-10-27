@@ -17,6 +17,7 @@ import { Field, TextInput } from '../../components/ui/Field.jsx';
 import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import { useModoEnfocado } from '../../hooks/useModoEnfocado.js';
 import { getDashboardRecaudoOliv } from '../../api/olivResumen.js';
 import { formatCOP, formatDate } from '../../utils/format.js';
@@ -100,13 +101,13 @@ const COLOR_EXCEL = {
 };
 
 export function OlivDashboardPage() {
-  const [filtros, setFiltros] = useState({
+  const [filtros, setFiltros] = useEstadoRetorno('oliv-dashboard-recaudo:filtros', {
     search: '', torre: [], estadoInmueble: [], conMovimientos: false, mesDesde: '', mesHasta: '',
   });
-  const [vistaMeses, setVistaMeses] = useState('ambos');
-  const [alcancePlan, setAlcancePlan] = useState('ambos');
-  const [pagina, setPagina] = useState(1);
-  const [sort, setSort] = useState({ key: null, direction: null });
+  const [vistaMeses, setVistaMeses] = useEstadoRetorno('oliv-dashboard-recaudo:vista', 'ambos');
+  const [alcancePlan, setAlcancePlan] = useEstadoRetorno('oliv-dashboard-recaudo:plan', 'ambos');
+  const [pagina, setPagina] = useEstadoRetorno('oliv-dashboard-recaudo:pagina', 1);
+  const [sort, setSort] = useEstadoRetorno('oliv-dashboard-recaudo:sort', { key: null, direction: null });
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);

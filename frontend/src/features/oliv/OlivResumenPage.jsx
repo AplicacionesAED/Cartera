@@ -25,6 +25,7 @@ import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import { useModoEnfocado } from '../../hooks/useModoEnfocado.js';
 import {
   getMesesResumenOliv, getResumenTorresOliv, cerrarMesAnteriorOliv,
@@ -236,7 +237,7 @@ export function OlivResumenPage() {
 
   // Consolidado de Cartera por Torre (navegable mes a mes)
   const [meses, setMeses] = useState([]);
-  const [mes, setMes] = useState('');
+  const [mes, setMes] = useEstadoRetorno('oliv-resumen:mes', '');
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
   const [cerrando, setCerrando] = useState(false);
@@ -248,10 +249,10 @@ export function OlivResumenPage() {
   const [planRecaudo, setPlanRecaudo] = useState(null);
   const [resumenStats, setResumenStats] = useState(null);
   const [syncStatus, setSyncStatus] = useState(null);
-  const [rangoTendencia, setRangoTendencia] = useState('total');
+  const [rangoTendencia, setRangoTendencia] = useEstadoRetorno('oliv-resumen:rango', 'total');
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
-  const [filtroPorcentaje, setFiltroPorcentaje] = useState('ambos');
-  const [vistaLinea, setVistaLinea] = useState('ambos');
+  const [filtroPorcentaje, setFiltroPorcentaje] = useEstadoRetorno('oliv-resumen:filtroPorcentaje', 'ambos');
+  const [vistaLinea, setVistaLinea] = useEstadoRetorno('oliv-resumen:vistaLinea', 'ambos');
   const [torreChartAbierta, setTorreChartAbierta] = useState(false);
   const [enfocado, toggleEnfocado] = useModoEnfocado();
 

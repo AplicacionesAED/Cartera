@@ -17,6 +17,7 @@ import { Field, TextInput } from '../../components/ui/Field.jsx';
 import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { ExportMenu } from '../../components/ui/ExportMenu.jsx';
+import { useEstadoRetorno } from '../../hooks/useEstadoRetorno.js';
 import { listNegociosOliv } from '../../api/oliv.js';
 import { formatCOP } from '../../utils/format.js';
 import { traerTodasLasPaginas } from '../../utils/exportarExcelColumnas.js';
@@ -43,8 +44,8 @@ function useDebounce(value, delay = 350) {
 
 function OlivNegociosLista() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
-  const [pagina, setPagina] = useState(1);
+  const [filtros, setFiltros] = useEstadoRetorno('oliv-negocios-list:filtros', FILTROS_VACIOS);
+  const [pagina, setPagina] = useEstadoRetorno('oliv-negocios-list:pagina', 1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [searchInput, setSearchInput] = useState(filtros.search);
