@@ -24,7 +24,7 @@ import { getStats } from '../../api/dashboard.js';
 import { listNegocios, iniciarBackfillNegocios, getBackfillStatusNegocios } from '../../api/negocios.js';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
-import { estadoToken } from '../../utils/estados.js';
+import { EstadoFiduciaBadge } from '../../components/ui/EstadoFiduciaBadge.jsx';
 import { etiquetaEtapa } from '../../utils/etapas.js';
 import { formatCOP } from '../../utils/format.js';
 import { exportNegociosCsv, exportNegociosExcel, exportNegociosPdf } from './negociosExport.js';
@@ -369,7 +369,7 @@ function NegociosLista() {
                           )}
                         </td>
                         <td>
-                          {n.estado && <Badge variant={estadoToken(n.estado)}>{n.estado}</Badge>}
+                          {n.estado && <EstadoFiduciaBadge estado={n.estado} />}
                           {!n.tieneNegocio && <Badge variant="neutral">Sin negocio</Badge>}
                         </td>
                         <td className={`${styles.derecha} ${styles.saldo} ${saldoNum > 0 ? styles.saldoPositivo : styles.muted}`}>

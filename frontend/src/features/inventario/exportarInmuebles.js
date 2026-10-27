@@ -49,7 +49,7 @@ const COLUMNAS_BASE = [
   { key: 'nombre', header: 'UNIDAD', width: 12, align: 'left', valor: (i) => i.nombre ?? '' },
   { key: 'categoria', header: 'CATEGORÍA', width: 16, align: 'left', valor: (i) => i.categoria ?? '' },
   { key: 'estado', header: 'ESTADO CRM', width: 14, align: 'center', estado: true, valor: (i) => i.estado ?? '' },
-  { key: 'estadoFiducia', header: 'ESTADO FIDUCIA', width: 22, align: 'center', estado: true, valor: (i) => (i.estadoFiducia ?? '').replace(/_/g, ' ') },
+  { key: 'estadoFiducia', header: 'ESTADO FIDUCIA', width: 22, align: 'center', estadoFiducia: true, valor: (i) => (i.estadoFiducia ?? '').replace(/_/g, ' ') },
   { key: 'libreSinVinculo', header: 'SIN NEGOCIO VINCULADO', width: 24, align: 'center', valor: (i) => (i.libreSinVinculo ? 'Sí' : '') },
   { key: 'referenciaRecaudo', header: 'REFERENCIA DE RECAUDO', width: 22, align: 'left', valor: (i) => i.referenciaRecaudo ?? '' },
 ];

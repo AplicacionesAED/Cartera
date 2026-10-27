@@ -17,7 +17,7 @@ import { getSubformsOportunidad, refrescarSubformsOportunidad } from '../../api/
 import { Button } from '../../components/ui/Button.jsx';
 import { filtrarDatosResumen } from '../../utils/columnasExcluidas.js';
 import { ordenarFinanciero } from '../../utils/ordenColumnas.js';
-import { estadoToken } from '../../utils/estados.js';
+import { EstadoFiduciaBadge } from '../../components/ui/EstadoFiduciaBadge.jsx';
 import { addFechaEstimada, formatFechaUTC } from '../../utils/planDePagos.js';
 import { obtenerProyecto, desglosarPiso } from '../../utils/proyectos.js';
 import { separarUnidadesAdicionales } from '../../utils/unidadesAdicionales.js';
@@ -548,7 +548,6 @@ export function NegocioDetalleContenido({ id }) {
     ...aptoEntriesBase,
   ];
 
-  const estadoVariant = estadoToken(negocio.estado);
 
   return (
     <div className={styles.detalle}>
@@ -573,7 +572,7 @@ export function NegocioDetalleContenido({ id }) {
         meta={`${negocio.totalMovimientos} movimientos`}
       >
         <HeroBadges>
-          {negocio.estado && <Badge variant={estadoVariant}>{negocio.estado}</Badge>}
+          {negocio.estado && <EstadoFiduciaBadge estado={negocio.estado} />}
           {!negocio.tieneNegocio && <Badge variant="neutral">Sin negocio</Badge>}
           {negocio.oportunidad && (
             <HeroBoton onClick={handleExportarEstadoCuenta} disabled={exportando} title="Exportar estado de cuenta (PDF)">

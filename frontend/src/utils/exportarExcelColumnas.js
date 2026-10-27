@@ -6,6 +6,7 @@
 //   - estado: colorea la celda según el estado del inmueble.
 //   - enlace: el valor es una URL y se escribe como hipervínculo ("Ver plano").
 import ExcelJS from 'exceljs';
+import { tonoEstadoFiduciaArgb } from './estadosFiducia.js';
 
 const COLOR = {
   headerBg: 'FF1B21A6',
@@ -61,7 +62,11 @@ export async function descargarExcelColumnas({ items, columnas, hoja = 'Inmueble
       if (c.numFmt) cell.numFmt = c.numFmt;
       cell.alignment = { vertical: 'middle', horizontal: c.align ?? (typeof valor === 'number' ? 'right' : 'left') };
       cell.fill = fill(bg);
-      if (c.estado) {
+      if (c.estadoFiducia) {
+        const tono = tonoEstadoFiduciaArgb(valor);
+        cell.fill = fill(tono.bg);
+        cell.font = { bold: true, color: { argb: tono.ink } };
+      } else if (c.estado) {
         const tono = tonoEstado(valor);
         if (tono) {
           cell.fill = fill(tono.bg);
