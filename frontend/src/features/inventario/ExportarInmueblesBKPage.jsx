@@ -7,7 +7,6 @@ const CONFIG = {
   subtitulo: 'Inventario de Baía Kristal (Zoho)',
   volverA: '/inventario',
   volverTexto: 'Inmuebles',
-  filtrosKey: 'inventario-list:filtros',
   filtrosVacios: { search: '', categoria: [], estado: [], estadoFiducia: [], etapa: [], frente: [], torre: [] },
   cargarDatos: cargarInmueblesBK,
   construirGrupos: construirGruposBK,

@@ -2,25 +2,25 @@
 // Baía Kristal (/inventario/exportar) y Oliv (/oliv/inmuebles/exportar), cada una con su configuración.
 // Mismo lenguaje que el detalle del inmueble: banner, cifras clave y una tarjeta con buscador y las columnas
 // separadas por SECCIONES (las mismas del detalle). Al abrir carga los inmuebles con los filtros que
-// tenía el listado (se guardan en sessionStorage), para saber qué columnas existen de verdad y no volver a
+// tenía el listado (llegan por el estado de la navegación), para saber qué columnas existen de verdad y no volver a
 // pedirlos al exportar. Por defecto solo viene marcada la que indique `seleccionInicial`.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Download, FileSpreadsheet } from 'lucide-react';
 import { BackLink } from '../../components/ui/BackLink.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Checkbox } from '../../components/ui/Checkbox.jsx';
 import { DetalleHero, HeroBadges } from '../../components/layout/DetalleHero.jsx';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import detalle from './InventarioDetallePage.module.css';
 import styles from './ExportarInmueblesPage.module.css';
 
 const sinTildes = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export function ExportarInmueblesPage({ config }) {
-  const { titulo, volverA, volverTexto, filtrosKey, filtrosVacios, cargarDatos, construirGrupos, exportar, seleccionInicial, subtitulo } = config;
+  const { titulo, volverA, volverTexto, filtrosVacios, cargarDatos, construirGrupos, exportar, seleccionInicial, subtitulo } = config;
   const navigate = useNavigate();
-  const [filtros] = usePersistentState(filtrosKey, filtrosVacios);
+  // Los filtros del listado llegan por el estado de la navegación (ya no se guardan en el navegador).
+  const filtros = useLocation().state?.filtros ?? filtrosVacios;
   const hayFiltros = Object.values(filtros).some((v) => (Array.isArray(v) ? v.length > 0 : v !== ''));
 
   const [items, setItems] = useState(null);

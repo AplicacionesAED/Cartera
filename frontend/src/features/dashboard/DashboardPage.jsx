@@ -28,7 +28,6 @@ import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../utils/cascadaFiltros.js';
 import { Button } from '../../components/ui/Button.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { useModoEnfocado } from '../../hooks/useModoEnfocado.js';
 import { getDashboardRecaudo } from '../../api/dashboard.js';
 import { formatCOP, formatDate } from '../../utils/format.js';
@@ -135,13 +134,13 @@ const COLOR_EXCEL = {
 };
 
 export function DashboardPage() {
-  const [filtros, setFiltros] = usePersistentState('dashboard-recaudo:filtros', {
+  const [filtros, setFiltros] = useState({
     search: '', etapa: [], frente: [], torre: [], conMovimientos: false, mesDesde: '', mesHasta: '',
   });
-  const [vistaMeses, setVistaMeses] = usePersistentState('dashboard-recaudo:vista', 'ambos'); // 'ambos' | 'esperado' | 'recaudado'
-  const [alcancePlan, setAlcancePlan] = usePersistentState('dashboard-recaudo:plan', 'ambos'); // 'ambos' | 'inicial' | 'contraentrega'
-  const [pagina, setPagina] = usePersistentState('dashboard-recaudo:pagina', 1);
-  const [sort, setSort] = usePersistentState('dashboard-recaudo:sort', { key: null, direction: null });
+  const [vistaMeses, setVistaMeses] = useState('ambos'); // 'ambos' | 'esperado' | 'recaudado'
+  const [alcancePlan, setAlcancePlan] = useState('ambos'); // 'ambos' | 'inicial' | 'contraentrega'
+  const [pagina, setPagina] = useState(1);
+  const [sort, setSort] = useState({ key: null, direction: null });
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);

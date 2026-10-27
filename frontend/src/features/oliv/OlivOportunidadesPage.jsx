@@ -107,8 +107,8 @@ function SyncStatusBar({ onTerminado }) {
 
 export function OlivOportunidadesPage() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = usePersistentState('oliv-oportunidades:filtros', { search: '', stage: [], torre: [], estadoInmueble: [] });
-  const [pagina, setPagina] = usePersistentState('oliv-oportunidades:pagina', 1);
+  const [filtros, setFiltros] = useState({ search: '', stage: [], torre: [], estadoInmueble: [] });
+  const [pagina, setPagina] = useState(1);
   const [resultado, setResultado] = useState(null);
   const [stages, setStages] = useState([]);
   const [opciones, setOpciones] = useState({ torresDisponibles: [], estadosInmuebleDisponibles: [] });

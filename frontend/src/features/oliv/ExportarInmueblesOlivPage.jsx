@@ -7,7 +7,6 @@ const CONFIG = {
   subtitulo: 'Unidades de Oliv (HubSpot)',
   volverA: '/oliv/inmuebles',
   volverTexto: 'Inmuebles',
-  filtrosKey: 'oliv-inventario-list:filtros',
   filtrosVacios: { search: '', torre: '', categoria: '', estado: '' },
   cargarDatos: cargarInmueblesOliv,
   construirGrupos: construirGruposOliv,

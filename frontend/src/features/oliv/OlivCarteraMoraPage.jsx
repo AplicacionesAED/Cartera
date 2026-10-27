@@ -27,7 +27,6 @@ import { Button } from '../../components/ui/Button.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { ariaSort } from '../../hooks/useSortableTable.js';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { getCarteraMoraOliv } from '../../api/olivResumen.js';
 import { formatCOP, formatDate } from '../../utils/format.js';
 import { StatTile } from '../dashboard/StatTile.jsx';
@@ -117,8 +116,8 @@ function fmtPct(v) {
 const LIMIT = 50;
 
 export function OlivCarteraMoraPage() {
-  const [filtros, setFiltros] = usePersistentState('oliv-cartera-mora:filtros', { search: '', torre: [], estadoInmueble: [], vista: 'inicial', rango: '' });
-  const [pagina, setPagina] = usePersistentState('oliv-cartera-mora:pagina', 1);
+  const [filtros, setFiltros] = useState({ search: '', torre: [], estadoInmueble: [], vista: 'inicial', rango: '' });
+  const [pagina, setPagina] = useState(1);
 
   // Enlaces desde Inicio (?vista=&rango=): aplican esos filtros una vez y limpian la URL.
   const navigate = useNavigate();
@@ -133,7 +132,7 @@ export function OlivCarteraMoraPage() {
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [sort, setSort] = usePersistentState('oliv-cartera-mora:sort', { key: null, direction: null });
+  const [sort, setSort] = useState({ key: null, direction: null });
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);

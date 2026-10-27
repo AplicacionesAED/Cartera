@@ -19,7 +19,6 @@ import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../uti
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { ExportMenu } from '../../components/ui/ExportMenu.jsx';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { getStats } from '../../api/dashboard.js';
 import { listNegocios, iniciarBackfillNegocios, getBackfillStatusNegocios } from '../../api/negocios.js';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
@@ -85,8 +84,8 @@ function Resumen({ stats }) {
 
 function NegociosLista() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = usePersistentState('negocios-list:filtros', FILTROS_VACIOS);
-  const [pagina, setPagina] = usePersistentState('negocios-list:pagina', 1);
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+  const [pagina, setPagina] = useState(1);
   const [resultado, setResultado] = useState(null);
   const [stats, setStats] = useState(null);
   const [cargando, setCargando] = useState(true);

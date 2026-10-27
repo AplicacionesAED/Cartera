@@ -15,7 +15,6 @@ import { ChevronRight, Search } from 'lucide-react';
 import { AccesosLayout } from '../../components/layout/AccesosLayout.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import {
   listConfiguracionesFrente,
   actualizarFechaProyecto,
@@ -114,7 +113,7 @@ export function ConfiguracionFrentesPage() {
   const [filas, setFilas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [busqueda, setBusqueda] = usePersistentState('configuracion-frentes:busqueda', '');
+  const [busqueda, setBusqueda] = useState('');
   const [abiertos, setAbiertos] = useState(() => new Set());
 
   const cargar = useCallback(async () => {

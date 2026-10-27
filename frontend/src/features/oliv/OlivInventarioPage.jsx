@@ -39,8 +39,8 @@ function useDebounce(value, delay = 350) {
 
 function OlivInventarioLista() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = usePersistentState('oliv-inventario-list:filtros', FILTROS_VACIOS);
-  const [pagina, setPagina] = usePersistentState('oliv-inventario-list:pagina', 1);
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+  const [pagina, setPagina] = useState(1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [searchInput, setSearchInput] = useState(filtros.search);
@@ -108,7 +108,7 @@ function OlivInventarioLista() {
           <p className={styles.subtitle}>Unidades de Oliv (HubSpot){total !== undefined && !sinInventario ? ` · ${total.toLocaleString('es-CO')} resultados` : ''}</p>
         </div>
         <div className={styles.acciones}>
-          <Button variant="secondary" onClick={() => navigate('/oliv/inmuebles/exportar')} disabled={sinInventario}>
+          <Button variant="secondary" onClick={() => navigate('/oliv/inmuebles/exportar', { state: { filtros } })} disabled={sinInventario}>
             <span className={styles.botonInterior}>
               <Download size={14} aria-hidden="true" />
               Exportar a Excel

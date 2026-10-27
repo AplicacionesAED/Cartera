@@ -10,7 +10,6 @@ import { Button } from '../../components/ui/Button.jsx';
 import { Field, TextInput } from '../../components/ui/Field.jsx';
 import { MultiSelect } from '../../components/ui/MultiSelect.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { formatDate, formatDateTime } from '../../utils/format.js';
 import { descripcionProyecto } from '../../utils/proyectos.js';
 import base from '../negocios/NegociosPage.module.css';
@@ -23,8 +22,8 @@ const PAGE_SIZE = 20;
 export function EncargosLista({ config }) {
   const { titulo, subtitulo, claveFiltros, rutaBase, api, conProyecto = false, conFecha = false, avisoEliminar } = config;
   const filtrosVacios = conProyecto ? { search: '', proyecto: [] } : { search: '' };
-  const [filtros, setFiltros] = usePersistentState(`${claveFiltros}:filtros`, filtrosVacios);
-  const [pagina, setPagina] = usePersistentState(`${claveFiltros}:pagina`, 1);
+  const [filtros, setFiltros] = useState(filtrosVacios);
+  const [pagina, setPagina] = useState(1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [subiendo, setSubiendo] = useState(false);

@@ -20,7 +20,6 @@ import { frentesDisponibles, torresDisponibles, podarSeleccion } from '../../uti
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { SyncProgreso } from '../../components/SyncProgreso.jsx';
 import { useSyncControl, normalizarEstadoRunning } from '../../hooks/useSyncControl.js';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { listInventario, iniciarSyncInventario, getSyncStatusInventario } from '../../api/inventario.js';
 import { etiquetaEtapa } from '../../utils/etapas.js';
 import { InventarioDetalleContenido } from './InventarioDetalleContenido.jsx';
@@ -45,8 +44,8 @@ function useDebounce(value, delay = 350) {
 
 function InventarioLista() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = usePersistentState('inventario-list:filtros', FILTROS_VACIOS);
-  const [pagina, setPagina] = usePersistentState('inventario-list:pagina', 1);
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+  const [pagina, setPagina] = useState(1);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [searchInput, setSearchInput] = useState(filtros.search);
@@ -128,7 +127,7 @@ function InventarioLista() {
           <p className={styles.subtitle}>Inventario de Baía Kristal (Zoho){total !== undefined && !sinInventario ? ` · ${total.toLocaleString('es-CO')} resultados` : ''}</p>
         </div>
         <div className={styles.acciones}>
-          <Button variant="secondary" onClick={() => navigate('/inventario/exportar')} disabled={sinInventario}>
+          <Button variant="secondary" onClick={() => navigate('/inventario/exportar', { state: { filtros } })} disabled={sinInventario}>
             <span className={styles.botonInterior}>
               <Download size={14} aria-hidden="true" />
               Exportar a Excel

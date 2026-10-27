@@ -1,3 +1,6 @@
+// OJO (oct 2026): ya NO se usa para filtros, páginas ni orden de listas -- esos arrancan limpios con useState (un filtro
+// restaurado hacía que el primer pedido saliera filtrado y los selectores de filtro no recibieran sus opciones). Se deja
+// solo para preferencias de interfaz (modo de sincronización, proyecto de Inicio, bloques KPI).
 // PLANTILLA -- copiado tal cual del HRMS aed. Va en
 // frontend/src/hooks/usePersistentState.js del proyecto nuevo.
 //

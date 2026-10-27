@@ -29,7 +29,6 @@ import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.jsx';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { useModoEnfocado } from '../../hooks/useModoEnfocado.js';
 import { getMesesResumen, getResumenEtapas, cerrarMesAnterior, getDashboardRecaudo, getResumenStats } from '../../api/dashboard.js';
 import { getSyncLogsOportunidades } from '../../api/oportunidades.js';
@@ -249,7 +248,7 @@ export function ResumenPage() {
 
   // Consolidado de Cartera por Etapa (navegable mes a mes)
   const [meses, setMeses] = useState([]);
-  const [mes, setMes] = usePersistentState('resumen:mes', '');
+  const [mes, setMes] = useState('');
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
   const [cerrando, setCerrando] = useState(false);
@@ -260,10 +259,10 @@ export function ResumenPage() {
   const [planRecaudo, setPlanRecaudo] = useState(null);
   const [resumenStats, setResumenStats] = useState(null);
   const [syncLogs, setSyncLogs] = useState([]);
-  const [rangoTendencia, setRangoTendencia] = usePersistentState('resumen:rango', 'total');
+  const [rangoTendencia, setRangoTendencia] = useState('total');
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
-  const [filtroPorcentaje, setFiltroPorcentaje] = usePersistentState('resumen:filtroPorcentaje', 'ambos');
-  const [vistaLinea, setVistaLinea] = usePersistentState('resumen:vistaLinea', 'ambos'); // 'ambos' | 'mensual' | 'acumulado'
+  const [filtroPorcentaje, setFiltroPorcentaje] = useState('ambos');
+  const [vistaLinea, setVistaLinea] = useState('ambos'); // 'ambos' | 'mensual' | 'acumulado'
   const [etapaAbierta, setEtapaAbierta] = useState(false);
   const [enfocado, toggleEnfocado] = useModoEnfocado();
 

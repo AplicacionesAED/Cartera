@@ -139,7 +139,10 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
   (`frentesDisponibles`, `torresDisponibles`, `podarSeleccion`). El estado de filtros guarda **arreglos** (`[]` = sin filtro);
   `hayFiltros` debe contar longitudes (un `[]` es truthy). En Dashboard y Cartera las opciones vienen de `meta` (resultado), no
   de `opciones`. Quedan de a uno: Verificado/Requerido (Sí/No), selectores de mes, hoja de Oliv, rangos de mora, trámite.
-- Estado de filtros en `usePersistentState` (sessionStorage); Otrosíes y Oportunidades usan `useState` a propósito.
+- **Los filtros, páginas y orden ya no se guardan en el navegador** (oct 2026): cada lista arranca limpia con `useState`. Los
+  listados devuelven las opciones de filtro solo en la petición sin filtros, así que un filtro restaurado ocultaba selectores.
+  `usePersistentState` queda solo para preferencias (modo de sync, proyecto de Inicio, bloques KPI). El exportador de inmuebles
+  recibe los filtros del listado por `navigate(..., { state: { filtros } })`.
 - Movimientos: columnas Fecha, Referencia de recaudo (enlace al negocio), Comprador, Unidad, Tipo, Valor.
 - Dinero en campos de texto, nunca `type="number"`. Exportar: `utils/exportCsv.js` y `exceljs`; ninguna pantalla oculta
   "Exportar" por rol (se gatea solo por el módulo de la pantalla).
