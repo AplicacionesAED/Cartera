@@ -76,7 +76,6 @@ async function list({ search, proyecto, categoria, estado, estadoFiducia, etapa,
   }
 
   const whereSql = `WHERE ${conditions.join(' AND ')}`;
-  const noFilters = !search && ![proyecto, categoria, estado, estadoFiducia, etapa, frente, torre].some((v) => lista(v).length);
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
 
@@ -86,18 +85,10 @@ async function list({ search, proyecto, categoria, estado, estadoFiducia, etapa,
       `SELECT inventario_items.*, ${ESTADO_FIDUCIA_SQL} AS estado_fiducia, ${LIBRE_SIN_VINCULO_SQL} AS libre_sin_vinculo ${FROM_CON_FIDUCIA} ${whereSql} ORDER BY proyecto ASC NULLS LAST, nombre ASC NULLS LAST LIMIT :limit OFFSET :offset`,
       { type: QueryTypes.SELECT, replacements: { ...replacements, limit: limitNum, offset: (pageNum - 1) * limitNum } }
     ),
-    noFilters
-      ? sequelize.query(`SELECT DISTINCT proyecto FROM inventario_items WHERE proyecto IS NOT NULL ORDER BY proyecto ASC`, { type: QueryTypes.SELECT })
-      : Promise.resolve(null),
-    noFilters
-      ? sequelize.query(`SELECT DISTINCT categoria FROM inventario_items WHERE categoria IS NOT NULL ORDER BY categoria ASC`, { type: QueryTypes.SELECT })
-      : Promise.resolve(null),
-    noFilters
-      ? sequelize.query(`SELECT DISTINCT estado FROM inventario_items WHERE estado IS NOT NULL ORDER BY estado ASC`, { type: QueryTypes.SELECT })
-      : Promise.resolve(null),
-    noFilters
-      ? sequelize.query(`SELECT DISTINCT ${ESTADO_FIDUCIA_SQL} AS estado_fiducia ${FROM_CON_FIDUCIA} WHERE (nombre IS NULL OR nombre NOT LIKE '*%') ORDER BY 1`, { type: QueryTypes.SELECT })
-      : Promise.resolve(null),
+    sequelize.query(`SELECT DISTINCT proyecto FROM inventario_items WHERE proyecto IS NOT NULL ORDER BY proyecto ASC`, { type: QueryTypes.SELECT }),
+    sequelize.query(`SELECT DISTINCT categoria FROM inventario_items WHERE categoria IS NOT NULL ORDER BY categoria ASC`, { type: QueryTypes.SELECT }),
+    sequelize.query(`SELECT DISTINCT estado FROM inventario_items WHERE estado IS NOT NULL ORDER BY estado ASC`, { type: QueryTypes.SELECT }),
+    sequelize.query(`SELECT DISTINCT ${ESTADO_FIDUCIA_SQL} AS estado_fiducia ${FROM_CON_FIDUCIA} WHERE (nombre IS NULL OR nombre NOT LIKE '*%') ORDER BY 1`, { type: QueryTypes.SELECT }),
   ]);
 
   const total = totalRows[0]?.total ?? 0;

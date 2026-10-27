@@ -138,8 +138,6 @@ async function listMovimientos({ encargoId, propietario, hoja, search, page = 1,
     ];
   }
 
-  const sinFiltros = !encargoId && !hoja && !propietario && !search;
-
   const [{ rows, count }, hojasRaw, negocioPorReferencia] = await Promise.all([
     OlivMovimiento.findAndCountAll({
       where,
@@ -151,7 +149,7 @@ async function listMovimientos({ encargoId, propietario, hoja, search, page = 1,
       ],
       include: [{ model: olivEncargo, as: 'encargo', attributes: ['nombre', 'codigo', 'archivo_nombre', 'fecha'] }],
     }),
-    sinFiltros ? OlivMovimiento.findAll({ attributes: ['nombre_hoja'], group: 'nombre_hoja', raw: true }) : null,
+    OlivMovimiento.findAll({ attributes: ['nombre_hoja'], group: 'nombre_hoja', raw: true }),
     _negocioPorReferencia(),
   ]);
 
@@ -195,7 +193,7 @@ async function listMovimientos({ encargoId, propietario, hoja, search, page = 1,
       };
     }),
     pagination: { total: count, page: pageNum, limit: limitNum, totalPages: Math.ceil(count / limitNum) },
-    ...(hojasRaw ? { hojas: hojasRaw.map((h) => h.nombre_hoja).filter(Boolean).sort() } : {}),
+    hojas: hojasRaw.map((h) => h.nombre_hoja).filter(Boolean).sort(),
   };
 }
 

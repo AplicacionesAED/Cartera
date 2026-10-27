@@ -147,12 +147,11 @@ async function list({ search, estado, torre, estadoInmueble, page = 1, limit = 5
   const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
   const total = filas.length;
   const data = filas.slice((pageNum - 1) * limitNum, pageNum * limitNum);
-  const sinFiltros = !search && !estado && !torre && !estadoInmueble;
 
   return {
     data,
     pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
-    ...(sinFiltros ? { estados: estadosDisponibles, torres: torresDisponibles, estadosInmueble: estadosInmuebleDisponibles } : {}),
+    estados: estadosDisponibles, torres: torresDisponibles, estadosInmueble: estadosInmuebleDisponibles,
   };
 }
 

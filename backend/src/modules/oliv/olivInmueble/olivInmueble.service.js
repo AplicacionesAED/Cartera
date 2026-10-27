@@ -50,8 +50,6 @@ async function list({ search, torre, categoria, estado, page = 1, limit = 50 }) 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
 
-  const noFiltros = !search && !lista(torre).length && !lista(categoria).length && !lista(estado).length;
-
   const [{ rows, count }, torres, categorias, estados] = await Promise.all([
     OlivInmueble.findAndCountAll({
       where,
@@ -59,17 +57,17 @@ async function list({ search, torre, categoria, estado, page = 1, limit = 50 }) 
       limit: limitNum,
       order: [['torre', 'ASC'], ['piso', 'ASC'], ['codigo_unidad', 'ASC']],
     }),
-    noFiltros ? OlivInmueble.findAll({ attributes: ['torre'], group: 'torre', where: { torre: { [Op.ne]: null } }, raw: true }) : null,
-    noFiltros ? OlivInmueble.findAll({ attributes: ['categoria'], group: 'categoria', where: { categoria: { [Op.ne]: null } }, raw: true }) : null,
-    noFiltros ? OlivInmueble.findAll({ attributes: ['estado'], group: 'estado', where: { estado: { [Op.ne]: null } }, raw: true }) : null,
+    OlivInmueble.findAll({ attributes: ['torre'], group: 'torre', where: { torre: { [Op.ne]: null } }, raw: true }),
+    OlivInmueble.findAll({ attributes: ['categoria'], group: 'categoria', where: { categoria: { [Op.ne]: null } }, raw: true }),
+    OlivInmueble.findAll({ attributes: ['estado'], group: 'estado', where: { estado: { [Op.ne]: null } }, raw: true }),
   ]);
 
   return {
     data: rows.map(_mapItem),
     pagination: { total: count, page: pageNum, limit: limitNum, totalPages: Math.ceil(count / limitNum) },
-    torres: torres ? torres.map((t) => t.torre).sort() : undefined,
-    categorias: categorias ? categorias.map((o) => o.categoria).sort() : undefined,
-    estados: estados ? estados.map((e) => e.estado).sort() : undefined,
+    torres: torres.map((t) => t.torre).sort(),
+    categorias: categorias.map((o) => o.categoria).sort(),
+    estados: estados.map((e) => e.estado).sort(),
   };
 }
 

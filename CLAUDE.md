@@ -141,8 +141,9 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
   de `opciones`. Quedan de a uno: Verificado/Requerido (Sí/No), selectores de mes, hoja de Oliv, rangos de mora, trámite.
 - **Filtros, páginas y orden con `useEstadoRetorno`** (oct 2026; reemplaza a `usePersistentState` en las listas): se guardan en
   `history.state` de la entrada, no en sessionStorage. Lista -> detalle -> Volver/Atrás los restaura; entrar desde el menú lateral
-  o un enlace arranca limpio. Los listados devuelven las opciones de filtro solo en la petición sin filtros: con filtros viejos
-  restaurados al montar, los selectores se ocultaban (por eso ya no hay persistencia entre visitas). `usePersistentState` queda
+  o un enlace arranca limpio. Los listados devuelven **siempre** las opciones de sus filtros (sobre todo el universo, nunca sobre el
+  resultado filtrado): antes solo las mandaban en la petición sin filtros y, con filtros restaurados al volver de un detalle, los
+  selectores desaparecían. Un listado nuevo con selectores debe seguir esta regla. `usePersistentState` queda
   solo para preferencias (modo de sync, proyecto de Inicio, bloques KPI). El exportador de inmuebles recibe los filtros del
   listado por `navigate(..., { state: { filtros } })`.
 - Movimientos: columnas Fecha, Referencia de recaudo (enlace al negocio), Comprador, Unidad, Tipo, Valor.

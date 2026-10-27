@@ -129,7 +129,6 @@ async function list({ search, estado, etapa, frente, torre, vinculacion, page = 
   const valores = await valoresProyectoTorre();
   const bind = [[...PROYECTO_TORRE_EXCLUIDOS], PATRON_NOMBRE_EXCLUIDO];
   const { whereSQL, idx } = await construirFiltroCombinado({ search, estado, etapa, frente, torre, vinculacion, valores, bind });
-  const noFilters = !search && !lista(estado).length && !lista(etapa).length && !lista(frente).length && !lista(torre).length && !lista(vinculacion).length;
 
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(9999, Math.max(1, Number(limit) || 50));
@@ -151,9 +150,7 @@ async function list({ search, estado, etapa, frente, torre, vinculacion, page = 
        LIMIT $${idx} OFFSET $${idx + 1}`,
       { bind: [...bind, limitNum, (pageNum - 1) * limitNum], type: QueryTypes.SELECT }
     ),
-    noFilters
-      ? sequelize.query(`SELECT DISTINCT estado FROM negocios WHERE estado IS NOT NULL ORDER BY estado ASC`, { type: QueryTypes.SELECT })
-      : Promise.resolve(null),
+    sequelize.query(`SELECT DISTINCT estado FROM negocios WHERE estado IS NOT NULL ORDER BY estado ASC`, { type: QueryTypes.SELECT }),
   ]);
   const total = totalRows[0]?.total ?? 0;
 
@@ -463,6 +460,21 @@ const SELECT_MOVIMIENTOS = `
   LEFT JOIN negocios n ON n.id = m.negocio_id
 `;
 
+// Opciones de los filtros de Movimientos: siempre sobre todo el universo, no sobre el resultado filtrado (si no, un
+// filtro sin coincidencias haría desaparecer los selectores).
+async function opcionesMovimientos() {
+  const [fideicomisosRaw, estadosRaw, tiposMovRaw] = await Promise.all([
+    sequelize.query(`SELECT DISTINCT datos->>'Fideicomiso' AS fideicomiso FROM negocios WHERE datos->>'Fideicomiso' IS NOT NULL AND datos->>'Fideicomiso' != '' ORDER BY 1`, { type: QueryTypes.SELECT }),
+    sequelize.query(`SELECT DISTINCT estado FROM negocios WHERE estado IS NOT NULL ORDER BY estado ASC`, { type: QueryTypes.SELECT }),
+    sequelize.query(`SELECT DISTINCT datos->>'Tipo Movimiento' AS tipo FROM negocio_movimientos WHERE datos->>'Tipo Movimiento' IS NOT NULL AND datos->>'Tipo Movimiento' != '' ORDER BY 1`, { type: QueryTypes.SELECT }),
+  ]);
+  return {
+    fideicomisos: fideicomisosRaw.map((r) => r.fideicomiso).filter(Boolean),
+    estados: estadosRaw.map((e) => e.estado).filter(Boolean),
+    tiposMovimiento: tiposMovRaw.map((r) => r.tipo).filter(Boolean),
+  };
+}
+
 async function listMovimientos({ search, fideicomiso, estado, tipoMovimiento, fechaDesde, fechaHasta, page = 1, limit = 50 }) {
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(200, Math.max(1, Number(limit) || 50));
@@ -472,31 +484,25 @@ async function listMovimientos({ search, fideicomiso, estado, tipoMovimiento, fe
     return {
       data: [],
       pagination: { total: 0, page: pageNum, limit: limitNum, totalPages: 0 },
-      fideicomisos: [],
-      estados: [],
-      tiposMovimiento: [],
+      ...(await opcionesMovimientos()),
     };
   }
   const { whereSQL, bind, nextIdx } = resuelto;
 
-  const [totalRows, movimientos, fideicomisosRaw, estadosRaw, tiposMovRaw] = await Promise.all([
+  const [totalRows, movimientos, opciones] = await Promise.all([
     sequelize.query(`SELECT COUNT(*)::int AS total FROM negocio_movimientos m ${whereSQL}`, { bind, type: QueryTypes.SELECT }),
     sequelize.query(
       `${SELECT_MOVIMIENTOS} ${whereSQL} ORDER BY m.fecha_contable DESC NULLS LAST, m.creado_en DESC LIMIT $${nextIdx} OFFSET $${nextIdx + 1}`,
       { bind: [...bind, limitNum, (pageNum - 1) * limitNum], type: QueryTypes.SELECT }
     ),
-    sequelize.query(`SELECT DISTINCT datos->>'Fideicomiso' AS fideicomiso FROM negocios WHERE datos->>'Fideicomiso' IS NOT NULL AND datos->>'Fideicomiso' != '' ORDER BY 1`, { type: QueryTypes.SELECT }),
-    sequelize.query(`SELECT DISTINCT estado FROM negocios WHERE estado IS NOT NULL ORDER BY estado ASC`, { type: QueryTypes.SELECT }),
-    sequelize.query(`SELECT DISTINCT datos->>'Tipo Movimiento' AS tipo FROM negocio_movimientos WHERE datos->>'Tipo Movimiento' IS NOT NULL AND datos->>'Tipo Movimiento' != '' ORDER BY 1`, { type: QueryTypes.SELECT }),
+    opcionesMovimientos(),
   ]);
   const total = totalRows[0]?.total ?? 0;
 
   return {
     data: movimientos.map(mapMovimientoRow),
     pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
-    fideicomisos: fideicomisosRaw.map((r) => r.fideicomiso).filter(Boolean),
-    estados: estadosRaw.map((e) => e.estado).filter(Boolean),
-    tiposMovimiento: tiposMovRaw.map((r) => r.tipo).filter(Boolean),
+    ...opciones,
   };
 }
 
