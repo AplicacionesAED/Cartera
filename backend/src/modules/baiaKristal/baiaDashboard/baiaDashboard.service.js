@@ -214,9 +214,20 @@ async function construirFilasCompletas() {
       acumularPorPeriodo({ ...paramsAcumular, keyFn: diaKey, porPeriodo: porDia, porPeriodoInicial: porDiaInicial, porPeriodoContraentrega: porDiaContraentrega });
     }
 
-    if (valorInmueble == null) {
-      const precio = Number(inv.datos?.Unit_Price);
-      if (!isNaN(precio) && precio > 0) valorInmueble = precio;
+    // Precio unitario del inmueble (Unit_Price): con él se suma el valor de las unidades disponibles (estado fiducia LIBRE).
+    const precioUnitarioNum = Number(inv.datos?.Unit_Price);
+    const precioUnitario = !isNaN(precioUnitarioNum) && precioUnitarioNum > 0 ? precioUnitarioNum : null;
+    if (valorInmueble == null && precioUnitario != null) valorInmueble = precioUnitario;
+    // Valor de venta y cuota inicial tal como los trae el Excel de la fiducia (no el plan de pagos de Zoho): con ellos
+    // se suman el valor ventas fiduciaria y el valor cuotas iniciales del Resumen, tenga o no el negocio oportunidad.
+    let valorVentaFiducia = null;
+    let cuotaInicialFiduciaResumen = null;
+    if (negocio) {
+      const vv = resolverValorVenta(negocio, etapa);
+      if (vv != null && !isNaN(vv)) valorVentaFiducia = vv;
+      const ciKey = Object.keys(negocio.datos || {}).find((k) => k.toLowerCase() === 'cuota inicial');
+      const ci = ciKey ? parseMonto(negocio.datos[ciKey]) : NaN;
+      if (!isNaN(ci)) cuotaInicialFiduciaResumen = ci;
     }
     if (fechaSaldoContraentrega == null && fechaConfigurada) fechaSaldoContraentrega = fechaConfigurada;
 
@@ -228,7 +239,10 @@ async function construirFilasCompletas() {
       nomenclatura: nomenclaturaCompleta({ proyecto: inv.proyecto, torre: inv.torre, piso: inv.piso, nombre: inv.nombre, datos: inv.datos }),
       unidad: inv.datos?.Product_Name ?? null,
       valorInmueble,
+      valorVentaFiducia,
+      precioUnitario,
       valorCuotaInicial,
+      cuotaInicialFiducia: cuotaInicialFiduciaResumen,
       abonadoCuotaInicial,
       fechaSaldoContraentrega,
       valorSaldoContraentrega,
@@ -249,6 +263,8 @@ async function construirFilasCompletas() {
       referencia: negocio?.referencia ?? null,
       comprador: negocio?.compradores?.[0]?.nombre ?? null,
       estado: negocio?.estado ?? null,
+      // Mismo estado fiducia que muestra Inmuebles: VIP del CRM, si no el del negocio vinculado, si no LIBRE.
+      estadoFiducia: inv.estado === 'VIP' ? 'VIP' : (negocio?.estado ?? 'LIBRE'),
       enTramite: negocio?.en_tramite ?? false,
       esCanje: negocio?.es_canje ?? false,
       estadoInventario: inv.estado ?? null,
@@ -265,12 +281,10 @@ async function construirFilasCompletas() {
   return { filas, valores };
 }
 
-// Un inmueble cuenta como "vendido" (y NO disponible) si su negocio de la
-// fiducia está en alguno de estos estados -- misma regla para los KPIs de
-// Inmuebles disponibles/vendidos del Resumen y para "Uni. disponible" del
-// Consolidado (Jefe Gabriel, 2026-10-01: antes el KPI usaba el estado del
-// inmueble en Inventario y daba 271 contra 227 del Consolidado).
-const ESTADOS_NEGOCIO_VENDIDA_FIDU = new Set(['PROMETIDO', 'OPCIONADO', 'VENDIDO', 'ESCRITURA_AUTORIZADA']);
+// Un inmueble está "disponible" solo si su ESTADO FIDUCIA en el módulo Inmuebles es LIBRE (ver ESTADO_FIDUCIA_SQL en
+// baiaInventario.service.js); cualquier otro estado cuenta como "vendido". Misma regla para los KPIs de Inmuebles
+// disponibles/vendidos del Resumen y para "Uni. disponible" del Consolidado.
+const esVendido = (f) => f.estadoFiducia !== 'LIBRE';
 
 async function obtenerCache() {
   const cached = getCache();
@@ -364,11 +378,11 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
     totalesColumnasFijas.cuotasEnMoraInicial += f.cuotasEnMoraInicial ?? 0;
     totalesColumnasFijas.montoEnMoraInicial += f.montoEnMoraInicial ?? 0;
 
-    if (ESTADOS_NEGOCIO_VENDIDA_FIDU.has(f.estado)) {
-      if (f.valorInmueble != null) totalesColumnasFijas.valorVendidos += f.valorInmueble;
+    if (esVendido(f)) {
+      if (f.valorVentaFiducia != null) totalesColumnasFijas.valorVendidos += f.valorVentaFiducia;
       totalesColumnasFijas.cantidadVendidos += 1;
     } else {
-      if (f.valorInmueble != null) totalesColumnasFijas.valorDisponible += f.valorInmueble;
+      if (f.precioUnitario != null) totalesColumnasFijas.valorDisponible += f.precioUnitario;
       totalesColumnasFijas.cantidadDisponible += 1;
     }
 
@@ -579,6 +593,7 @@ function acumuladoEtapaVacio() {
     uniTotales: 0, uniVendidasFidu: 0, uniVendidasCRM: 0,
     valorTotalVentasFiduciaria: 0, valorCuotasIniciales: 0, valorTotalUnidadesDisponibles: 0,
     recaudoReal: 0, recaudoCuotaInicial: 0, carteraMas5Dias: 0, esperadoAFechaInicial: 0,
+    pendienteTotalFiduciaria: 0, pendienteCuotaInicial: 0, pendienteCredito: 0,
   };
 }
 
@@ -586,7 +601,7 @@ const CAMPOS_SUMABLES_TOTAL = [
   'uniTotales', 'uniVendidasFidu', 'uniVendidasCRM',
   'valorTotalVenta', 'valorTotalVentasFiduciaria', 'valorCuotasIniciales', 'valorTotalUnidadesDisponibles',
   'recaudoReal', 'recaudoCuotaInicial', 'carteraMas5Dias', 'esperadoAFechaInicial',
-  'pendienteTotalFiduciaria', 'pendienteCuotaInicial', 'pendienteCredito',
+  'recaudoCredito', 'pendienteTotalFiduciaria', 'pendienteCuotaInicial', 'pendienteCredito',
 ];
 
 async function obtenerResumenPorEtapa() {
@@ -598,18 +613,29 @@ async function obtenerResumenPorEtapa() {
     if (!porEtapa.has(f.etapa)) porEtapa.set(f.etapa, acumuladoEtapaVacio());
     const e = porEtapa.get(f.etapa);
     e.uniTotales += 1;
-    if (ESTADOS_NEGOCIO_VENDIDA_FIDU.has(f.estado)) e.uniVendidasFidu += 1;
+    if (esVendido(f)) e.uniVendidasFidu += 1;
     if (ESTADOS_INV_VENDIDA_CRM.has(f.estadoInventario)) e.uniVendidasCRM += 1;
 
-    if (f.negocioId != null && ESTADOS_NEGOCIO_VENDIDA_FIDU.has(f.estado)) {
-      if (f.valorInmueble != null) e.valorTotalVentasFiduciaria += f.valorInmueble;
-      if (f.valorCuotaInicial != null) e.valorCuotasIniciales += f.valorCuotaInicial;
-      if (f.totalAbonado != null) e.recaudoReal += f.totalAbonado;
-      if (f.abonadoCuotaInicial != null) e.recaudoCuotaInicial += f.abonadoCuotaInicial;
+    if (esVendido(f)) {
+      if (f.valorVentaFiducia != null) e.valorTotalVentasFiduciaria += f.valorVentaFiducia;
+      if (f.cuotaInicialFiducia != null) e.valorCuotasIniciales += f.cuotaInicialFiducia;
+      // Recaudado y pendiente por negocio, sobre los valores de la fiducia: lo pagado cubre primero la cuota inicial y lo
+      // que sobra va al crédito (saldo). Así cada negocio queda entre 0 y su valor, sin que un sobrepago de uno tape lo
+      // que debe otro.
+      const venta = f.valorVentaFiducia;
+      const cuotaInicial = f.cuotaInicialFiducia;
+      const pagado = f.totalAbonado ?? 0;
+      e.recaudoReal += pagado;
+      if (cuotaInicial != null) {
+        e.recaudoCuotaInicial += Math.min(pagado, cuotaInicial);
+        e.pendienteCuotaInicial += Math.max(0, cuotaInicial - pagado);
+      }
+      if (venta != null) e.pendienteTotalFiduciaria += Math.max(0, venta - pagado);
+      if (venta != null && cuotaInicial != null) e.pendienteCredito += Math.max(0, venta - Math.max(pagado, cuotaInicial));
       if (f.esperadoAFechaInicial != null) e.esperadoAFechaInicial += f.esperadoAFechaInicial;
       if ((f.maxDiasAtrasoInicial ?? 0) > UMBRAL_CARTERA_DIAS) e.carteraMas5Dias += f.montoEnMoraInicial ?? 0;
-    } else if (f.valorInmueble != null) {
-      e.valorTotalUnidadesDisponibles += f.valorInmueble;
+    } else if (f.precioUnitario != null) {
+      e.valorTotalUnidadesDisponibles += f.precioUnitario;
     }
   }
 
@@ -628,14 +654,15 @@ async function obtenerResumenPorEtapa() {
       valorTotalUnidadesDisponibles: e.valorTotalUnidadesDisponibles,
       recaudoReal: e.recaudoReal,
       recaudoCuotaInicial: e.recaudoCuotaInicial,
+      recaudoCredito: e.recaudoReal - e.recaudoCuotaInicial,
       esperadoAFechaInicial: e.esperadoAFechaInicial,
       pctRecaudoSobreVentasFiduciaria: e.valorTotalVentasFiduciaria > 0 ? e.recaudoReal / e.valorTotalVentasFiduciaria : null,
-      pctRecaudoSobreCuotaInicial: e.valorCuotasIniciales > 0 ? e.recaudoReal / e.valorCuotasIniciales : null,
+      pctRecaudoSobreCuotaInicial: e.valorCuotasIniciales > 0 ? e.recaudoCuotaInicial / e.valorCuotasIniciales : null,
       carteraMas5Dias: e.carteraMas5Dias,
       pctCarteraMas5Dias: e.esperadoAFechaInicial > 0 ? e.carteraMas5Dias / e.esperadoAFechaInicial : null,
-      pendienteTotalFiduciaria: Math.max(0, e.valorTotalVentasFiduciaria - e.recaudoReal),
-      pendienteCuotaInicial: Math.max(0, e.valorCuotasIniciales - e.recaudoReal),
-      pendienteCredito: Math.max(0, e.valorTotalVentasFiduciaria - e.recaudoReal) - Math.max(0, e.valorCuotasIniciales - e.recaudoReal),
+      pendienteTotalFiduciaria: e.pendienteTotalFiduciaria,
+      pendienteCuotaInicial: e.pendienteCuotaInicial,
+      pendienteCredito: e.pendienteCredito,
       fechaCorte,
     };
   });
@@ -648,7 +675,7 @@ async function obtenerResumenPorEtapa() {
     etapa: 'TOTAL GENERAL',
     uniDisponible: total.uniTotales - total.uniVendidasFidu,
     pctRecaudoSobreVentasFiduciaria: total.valorTotalVentasFiduciaria > 0 ? total.recaudoReal / total.valorTotalVentasFiduciaria : null,
-    pctRecaudoSobreCuotaInicial: total.valorCuotasIniciales > 0 ? total.recaudoReal / total.valorCuotasIniciales : null,
+    pctRecaudoSobreCuotaInicial: total.valorCuotasIniciales > 0 ? total.recaudoCuotaInicial / total.valorCuotasIniciales : null,
     pctCarteraMas5Dias: total.esperadoAFechaInicial > 0 ? total.carteraMas5Dias / total.esperadoAFechaInicial : null,
     fechaCorte: null,
   });

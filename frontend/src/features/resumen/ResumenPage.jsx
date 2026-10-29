@@ -19,7 +19,6 @@
 // verdad, ver el comentario ahí). El footer de sync usa el también nuevo
 // GET /oportunidades/sync/logs.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ExcelJS from 'exceljs';
 import { exportarConsolidadoPdf } from './consolidadoPdf.js';
 import { Maximize2, Minimize2, Layers, MapPin, Building, X, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, Building2, Wallet, AlertTriangle, Hourglass, Target, KeyRound } from 'lucide-react';
 import { Field, Select } from '../../components/ui/Field.jsx';
@@ -128,9 +127,6 @@ function formatFechaCorte(iso) {
   return new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-const NOTA_VENDIDAS_FIDU = 'Cuenta Negocios (Excel de fiducia) en estado PROMETIDO, OPCIONADO, VENDIDO o ESCRITURA_AUTORIZADA. Es un conteo distinto de "Vendidas CRM" (que cuenta por estado del inmueble en Inventario): clasifican universos distintos, negocio financiero vs. inmueble físico.';
-const NOTA_CARTERA_5D = 'Mismo criterio de mora activa que usa Cartera en Gestión (Cuota Inicial, sin Saldo Contraentrega), sin excluir "trámites pendientes" (no existe ese flag en el sistema).';
-
 // El span de cada grupo se deriva de COLUMNAS (cuántas columnas declaran ese
 // `grupo`) en vez de un número fijo -- un span hardcodeado que no coincide
 // con el conteo real desalinea el <th colSpan> del grupo contra las columnas
@@ -143,23 +139,24 @@ const GRUPOS_BASE = [
   { label: 'Por recaudar', tono: 'warning' },
 ];
 const COLUMNAS = [
-  { key: 'uniTotales', grupo: 0, label: 'UNI TOTALES', render: (e) => formatInt(e.uniTotales) },
-  { key: 'uniVendidasFidu', grupo: 0, label: 'UNI VENDIDAS (FIDU)', nota: NOTA_VENDIDAS_FIDU, render: (e) => formatInt(e.uniVendidasFidu) },
-  { key: 'uniVendidasCRM', grupo: 0, label: 'UNIDADES VENDIDAS CRM', render: (e) => formatInt(e.uniVendidasCRM) },
-  { key: 'uniDisponible', grupo: 0, label: 'UNIDADES DISPONIBLE', render: (e) => formatInt(e.uniDisponible) },
-  { key: 'valorTotalVenta', grupo: 0, label: 'VALOR TOTAL VENTA (FIDUCIARIA+DISPONIBLES)', render: (e) => formatMM(e.valorTotalVenta) },
-  { key: 'valorTotalVentasFiduciaria', grupo: 0, label: 'VALOR TOTAL VENTAS FIDUCIARIA', render: (e) => formatMM(e.valorTotalVentasFiduciaria) },
-  { key: 'valorCuotasIniciales', grupo: 0, label: 'VALOR CUOTAS INICIALES', render: (e) => formatMM(e.valorCuotasIniciales) },
-  { key: 'valorTotalUnidadesDisponibles', grupo: 0, label: 'VALOR($) UNIDADES DISPONIBLES', render: (e) => formatMM(e.valorTotalUnidadesDisponibles) },
-  { key: 'recaudoReal', grupo: 1, label: 'VR. TOTAL RECAUDADO A LA FECHA', render: (e) => formatMM(e.recaudoReal) },
-  { key: 'pctRecaudoSobreVentasFiduciaria', grupo: 1, label: '% RECAUDO / VENTAS FIDUCIARIA', render: (e) => formatPct(e.pctRecaudoSobreVentasFiduciaria) },
-  { key: 'pctRecaudoSobreCuotaInicial', grupo: 1, label: '% RECAUDO / CUOTA INICIAL', render: (e) => formatPct(e.pctRecaudoSobreCuotaInicial) },
-  { key: 'carteraMas5Dias', grupo: 1, label: 'CARTERA > 5 DÍAS', nota: NOTA_CARTERA_5D, render: (e) => formatMM(e.carteraMas5Dias) },
-  { key: 'pctCarteraMas5Dias', grupo: 1, label: '% CARTERA > 5 DÍAS', nota: NOTA_CARTERA_5D, render: (e) => formatPct(e.pctCarteraMas5Dias) },
-  { key: 'pendienteTotalFiduciaria', grupo: 2, label: 'PENDIENTE POR RECAUDAR FIDUCIARIA', render: (e) => formatMM(e.pendienteTotalFiduciaria) },
-  { key: 'pendienteCuotaInicial', grupo: 2, label: 'CUOTAS INICIALES POR RECAUDAR', render: (e) => formatMM(e.pendienteCuotaInicial) },
-  { key: 'pendienteCredito', grupo: 2, label: 'CRÉDITO POR RECAUDAR', render: (e) => formatMM(e.pendienteCredito) },
-  { key: 'fechaCorte', grupo: 2, label: 'FECHA DE CORTE INFO', render: (e) => formatFechaCorte(e.fechaCorte) },
+  { key: 'uniTotales', grupo: 0, label: 'Unidades totales', nota: 'Inmuebles del inventario de Zoho en la etapa. No incluye proyectos excluidos ni unidades marcadas con * en el nombre.', render: (e) => formatInt(e.uniTotales) },
+  { key: 'uniVendidasFidu', grupo: 0, label: 'Unidades vendidas', nota: 'Inmuebles con estado fiducia distinto de LIBRE. El estado fiducia es VIP si el inmueble es VIP en Zoho; si no, el del negocio de la fiducia vinculado, y LIBRE si no tiene negocio.', render: (e) => formatInt(e.uniVendidasFidu) },
+  { key: 'uniDisponible', grupo: 0, label: 'Unidades disponibles', nota: 'Inmuebles con estado fiducia LIBRE: las unidades totales menos las vendidas.', render: (e) => formatInt(e.uniDisponible) },
+  { key: 'valorTotalUnidadesDisponibles', grupo: 0, label: 'Valor unidades disponibles', nota: 'Suma del precio unitario (Unit_Price en Zoho) de los inmuebles con estado fiducia LIBRE.', render: (e) => formatMM(e.valorTotalUnidadesDisponibles) },
+  { key: 'valorTotalVentasFiduciaria', grupo: 0, label: 'Valor ventas fiduciaria', nota: 'Suma del Valor venta que trae el Excel de la fiducia para cada negocio vendido (en Etapas 1 y 2, si está VENDIDO, el Valor factura). No usa el plan de pagos de Zoho.', render: (e) => formatMM(e.valorTotalVentasFiduciaria) },
+  { key: 'valorCuotasIniciales', grupo: 0, label: 'Valor cuotas iniciales', nota: 'Suma de la Cuota Inicial que trae el Excel de la fiducia para cada negocio vendido. No usa el plan de pagos de Zoho.', render: (e) => formatMM(e.valorCuotasIniciales) },
+  { key: 'valorTotalVenta', grupo: 0, label: 'Valor total de venta', nota: 'Valor ventas fiduciaria más valor de las unidades disponibles.', render: (e) => formatMM(e.valorTotalVenta) },
+  { key: 'recaudoReal', grupo: 1, label: 'Recaudado a la fecha', nota: 'Suma de lo pagado (movimientos de la fiducia) en los negocios vendidos que tienen plan de pagos, a la fecha de corte.', render: (e) => formatMM(e.recaudoReal) },
+  { key: 'recaudoCuotaInicial', grupo: 1, label: 'Recaudado cuota inicial', nota: 'Parte de lo recaudado que cubre la cuota inicial de cada negocio: lo pagado hasta el valor de su cuota inicial en la fiducia.', render: (e) => formatMM(e.recaudoCuotaInicial) },
+  { key: 'recaudoCredito', grupo: 1, label: 'Recaudado crédito', nota: 'Parte de lo recaudado que pasa de la cuota inicial: recaudado a la fecha menos recaudado cuota inicial.', render: (e) => formatMM(e.recaudoCredito) },
+  { key: 'pctRecaudoSobreVentasFiduciaria', grupo: 1, label: '% Recaudo / ventas', nota: 'Recaudado a la fecha ÷ valor ventas fiduciaria.', render: (e) => formatPct(e.pctRecaudoSobreVentasFiduciaria) },
+  { key: 'pctRecaudoSobreCuotaInicial', grupo: 1, label: '% Recaudo / cuota inicial', nota: 'Recaudado cuota inicial ÷ valor cuotas iniciales.', render: (e) => formatPct(e.pctRecaudoSobreCuotaInicial) },
+  { key: 'pendienteTotalFiduciaria', grupo: 2, label: 'Pendiente por recaudar', nota: 'Suma, por negocio vendido, de su valor de venta menos lo pagado. Un negocio que ya pagó de más no resta.', render: (e) => formatMM(e.pendienteTotalFiduciaria) },
+  { key: 'pendienteCuotaInicial', grupo: 2, label: 'Cuotas iniciales por recaudar', nota: 'Suma, por negocio vendido, de su cuota inicial menos lo pagado hasta ese valor.', render: (e) => formatMM(e.pendienteCuotaInicial) },
+  { key: 'pendienteCredito', grupo: 2, label: 'Crédito por recaudar', nota: 'Suma, por negocio vendido, de lo que falta de su valor de venta después de la cuota inicial.', render: (e) => formatMM(e.pendienteCredito) },
+  { key: 'carteraMas5Dias', grupo: 2, label: 'Cartera > 5 días', nota: 'Lo que falta pagar de las cuotas iniciales vencidas, en los negocios vendidos con más de 5 días de atraso en su cuota inicial. Usa el mismo criterio de mora de Cartera en Gestión (solo cuota inicial, sin saldo contraentrega) y no excluye trámites pendientes, porque ese marcador no existe en el sistema.', render: (e) => formatMM(e.carteraMas5Dias) },
+  { key: 'pctCarteraMas5Dias', grupo: 2, label: '% Cartera > 5 días', nota: 'Cartera > 5 días ÷ lo esperado a la fecha de las cuotas iniciales (las que ya cumplieron su fecha) de los negocios vendidos.', render: (e) => formatPct(e.pctCarteraMas5Dias) },
+  { key: 'fechaCorte', grupo: 2, label: 'Fecha de corte', nota: 'Día en que se calcularon las cifras: hoy en el mes en vivo, o el día del cierre en un mes guardado.', render: (e) => formatFechaCorte(e.fechaCorte) },
 ];
 const GRUPOS = GRUPOS_BASE.map((g, i) => ({ ...g, span: COLUMNAS.filter((c) => c.grupo === i).length }));
 const INICIO_DE_GRUPO = new Set(GRUPOS.reduce((acc, g, i) => {
@@ -169,15 +166,13 @@ const INICIO_DE_GRUPO = new Set(GRUPOS.reduce((acc, g, i) => {
 }, []));
 
 // Mismos hex que --color-{info,success,warning}-{surface,ink} de tokens.css,
-// como ARGB -- para que el Excel exportado (ver handleExportConsolidado) se
+// como ARGB -- para que el PDF exportado (ver handleExportConsolidadoPdf) se
 // vea con el mismo código de color por grupo que la tabla en pantalla.
 const TONOS_EXCEL = {
   info: { bg: 'FFE8E9FD', ink: 'FF232BED' },
   success: { bg: 'FFDFF3EA', ink: 'FF014145' },
   warning: { bg: 'FFFFF3D6', ink: 'FF8A5A00' },
 };
-const EXCEL_BORDE_GRUPO = { left: { style: 'medium', color: { argb: 'FFC3CBD6' } } };
-const EXCEL_BG_TOTAL = 'FFEEF1F5';
 
 function FilaEtapa({ fila, esTotal }) {
   return (
@@ -188,7 +183,7 @@ function FilaEtapa({ fila, esTotal }) {
       {COLUMNAS.map((col) => {
         const g = GRUPOS[col.grupo];
         return (
-          <td key={col.key} className={`${styles.celda} ${styles[`tono-${g.tono}`]} ${INICIO_DE_GRUPO.has(col.key) ? styles.bordeGrupo : ''}`}>
+          <td key={col.key} className={`${styles.celda} ${INICIO_DE_GRUPO.has(col.key) ? styles.bordeGrupo : ''}`}>
             {col.render(fila)}
           </td>
         );
@@ -203,9 +198,6 @@ function ConsolidadoCarteraEtapa({ data }) {
 
   return (
     <div>
-      <p className={styles.consolidadoNota}>
-        Las columnas con ⓘ usan un criterio aproximado o recién confirmado.
-      </p>
       <div className={styles.consolidadoWrap}>
         <table className={styles.consolidadoTable}>
           <colgroup>
@@ -220,13 +212,20 @@ function ConsolidadoCarteraEtapa({ data }) {
               ))}
             </tr>
             <tr>
-              <th className={styles.colSticky}>Etapa</th>
+              <th className={styles.colSticky}>
+                <span className={styles.tituloCol}>
+                  <span>Etapa</span>
+                  <InfoTooltip titulo="Etapa" text="Etapa constructiva del inmueble, según el Proyecto/Torre del inventario de Zoho. La última fila suma todas las etapas." />
+                </span>
+              </th>
               {COLUMNAS.map((col) => {
                 const g = GRUPOS[col.grupo];
                 return (
-                  <th key={col.key} title={col.label} className={`${styles.colHeader} ${styles[`tono-${g.tono}`]} ${INICIO_DE_GRUPO.has(col.key) ? styles.bordeGrupo : ''}`}>
-                    {col.label}
-                    {col.nota && <InfoTooltip text={col.nota} />}
+                  <th key={col.key} title={col.label} className={`${styles.colHeader} ${styles[`acento-${g.tono}`]} ${INICIO_DE_GRUPO.has(col.key) ? styles.bordeGrupo : ''}`}>
+                    <span className={styles.tituloCol}>
+                      <span>{col.label}</span>
+                      {col.nota && <InfoTooltip titulo={col.label} text={col.nota} />}
+                    </span>
                   </th>
                 );
               })}
@@ -253,7 +252,6 @@ export function ResumenPage() {
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
   const [cerrando, setCerrando] = useState(false);
-  const [exportandoConsolidado, setExportandoConsolidado] = useState(false);
   const [exportandoPdf, setExportandoPdf] = useState(false);
 
   // KPIs + tendencia (mismo backend que Dashboard Plan vs. Recaudo)
@@ -463,95 +461,6 @@ export function ResumenPage() {
     }
   }
 
-  // Excel con los MISMOS valores ya formateados que se ven en pantalla
-  // (col.render(fila), ej. "$134.648" en miles de millones -- no el peso
-  // completo sin abreviar) y el mismo color por grupo (Cifras generales/
-  // Recaudado/Por recaudar), para que el archivo sea una foto fiel de la
-  // tabla, no una re-derivación con otra convención numérica.
-  async function handleExportConsolidado() {
-    if (!datos) return;
-    setExportandoConsolidado(true);
-    try {
-      const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet('Consolidado');
-      const fillSolida = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
-
-      ws.getColumn(1).width = 16;
-      COLUMNAS.forEach((_, i) => { ws.getColumn(i + 2).width = 20; });
-
-      ws.mergeCells(1, 1, 2, 1);
-      const etapaHeader = ws.getCell(1, 1);
-      etapaHeader.value = 'ETAPA';
-      etapaHeader.font = { bold: true };
-      etapaHeader.alignment = { vertical: 'middle', horizontal: 'left' };
-
-      let cursor = 2;
-      GRUPOS.forEach((g) => {
-        const inicio = cursor;
-        const fin = cursor + g.span - 1;
-        if (fin > inicio) ws.mergeCells(1, inicio, 1, fin);
-        const cell = ws.getCell(1, inicio);
-        cell.value = g.label.toUpperCase();
-        cell.fill = fillSolida(TONOS_EXCEL[g.tono].bg);
-        cell.font = { bold: true, color: { argb: TONOS_EXCEL[g.tono].ink } };
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cursor = fin + 1;
-      });
-
-      COLUMNAS.forEach((col, i) => {
-        const g = GRUPOS[col.grupo];
-        const cell = ws.getCell(2, i + 2);
-        cell.value = col.label;
-        cell.fill = fillSolida(TONOS_EXCEL[g.tono].bg);
-        cell.font = { bold: true, color: { argb: TONOS_EXCEL[g.tono].ink }, size: 10 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        if (INICIO_DE_GRUPO.has(col.key)) cell.border = EXCEL_BORDE_GRUPO;
-      });
-      ws.getRow(1).height = 20;
-      ws.getRow(2).height = 34;
-
-      const filas = [...datos.etapas, datos.total];
-      filas.forEach((fila, idx) => {
-        const esTotal = idx === filas.length - 1;
-        const row = ws.getRow(idx + 3);
-        const etapaCell = row.getCell(1);
-        etapaCell.value = esTotal ? 'TOTAL GENERAL' : etiquetaEtapa(fila.etapa);
-        etapaCell.font = { bold: true };
-        if (esTotal) etapaCell.fill = fillSolida(EXCEL_BG_TOTAL);
-
-        COLUMNAS.forEach((col, i) => {
-          const g = GRUPOS[col.grupo];
-          const cell = row.getCell(i + 2);
-          cell.value = col.render(fila);
-          cell.alignment = { horizontal: 'center' };
-          if (esTotal) {
-            cell.fill = fillSolida(EXCEL_BG_TOTAL);
-            cell.font = { bold: true };
-          } else {
-            cell.fill = fillSolida(TONOS_EXCEL[g.tono].bg);
-            cell.font = { color: { argb: TONOS_EXCEL[g.tono].ink } };
-          }
-          if (INICIO_DE_GRUPO.has(col.key)) cell.border = EXCEL_BORDE_GRUPO;
-        });
-      });
-
-      ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 2 }];
-
-      const buffer = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `resumen-gerencial-${datos.mes}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setExportandoConsolidado(false);
-    }
-  }
-
   const lastSync = syncLogs[0];
   const syncOk = syncLogs.filter((s) => s.status === 'success').length;
   const syncErr = syncLogs.filter((s) => s.status === 'error').length;
@@ -628,35 +537,35 @@ export function ResumenPage() {
       <div className={styles.kpiSecciones}>
         <KpiBloque storageKey="resumen:kpi100" titulo={`Total (100%) — ${labelVentana}`} resumen={kpisRecaudo ? `Totalidad ${fmtMoney(kpisRecaudo.totalidad100)} · Recaudado ${fmtMoney(kpisRecaudo.recaudado100)} · Por recaudar ${fmtMoney(kpisRecaudo.porRecaudar100)}` : null}>
           <div className={dashStyles.statsGrid}>
-            <StatTileConHint label="Totalidad del 100%" icon={Target} tone="primary" value={kpisRecaudo ? fmtMoney(kpisRecaudo.totalidad100) : '—'} description={`Total esperado de todo el plan de pagos (Cuota Inicial más Saldo), dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Recaudado del 100%" icon={CheckCircle2} tone="success" value={kpisRecaudo ? fmtMoney(kpisRecaudo.recaudado100) : '—'} description={`Todo lo realmente recaudado, sin importar a qué cuota se aplicó, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Por recaudar (100%)" icon={Hourglass} tone="neutral" value={kpisRecaudo ? fmtMoney(kpisRecaudo.porRecaudar100) : '—'} description={`Plan de pagos esperado menos lo recaudado real, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Cuotas vencidas (100%) (actual)" icon={AlertTriangle} tone="warning" value={kpisActuales ? String(kpisActuales.cuotasEnMora) : '—'} sub={kpisActuales ? fmtMoney(kpisActuales.montoEnMora) : undefined} description="Cuotas atrasadas de todo el plan de pagos (Cuota Inicial y Saldo), a hoy -- no cambia con el filtro de periodo." />
+            <StatTileConHint label="Totalidad del 100%" icon={Target} tone="primary" value={kpisRecaudo ? fmtMoney(kpisRecaudo.totalidad100) : '—'} description={`Suma del valor esperado de las cuotas del plan de pagos de todos los negocios (Propuesta de pago de Zoho; Forma de pago si no hay propuesta) cuya fecha cae dentro del periodo (${labelVentana}). La última cuota (Saldo Contraentrega) se ajusta al Valor venta de la fiducia y usa la fecha de entrega configurada.`} />
+            <StatTileConHint label="Recaudado del 100%" icon={CheckCircle2} tone="success" value={kpisRecaudo ? fmtMoney(kpisRecaudo.recaudado100) : '—'} description={`Suma de los pagos de los movimientos de la fiducia, por la fecha del pago, dentro del periodo (${labelVentana}), sin importar a qué cuota se aplicaron.`} />
+            <StatTileConHint label="Por recaudar (100%)" icon={Hourglass} tone="neutral" value={kpisRecaudo ? fmtMoney(kpisRecaudo.porRecaudar100) : '—'} description={`Totalidad del 100% menos el recaudado del 100% del mismo periodo (${labelVentana}); nunca negativo.`} />
+            <StatTileConHint label="Cuotas vencidas (100%) (actual)" icon={AlertTriangle} tone="warning" value={kpisActuales ? String(kpisActuales.cuotasEnMora) : '—'} sub={kpisActuales ? fmtMoney(kpisActuales.montoEnMora) : undefined} description="Cantidad de cuotas del plan de pagos (Cuota Inicial y Saldo) de todos los negocios con fecha estimada anterior a hoy y sin pagar completas; el valor es lo que falta por pagar de ellas. No cambia con el filtro de periodo." />
           </div>
         </KpiBloque>
 
         <KpiBloque storageKey="resumen:kpi30" titulo={`Cuota inicial (30%) — ${labelVentana}`} resumen={kpisRecaudo ? `Totalidad ${fmtMoney(kpisRecaudo.totalidad30)} · Recaudado ${fmtMoney(kpisRecaudo.recaudado30)} · Por recaudar ${fmtMoney(kpisRecaudo.porRecaudar30)}` : null}>
           <div className={dashStyles.statsGrid}>
-            <StatTileConHint label="Totalidad del 30%" icon={Target} tone="primary" value={kpisRecaudo ? fmtMoney(kpisRecaudo.totalidad30) : '—'} description={`Total esperado de la Cuota Inicial según el plan de pagos, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Recaudado del 30%" icon={CheckCircle2} tone="success" value={kpisRecaudo ? fmtMoney(kpisRecaudo.recaudado30) : '—'} description={`Lo realmente recaudado hacia la Cuota Inicial, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Por recaudar (30%)" icon={Hourglass} tone="neutral" value={kpisRecaudo ? fmtMoney(kpisRecaudo.porRecaudar30) : '—'} description={`Cuota Inicial esperada menos lo recaudado real, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Cuotas vencidas (30%) (actual)" icon={AlertTriangle} tone="warning" value={kpisActuales ? String(kpisActuales.cuotasEnMoraInicial) : '—'} sub={kpisActuales ? fmtMoney(kpisActuales.montoEnMoraInicial) : undefined} description="Cuotas atrasadas SOLO de la Cuota Inicial, a hoy -- no cambia con el filtro de periodo." />
+            <StatTileConHint label="Totalidad del 30%" icon={Target} tone="primary" value={kpisRecaudo ? fmtMoney(kpisRecaudo.totalidad30) : '—'} description={`Suma de las cuotas de Cuota Inicial del plan de pagos (todas menos el Saldo Contraentrega) cuya fecha cae dentro del periodo (${labelVentana}).`} />
+            <StatTileConHint label="Recaudado del 30%" icon={CheckCircle2} tone="success" value={kpisRecaudo ? fmtMoney(kpisRecaudo.recaudado30) : '—'} description={`Pagos de la fiducia que la conciliación aplica a las cuotas de Cuota Inicial, por la fecha del pago, dentro del periodo (${labelVentana}).`} />
+            <StatTileConHint label="Por recaudar (30%)" icon={Hourglass} tone="neutral" value={kpisRecaudo ? fmtMoney(kpisRecaudo.porRecaudar30) : '—'} description={`Totalidad del 30% menos el recaudado del 30% del mismo periodo (${labelVentana}); nunca negativo.`} />
+            <StatTileConHint label="Cuotas vencidas (30%) (actual)" icon={AlertTriangle} tone="warning" value={kpisActuales ? String(kpisActuales.cuotasEnMoraInicial) : '—'} sub={kpisActuales ? fmtMoney(kpisActuales.montoEnMoraInicial) : undefined} description="Cantidad de cuotas de la Cuota Inicial de todos los negocios con fecha estimada anterior a hoy y sin pagar completas; el valor es lo que falta por pagar de ellas. No cambia con el filtro de periodo." />
           </div>
         </KpiBloque>
 
         <KpiBloque storageKey="resumen:kpi70" titulo={`Saldo contraentrega (70%) — ${labelVentana}`} resumen={kpisRecaudo ? `Totalidad ${fmtMoney(kpisRecaudo.totalidad70)} · Recaudado ${fmtMoney(kpisRecaudo.recaudado70)} · Pendiente ${fmtMoney(kpisRecaudo.pendienteContraentrega)}` : null}>
           <div className={dashStyles.statsGrid}>
-            <StatTileConHint label="Totalidad del 70%" icon={Target} tone="primary" value={kpisRecaudo ? fmtMoney(kpisRecaudo.totalidad70) : '—'} description={`Total esperado del Saldo Contraentrega según conciliación, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Saldo recaudado contraentrega" icon={Wallet} tone="success" value={kpisRecaudo ? fmtMoney(kpisRecaudo.recaudado70) : '—'} description={`Lo realmente recaudado hacia el Saldo Contraentrega, dentro del periodo seleccionado (${labelVentana}).`} />
-            <StatTileConHint label="Saldo pendiente contraentrega" icon={Hourglass} tone="neutral" value={kpisRecaudo ? fmtMoney(kpisRecaudo.pendienteContraentrega) : '—'} description={`Saldo Contraentrega según conciliación, menos lo recaudado real, dentro del periodo seleccionado (${labelVentana}).`} />
+            <StatTileConHint label="Totalidad del 70%" icon={Target} tone="primary" value={kpisRecaudo ? fmtMoney(kpisRecaudo.totalidad70) : '—'} description={`Valor de la última cuota del plan de pagos (Saldo Contraentrega, ajustada al Valor venta de la fiducia) de los negocios cuya fecha de entrega cae dentro del periodo (${labelVentana}). La fecha es la de entrega configurada en Ajustes.`} />
+            <StatTileConHint label="Saldo recaudado contraentrega" icon={Wallet} tone="success" value={kpisRecaudo ? fmtMoney(kpisRecaudo.recaudado70) : '—'} description={`Pagos de la fiducia que la conciliación aplica al Saldo Contraentrega (la última cuota del plan), por la fecha del pago, dentro del periodo (${labelVentana}).`} />
+            <StatTileConHint label="Saldo pendiente contraentrega" icon={Hourglass} tone="neutral" value={kpisRecaudo ? fmtMoney(kpisRecaudo.pendienteContraentrega) : '—'} description={`Totalidad del 70% menos el saldo recaudado del mismo periodo (${labelVentana}); nunca negativo.`} />
           </div>
         </KpiBloque>
 
         <div>
-          <h3 className={styles.kpiSeccionTitulo}>Inventario y ventas (actual)</h3>
+          <h3 className={styles.kpiSeccionTitulo}>Inventario y ventas (actual)<InfoTooltip text="Foto de hoy, sin filtro de periodo. Cada inmueble es disponible si su estado fiducia (módulo Inmuebles) es LIBRE, y vendido en cualquier otro caso." /></h3>
           <div className={dashStyles.statsGrid}>
-            <StatTileConHint label="Inmuebles disponibles (actual)" icon={Building2} tone="primary" value={kpisActuales ? fmtMoney(kpisActuales.valorDisponible) : '—'} sub={kpisActuales ? `${kpisActuales.cantidadDisponible} unidades` : undefined} description="Valor y cantidad de los inmuebles cuyo negocio en la fiducia NO está en Prometido, Opcionado, Vendido ni Escritura autorizada, a hoy (misma regla que 'Uni. disponible' del Consolidado)." />
-            <StatTileConHint label="Inmuebles vendidos (actual)" icon={KeyRound} tone="success" value={kpisActuales ? fmtMoney(kpisActuales.valorVendidos) : '—'} sub={kpisActuales ? `${kpisActuales.cantidadVendidos} unidades` : undefined} description="Valor y cantidad de los inmuebles cuyo negocio en la fiducia está en Prometido, Opcionado, Vendido o Escritura autorizada, a hoy." />
+            <StatTileConHint label="Inmuebles disponibles (actual)" icon={Building2} tone="primary" value={kpisActuales ? fmtMoney(kpisActuales.valorDisponible) : '—'} sub={kpisActuales ? `${kpisActuales.cantidadDisponible} unidades` : undefined} description="Cantidad de inmuebles con estado fiducia LIBRE en el módulo Inmuebles y suma de su precio unitario, a hoy (misma regla que 'Uni. disponible' del Consolidado)." />
+            <StatTileConHint label="Inmuebles vendidos (actual)" icon={KeyRound} tone="success" value={kpisActuales ? fmtMoney(kpisActuales.valorVendidos) : '—'} sub={kpisActuales ? `${kpisActuales.cantidadVendidos} unidades` : undefined} description="Cantidad de inmuebles con estado fiducia distinto de LIBRE en el módulo Inmuebles y suma de su Valor venta en la fiducia, a hoy." />
           </div>
         </div>
       </div>
@@ -672,9 +581,9 @@ export function ResumenPage() {
             <div className={styles.tendenciaHeaderAcciones}>
               {resumenStats && (
                 <span className={styles.tendenciaStats}>
-                  Recaudado en el año <strong>{fmtMoney(resumenStats.recaudoAnio)}</strong>
+                  Recaudado en el año <InfoTooltip text="Suma de lo recaudado en los meses del año actual: pagos de los movimientos de la fiducia, por la fecha del pago (la misma fuente del gráfico, sin filtros de periodo ni de ubicación)." /><strong>{fmtMoney(resumenStats.recaudoAnio)}</strong>
                   <span className={styles.puntoSep}>·</span>
-                  Separaciones este mes <strong>{resumenStats.separacionesMes}</strong>
+                  Separaciones este mes <InfoTooltip text="Cantidad de oportunidades de Zoho cuya fecha de Pago de separación cae dentro del mes actual." /><strong>{resumenStats.separacionesMes}</strong>
                 </span>
               )}
               <Button variant="secondary" onClick={toggleEnfocado}>
@@ -716,25 +625,27 @@ export function ResumenPage() {
 
       {/* Consolidado de Cartera por Etapa */}
       <div className={styles.consolidadoCard}>
-        <h2 className={styles.consolidadoTitulo}>
-          Consolidado de Cartera por Etapa
-          <InfoTooltip text="Réplica en vivo del Excel 'CONSOLIDADO DE CARTERA' que arma Gerencia cada mes." />
-        </h2>
-        <div className={styles.mesSelector}>
-          <Field className={styles.fieldMesSm} label="Mes">
-            {(p) => (
-              <Select {...p} value={mes} onChange={(e) => setMes(e.target.value)}>
-                {meses.map((m) => <option key={m.mes} value={m.mes}>{m.etiqueta}</option>)}
-              </Select>
-            )}
-          </Field>
-          {datos?.enVivo && <Badge variant="info">En vivo</Badge>}
-          <Button variant="secondary" className={styles.exportarConsolidado} onClick={handleExportConsolidado} disabled={!datos || exportandoConsolidado}>
-            {exportandoConsolidado ? 'Exportando…' : 'Exportar Consolidado (Excel)'}
-          </Button>
-          <Button variant="secondary" onClick={handleExportConsolidadoPdf} disabled={!datos || exportandoPdf}>
-            {exportandoPdf ? 'Exportando…' : 'Exportar Consolidado (PDF)'}
-          </Button>
+        <div className={styles.consolidadoCabecera}>
+          <div>
+            <h2 className={styles.consolidadoTitulo}>
+              Consolidado de Cartera por Etapa
+              <InfoTooltip text="Réplica en vivo del Excel “CONSOLIDADO DE CARTERA” que Gerencia arma cada mes." />
+            </h2>
+            <p className={styles.consolidadoSubtitulo}>Cifras en miles de millones de pesos (COP). Pasa el cursor sobre ⓘ para ver cómo se calcula cada columna.</p>
+          </div>
+          <div className={styles.consolidadoControles}>
+            <Field className={styles.fieldMesSm} label="Mes">
+              {(p) => (
+                <Select {...p} value={mes} onChange={(e) => setMes(e.target.value)}>
+                  {meses.map((m) => <option key={m.mes} value={m.mes}>{m.etiqueta}</option>)}
+                </Select>
+              )}
+            </Field>
+            {datos?.enVivo && <Badge variant="info">En vivo</Badge>}
+            <Button variant="secondary" onClick={handleExportConsolidadoPdf} disabled={!datos || exportandoPdf}>
+              {exportandoPdf ? 'Exportando…' : 'Exportar PDF'}
+            </Button>
+          </div>
         </div>
         <ConsolidadoCarteraEtapa data={datos} />
         {meses.length <= 1 && <p className={styles.avisoMeses}>Todavía no hay meses cerrados para navegar -- se va a ir guardando una foto automáticamente al cierre de cada mes.</p>}
@@ -757,8 +668,8 @@ export function ResumenPage() {
         {lastSync ? (
           <>
             {lastSync.status === 'success' ? <CheckCircle2 size={14} className={styles.syncOk} /> : lastSync.status === 'error' ? <XCircle size={14} className={styles.syncErr} /> : <Clock size={14} className={styles.syncPend} />}
-            <span>Última sync Zoho: <strong>{formatDateTime(lastSync.iniciadoEn)}</strong> · {lastSync.registrosSync} registros</span>
-            <span className={styles.syncResumen}>Últimas 5: {syncOk} OK · {syncErr} errores</span>
+            <span>Última sync Zoho: <strong>{formatDateTime(lastSync.iniciadoEn)}</strong> · {lastSync.registrosSync} registros<InfoTooltip text="Última sincronización de datos del CRM (Zoho) que alimenta inmuebles y oportunidades (planes de pago). La fiducia se carga aparte, con el Excel diario." /></span>
+            <span className={styles.syncResumen}>Últimas 5: {syncOk} OK · {syncErr} errores<InfoTooltip text="Resultado de las 5 sincronizaciones más recientes de Zoho." /></span>
           </>
         ) : (
           <span>Sin historial de sincronización</span>

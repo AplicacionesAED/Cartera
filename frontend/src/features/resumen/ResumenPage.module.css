@@ -70,13 +70,10 @@
 
 /* Barra única de filtros (ubicación + periodo) */
 .toolbarCard {
+  composes: tarjeta from '../../components/ui/Filtros.module.css';
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  padding: 20px 24px;
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
 }
 
 .toolbarFila {
@@ -216,16 +213,6 @@
   margin: 0;
 }
 
-.mesSelector {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-md);
-}
-
-.exportarConsolidado {
-  margin-left: auto;
-}
-
 .fieldMesSm {
   width: 220px;
 }
@@ -252,58 +239,62 @@
 
 /* ── Tabla Consolidado (grupos coloreados + columna fija) ───────────────── */
 
-.consolidadoNota {
-  font-size: var(--text-label-size);
+.consolidadoCabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.consolidadoSubtitulo {
+  margin: 4px 0 0;
+  font-size: var(--text-data-size);
   color: var(--color-ink-muted);
-  margin: 0;
+}
+
+.consolidadoControles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
 }
 
 .consolidadoWrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  background: #fff;
 }
 
-/* table-layout:fixed + <colgroup> (ver ConsolidadoCarteraEtapa en el JSX) --
-   sin esto, table-layout:auto con `width:100%` fuerza 18 columnas a caber en
-   el ancho del contenedor sin importar cuánto texto tengan: los encabezados
-   de varias palabras (ej. "VALOR TOTAL VENTA (FIDUCIARIA+DISPONIBLES)")
-   terminaban recortados a un ancho menor al de su propio texto, sin
-   `overflow` que los recorte, así que se veían literalmente encima del
-   encabezado vecino. Con columnas de ancho fijo (colDato) y SIN width:100%
-   en la tabla (el ancho real sale de la suma de columnas, no al revés), cada
-   encabezado tiene el espacio que declaró su <col> y el `consolidadoWrap`
-   de arriba se encarga del scroll horizontal -- mismo patrón que
-   `DashboardPage.module.css` (.megaTable) para la tabla de Plan vs. Recaudo. */
+/* table-layout:fixed + <colgroup> (ver ConsolidadoCarteraEtapa en el JSX): cada columna tiene el ancho que declara su
+   <col> y el `consolidadoWrap` se encarga del scroll horizontal -- sin width:100% en la tabla, para que el ancho real
+   salga de la suma de columnas y no se aprieten los encabezados largos. `border-collapse: separate` porque la columna
+   fija (sticky) pierde sus bordes con `collapse`. */
 .consolidadoTable {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
-  font-size: var(--text-data-size);
+  font-size: 0.875rem;
 }
 
 .colEtapaGroup {
-  width: 150px;
+  width: 168px;
 }
 
 .colDato {
-  width: 132px;
+  width: 152px;
 }
 
 .consolidadoTable th,
 .consolidadoTable td {
-  padding: var(--space-sm) 6px;
-  text-align: center;
+  padding: 11px 12px;
+  text-align: right;
   border-bottom: 1px solid var(--color-border);
 }
 
-/* `.consolidadoTable th` de arriba (selector clase+elemento) pesa MÁS que
-   `.colHeader` sola (una sola clase) -- si el nowrap fuera parte de esa
-   regla compartida, ganaría por especificidad sobre el white-space:normal
-   de `.colHeader` de más abajo sin importar el orden en el archivo, y los
-   encabezados largos nunca envolverían (quedarían en una sola línea
-   desbordando sobre la columna vecina, sin borde que lo delate). Por eso el
-   nowrap se aplica explícito solo donde hace falta -- nunca en el selector
-   compartido con `.colHeader`. */
+/* El nowrap se aplica solo donde hace falta (nunca en el selector compartido con `.colHeader`, que tiene que poder
+   envolver sus encabezados de varias palabras). */
 .celda,
 .colSticky,
 .grupoHeader {
@@ -314,54 +305,96 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  text-align: left;
-  padding-left: var(--space-md);
-  background: var(--color-surface);
+  text-align: left !important;
+  padding-left: var(--space-lg) !important;
+  background: #fff;
   font-weight: 600;
   color: var(--color-ink);
+  box-shadow: 1px 0 0 var(--color-border);
 }
 
 .colStickyTotal {
   background: var(--color-surface-sunken);
 }
 
+/* Fila de grupos: una banda con el color del grupo (cifras / recaudado / por recaudar). */
 .grupoHeader {
-  font-size: var(--text-label-size);
-  font-weight: var(--text-label-weight);
-  letter-spacing: var(--text-label-tracking);
+  text-align: left !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  border-left: 2px solid var(--color-border);
 }
 
+/* Fila de columnas: fondo neutro, título en dos líneas como máximo y un trazo del color del grupo debajo (el color
+   agrupa, no pinta toda la tabla). El título y su ⓘ forman una sola pieza alineada a la derecha, sobre la cifra. */
 .colHeader {
-  font-size: 10px;
-  font-weight: var(--text-label-weight);
-  letter-spacing: var(--text-label-tracking);
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-ink);
+  background: var(--color-surface);
   white-space: normal;
-  overflow-wrap: break-word;
-  line-height: 1.35;
   vertical-align: bottom;
-  padding-top: var(--space-sm);
-  padding-bottom: var(--space-sm);
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  border-bottom-width: 2px !important;
+}
+
+.colHeader.colSticky {
+  background: var(--color-surface);
+  vertical-align: bottom;
+}
+
+.tituloCol {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 100%;
+  text-align: right;
+  text-wrap: balance;
+}
+
+.colSticky .tituloCol {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.acento-info {
+  border-bottom-color: color-mix(in srgb, var(--color-info-ink) 45%, white) !important;
+}
+
+.acento-success {
+  border-bottom-color: color-mix(in srgb, var(--color-success-ink) 45%, white) !important;
+}
+
+.acento-warning {
+  border-bottom-color: color-mix(in srgb, var(--color-warning-ink) 45%, white) !important;
 }
 
 .celda {
   font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
 }
 
+/* Primera columna de cada grupo: una línea vertical suave que separa los tres bloques. */
 .bordeGrupo {
-  border-left: 2px solid var(--color-border-strong);
+  border-left: 1px solid var(--color-border-strong);
 }
 
-.fila:hover {
-  background: var(--color-surface-sunken);
+.fila:hover td,
+.fila:hover .colSticky {
+  background: var(--color-surface);
 }
 
-.filaTotal {
+.filaTotal td {
   background: var(--color-surface-sunken);
   font-weight: 700;
   border-top: 2px solid var(--color-border-strong);
+  border-bottom: 0;
 }
 
 .filaTotal .colSticky {
@@ -381,13 +414,6 @@
 .tono-warning {
   background: var(--color-warning-surface);
   color: var(--color-warning-ink);
-}
-
-.filaTotal .tono-info,
-.filaTotal .tono-success,
-.filaTotal .tono-warning {
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
 }
 
 /* ── Footer sync ─────────────────────────────────────────────────────── */

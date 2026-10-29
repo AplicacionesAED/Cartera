@@ -41,8 +41,8 @@ async function cargarLogo() {
 
 const NOTA_BAIA_KRISTAL =
   'Réplica del Excel "CONSOLIDADO DE CARTERA" que arma Gerencia cada mes, calculada sobre la conciliación real. ' +
-  'Vendidas (FIDU): negocios de la fiducia en estado Prometido, Opcionado, Vendido o Escritura autorizada. ' +
-  'Vendidas CRM: inmuebles Vendido, Reservado o Separado en Zoho. Disponibles: unidades sin negocio vendido en la fiducia.';
+  'Vendidas (FIDU): inmuebles con cualquier estado fiducia distinto de Libre. ' +
+  'Disponibles: inmuebles con estado fiducia Libre; su valor es la suma del precio unitario.';
 
 // Por defecto arma el consolidado por ETAPA de Baía Kristal; Oliv (consolidado por TORRE) pasa `titulo`,
 // `encabezadoPrimera`, `filasDatos`, `etiquetaFila`, `nota` y `prefijoArchivo`.
