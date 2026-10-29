@@ -36,7 +36,8 @@ async function listEncargos({ search, proyecto, page = 1, limit = 20 }) {
     where,
     offset: (pageNum - 1) * limitNum,
     limit: limitNum,
-    order: [['creado_en', 'DESC']],
+    // Por la fecha del correo (no por cuándo se importó: los de un día entran todos juntos).
+    order: [[sequelize.literal('COALESCE(email_fecha, creado_en)'), 'DESC'], ['id', 'DESC']],
     include: [{ model: HojaFiduciaria, as: 'hojas', attributes: ['id', 'nombre_hoja', 'total_filas'], separate: true, order: [['nombre_hoja', 'ASC']] }],
   });
 

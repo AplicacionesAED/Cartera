@@ -104,7 +104,9 @@ export function EncargosLista({ config }) {
   const filas = meta.data ?? [];
   const total = meta.pagination?.total;
   const hayFiltros = Object.values(filtros).some((v) => v !== '');
-  const columnas = conFecha ? 6 : 5;
+  // Oliv tiene su columna Fecha; Baía Kristal, la fecha del correo del que llegó el Excel.
+  const conCorreo = !conFecha;
+  const columnas = 6;
 
   return (
     <div className={base.page}>
@@ -193,6 +195,7 @@ export function EncargosLista({ config }) {
               <th>Encargo</th>
               <th>Archivo</th>
               <th>Hojas</th>
+              {conCorreo && <th>Fecha del correo</th>}
               <th>Importado</th>
               <th />
             </tr>
@@ -255,6 +258,7 @@ export function EncargosLista({ config }) {
                       ))}
                     </div>
                   </td>
+                  {conCorreo && <td className={styles.fechaCorta}>{enc.email_fecha ? formatDateTime(enc.email_fecha) : '—'}</td>}
                   <td className={styles.fechaCorta}>{formatDateTime(enc.creado_en)}</td>
                   <td className={styles.accionesCol}>
                     <div className={styles.acciones}>
