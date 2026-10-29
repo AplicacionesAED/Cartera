@@ -40,16 +40,6 @@ const removeEncargo = asyncHandler(async (req, res) => {
   ok(res, { message: 'Eliminado' });
 });
 
-const listMovimientos = asyncHandler(async (req, res) => {
-  const { encargId, codigo, propietario, hoja, search, page, limit, fechaDesde, fechaHasta, sortField, sortDir } = req.query;
-  ok(res, await service.listMovimientos({ encargId, codigo, propietario, hoja, search, page, limit, fechaDesde, fechaHasta, sortField, sortDir }));
-});
-
-const listPropietarios = asyncHandler(async (req, res) => {
-  const { encargId, search } = req.query;
-  ok(res, await service.listPropietarios({ encargId, search }));
-});
-
 const listNomenclaturas = asyncHandler(async (req, res) => {
   const { search, page, limit } = req.query;
   ok(res, await service.listNomenclaturas(req.params.id, { search, page, limit }));
@@ -60,4 +50,4 @@ const getApartamentoDetalle = asyncHandler(async (req, res) => {
   ok(res, await service.getApartamentoDetalle(req.params.id, referencia));
 });
 
-module.exports = { upload, listEncargos, getEncargo, getHoja, updateEncargo, removeEncargo, listMovimientos, listPropietarios, listNomenclaturas, getApartamentoDetalle };
+module.exports = { upload, listEncargos, getEncargo, getHoja, updateEncargo, removeEncargo, listNomenclaturas, getApartamentoDetalle };

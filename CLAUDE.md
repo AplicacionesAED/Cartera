@@ -68,9 +68,10 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
   copia otro join así, revisar índices del legado.
 - `DATEONLY` de Sequelize devuelve string `'YYYY-MM-DD'`, no `Date`. `negocio_movimientos.fecha_contable` y
   `oportunidades.fecha_inicio_plan_pagos` son `DATE` que guardan solo fecha UTC a medianoche (deliberado; no convertir).
-- **Movimientos fiduciarios normalizados**: `movimientos_fiduciarios.datos` se sacó a 22 columnas (forma A); un disparador
-  (`mf_llenar_columnas`) las llena y deja `datos` en NULL si se reconstruye idéntico. **Para leer el objeto original usar
-  siempre `mf_datos(fila)`, nunca la columna `datos` cruda.** Las filas tipo B y formas desconocidas conservan `datos`.
+- **`movimientos_fiduciarios` ya no existe** (migración `20261029120000`): era una copia fila por fila de las hojas del Excel
+  (~2,3 GB) que nadie leía. La fuente de las filas de la fiducia es `hojas_fiduciarias.filas`; la subida ya no las copia.
+  No reintroducirla (si hace falta consultar filas por encargo, leer de la hoja). El detalle de la normalización está en
+  `docs/HISTORIAL.md`.
 - **Filtros de selección múltiple** (oct 2026): los listados reciben cada filtro repetido (`?etapa=1&etapa=2`);
   `utils/filtros.js#lista()` normaliza a arreglo y `filtrarCascadaEnMemoria()` filtra los resultados en memoria. Semántica:
   OR dentro de un filtro, AND entre filtros, vacío = sin filtro. La cascada Etapa→Frente→Torre usa
@@ -102,8 +103,8 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
 
 ### Negocios, vinculación y conciliación
 
-- `negocio.backfill.js` reconstruye `Negocio`/`NegocioComprador`/`NegocioMovimiento` desde `HojaFiduciaria`/`MovimientoFiduciario`
-  (correr `POST /negocios/backfill` tras cada Excel nuevo). Es **atómico/transaccional** y debe correr en proceso aparte (un
+- `negocio.backfill.js` reconstruye `Negocio`/`NegocioComprador`/`NegocioMovimiento` desde `HojaFiduciaria`
+  (la "última" hoja de cada referencia se decide por `COALESCE(email_fecha, creado_en)`, no por cuándo se subió; correr `POST /negocios/backfill` tras cada Excel nuevo). Es **atómico/transaccional** y debe correr en proceso aparte (un
   reinicio de nodemon a mitad dejó datos incompletos).
 - **Vinculación negocio↔inmueble** (tabla `vinculos_negocio_inmueble`, `modules/vinculo/`: `vinculoResolver`, `categoriaTorre`,
   `vinculo.service`): primero por **nomenclatura + categoría**, con la **referencia de recaudo** como respaldo; guarda el
@@ -124,8 +125,9 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
   (filtro duro). PDF bajo demanda en 2 pasos, streaming `inline`, nunca se guarda copia. **No confundir las 3 "etapas"**:
   `stage` (etapa del negocio, pipeline Zoho), `etapa` de la fila (etapa del proyecto, oculta en la tabla pero en la API) y
   `etapa` como query param (etapa del inmueble, cascada). La etiqueta del filtro es "Etapa del inmueble".
-- Fiducia (`fiducia.upload.js`): sube Excel a `EncargFiduciario`/`HojaFiduciaria`/`MovimientoFiduciario`. El endpoint
-  `/fiducia/movimientos` no lo usa ninguna pantalla (Movimientos usa `negocio_movimientos`).
+- Fiducia (`fiducia.upload.js`): sube Excel a `EncargFiduciario`/`HojaFiduciaria`. Movimientos
+  usa `negocio_movimientos` (se reconstruye desde las hojas). Los endpoints `/fiducia/movimientos` y `/fiducia/propietarios`
+  se eliminaron junto con la tabla. La lista de Encargos se ordena por la fecha del correo (`email_fecha`).
 - `ConfiguracionFrente`: fecha de entrega por Frente/Torre/Piso, mutuamente excluyentes entre niveles (409).
 - `GET /inicio`: KPIs y alertas por proyecto; omite lo que el usuario no puede ver.
 

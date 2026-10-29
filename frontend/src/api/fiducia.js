@@ -27,14 +27,6 @@ export function removeEncargo(id) {
   return client.delete(`/fiducia/encargos/${id}`);
 }
 
-export function listMovimientos(params) {
-  return client.get(`/fiducia/movimientos${toQuery(params)}`);
-}
-
-export function listPropietarios(params) {
-  return client.get(`/fiducia/propietarios${toQuery(params)}`);
-}
-
 export function getNomenclaturas(encargoId, params) {
   return client.get(`/fiducia/encargos/${encargoId}/nomenclaturas${toQuery(params)}`);
 }

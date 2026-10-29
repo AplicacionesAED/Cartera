@@ -5,29 +5,13 @@
 // subida (processResumenSheet/processMovPorPropietarioSheet, sobre las
 // hojas "Movimientos"/"Mov_Por_Propietario") -- esa parte se porta en la
 // fase de Negocios, cuando esos modelos existan en esta base. Acá solo se
-// guarda el Excel crudo (EncargFiduciario/HojaFiduciaria/MovimientoFiduciario),
-// que es autocontenido.
+// guarda el Excel crudo (EncargFiduciario/HojaFiduciaria), que es autocontenido.
+// Ya no se copia fila por fila a `movimientos_fiduciarios` (se eliminó: nada la leía y pesaba ~2,3 GB).
 const XLSX = require('xlsx');
 const XlsxPopulate = require('xlsx-populate');
 const EncargFiduciario = require('./encargFiduciario.model');
 const HojaFiduciaria = require('./hojaFiduciaria.model');
-const MovimientoFiduciario = require('./movimientoFiduciario.model');
 const { invalidarCacheDashboard } = require('../baiaDashboard/baiaDashboardCache');
-
-const PROPIETARIO_KEYS = [
-  'propietario', 'prop', 'cliente', 'client', 'nombre', 'name',
-  'beneficiario', 'titular', 'copropietario', 'tercero', 'usuario',
-  'comprador', 'adquirente', 'adquiriente',
-];
-
-function detectPropietarioKey(columnas) {
-  const lower = columnas.map((c) => (c || '').toLowerCase().trim());
-  for (const key of PROPIETARIO_KEYS) {
-    const idx = lower.findIndex((c) => c === key || c.includes(key));
-    if (idx !== -1) return idx;
-  }
-  return 0; // fallback: primera columna
-}
 
 function extractCodigo(filename) {
   const stem = filename.replace(/\.[^.]+$/, '');
@@ -124,22 +108,6 @@ async function procesarArchivoFiducia(buffer, filename, metadata = {}) {
     if (totalFilas === 0 && columnas.length === 0) continue;
 
     const hoja = await HojaFiduciaria.create({ encarg_id: encargo.id, nombre_hoja: sheetName, columnas, filas, total_filas: totalFilas });
-
-    const propietarioIdx = detectPropietarioKey(columnas);
-
-    const BATCH = 100;
-    for (let i = 0; i < filas.length; i += BATCH) {
-      await MovimientoFiduciario.bulkCreate(
-        filas.slice(i, i + BATCH).map((row) => {
-          const datos = {};
-          columnas.forEach((col, ci) => {
-            if (col) datos[col] = row[ci] ?? null;
-          });
-          const propietario = row[propietarioIdx] ? String(row[propietarioIdx]).trim() : null;
-          return { encarg_id: encargo.id, hoja_id: hoja.id, nombre_hoja: sheetName, propietario: propietario || null, datos };
-        })
-      );
-    }
 
     hojasCreadas.push({ id: hoja.id, nombreHoja: sheetName, totalFilas });
     // Nota: el legado también poblaba Negocio acá para las hojas

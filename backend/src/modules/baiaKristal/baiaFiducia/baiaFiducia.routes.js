@@ -18,7 +18,4 @@ router.get('/encargos/:id/negocio/:referencia', requireAuth, requireModulo('enca
 router.patch('/encargos/:id', requireAuth, requireModulo('encargos'), controller.updateEncargo);
 router.delete('/encargos/:id', requireAuth, requireModulo('encargos'), controller.removeEncargo);
 
-router.get('/movimientos', requireAuth, requireModulo('encargos'), controller.listMovimientos);
-router.get('/propietarios', requireAuth, requireModulo('encargos'), controller.listPropietarios);
-
 module.exports = router;
