@@ -93,6 +93,7 @@ async function construirFiltroCombinado({ search, estado, etapa, frente, torre, 
     if (vincs.includes('nomenclatura')) ors.push(`c.vinculo_metodo = 'nomenclatura'`);
     if (vincs.includes('referencia')) ors.push(`c.vinculo_metodo = 'referencia'`);
     if (vincs.includes('sin')) ors.push(`(c.negocio_id IS NOT NULL AND c.inventario_datos IS NULL)`);
+    if (vincs.includes('desvinculado')) ors.push(`c.desvinculado`);
     if (ors.length) condiciones.push(`(${ors.join(' OR ')})`);
   }
 
