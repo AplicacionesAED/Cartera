@@ -356,17 +356,26 @@ async function getMovimientos(id, { page = 1, limit = 50 }) {
   ]);
   const total = totalRows[0]?.total ?? 0;
 
-  // TOTAL MOVIMIENTOS: suma de la columna Valor de TODOS los movimientos del negocio (no solo los de la página), leída
-  // igual que la tabla (se quitan los símbolos y se respeta el signo).
-  const valores = await sequelize.query(`SELECT datos->>'Valor' AS valor FROM negocio_movimientos WHERE negocio_id = $1`, { bind: [negocioId], type: QueryTypes.SELECT });
-  const totalValor = valores.reduce((suma, { valor }) => {
+  // TOTAL MOVIMIENTOS: resumen de la columna Valor de TODOS los movimientos del negocio (no solo los de la página),
+  // leída igual que la tabla (se quitan los símbolos y se respeta el signo): total, lo que entra (valores positivos),
+  // lo que sale (negativos), el rango de fechas contables y el último movimiento.
+  const filasValor = await sequelize.query(`SELECT datos->>'Valor' AS valor, fecha_contable FROM negocio_movimientos WHERE negocio_id = $1`, { bind: [negocioId], type: QueryTypes.SELECT });
+  const resumen = { total: 0, ingresos: 0, egresos: 0, nIngresos: 0, nEgresos: 0, desde: null, hasta: null, ultimoValor: null };
+  for (const { valor, fecha_contable: fecha } of filasValor) {
     const n = parseFloat(String(valor ?? '').replace(/[^0-9.-]/g, ''));
-    return Number.isNaN(n) ? suma : suma + n;
-  }, 0);
+    if (Number.isNaN(n)) continue;
+    resumen.total += n;
+    if (n > 0) { resumen.ingresos += n; resumen.nIngresos += 1; }
+    if (n < 0) { resumen.egresos += n; resumen.nEgresos += 1; }
+    if (fecha) {
+      if (!resumen.desde || fecha < resumen.desde) resumen.desde = fecha;
+      if (!resumen.hasta || fecha >= resumen.hasta) { resumen.hasta = fecha; resumen.ultimoValor = n; }
+    }
+  }
 
   // fecha_contable/id_movimiento: la conciliación y el estado de cuenta (PDF) los leen en crudo.
   const data = movimientos.map((m) => ({ ...mapMovimientoRow(m), fecha_contable: m.fecha_contable, id_movimiento: m.id_movimiento }));
-  return { data, pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) }, totalValor };
+  return { data, pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) }, resumen };
 }
 
 // Construye el WHERE de negocio_movimientos a partir de los mismos filtros

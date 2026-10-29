@@ -12,6 +12,7 @@ import { Pagination } from '../../components/ui/Pagination.jsx';
 import { ListaInfo, ListaFinanciera } from '../../components/ui/DatosFinancieros.jsx';
 import { getNegocio, getMovimientosNegocio } from '../../api/negocios.js';
 import { MovimientosTabla } from '../fiducia/MovimientosTabla.jsx';
+import { ResumenMovimientos } from './ResumenMovimientos.jsx';
 import base from './NegociosPage.module.css';
 import { getSubformsOportunidad, refrescarSubformsOportunidad } from '../../api/oportunidades.js';
 import { Button } from '../../components/ui/Button.jsx';
@@ -265,7 +266,7 @@ function MovimientosSection({ id }) {
   const [movimientos, setMovimientos] = useState(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
-  const [totalValor, setTotalValor] = useState(null);
+  const [resumenMov, setResumenMov] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(
@@ -275,7 +276,7 @@ function MovimientosSection({ id }) {
         .then((res) => {
           setMovimientos(res.data?.data ?? []);
           setPagination(res.data?.pagination ?? null);
-          setTotalValor(res.data?.totalValor ?? null);
+          setResumenMov(res.data?.resumen ?? null);
           setPage(p);
         })
         .finally(() => setLoading(false));
@@ -291,11 +292,7 @@ function MovimientosSection({ id }) {
       {!loading && movimientos && movimientos.length === 0 && <p className={styles.sinDatosPad}>Sin movimientos registrados</p>}
       {!loading && movimientos && movimientos.length > 0 && (
         <>
-          <div className={`${styles.kpiCard} ${styles.totalMovimientos}`}>
-            <p className={styles.miniLabel}>Total movimientos</p>
-            <p className={styles.kpiValor}>{formatCOP(totalValor) ?? '$ 0'}</p>
-            {pagination && <p className={styles.kpiSub}>{pagination.total} {pagination.total === 1 ? 'movimiento' : 'movimientos'}</p>}
-          </div>
+          <ResumenMovimientos resumen={resumenMov} totalMovimientos={pagination?.total} />
           <div className={base.tableWrap}>
             <MovimientosTabla movimientos={movimientos} />
           </div>

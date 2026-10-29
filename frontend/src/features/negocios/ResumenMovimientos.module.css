@@ -1,0 +1,179 @@
+/* Resumen del historial de movimientos: el total manda (cifra grande a la izquierda) y a la derecha, en columnas
+   alineadas, el contexto real: lo que entra, lo que sale y el último movimiento. Solo tokens del sistema. */
+.resumen {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(0, 2fr);
+  gap: var(--space-lg);
+  align-items: stretch;
+  margin-bottom: var(--space-md);
+  padding: var(--space-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-brand-deep) 6%, transparent);
+}
+
+.principal {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-data-size);
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.total {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 1.3rem + 1.2vw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: var(--text-data-size);
+  color: var(--color-ink-muted);
+}
+
+.rango {
+  position: relative;
+  padding-left: 10px;
+}
+
+.rango::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  transform: translateY(-50%);
+}
+
+/* Proporción entre lo que entra y lo que sale: solo aparece si hay salidas. */
+.barra {
+  display: flex;
+  height: 6px;
+  margin-top: var(--space-sm);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-danger-surface);
+}
+
+.barraEntra {
+  display: block;
+  height: 100%;
+  background: var(--color-success-ink);
+  border-radius: var(--radius-full);
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin: 0;
+  padding-left: var(--space-lg);
+  border-left: 1px solid var(--color-border);
+}
+
+.dato {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.datoEtiqueta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-data-size);
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+}
+
+.iconoEntra {
+  background: var(--color-success-surface);
+  color: var(--color-success-ink);
+}
+
+.iconoSale {
+  background: var(--color-danger-surface);
+  color: var(--color-danger-ink);
+}
+
+.iconoFecha {
+  background: var(--color-info-surface);
+  color: var(--color-info-ink);
+}
+
+.datoValor {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.datoSub {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: var(--text-data-size);
+  color: var(--color-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vacio {
+  font-weight: 400;
+  color: var(--color-ink-muted);
+}
+
+@media (max-width: 900px) {
+  .resumen {
+    grid-template-columns: 1fr;
+  }
+
+  .datos {
+    padding-left: 0;
+    padding-top: var(--space-md);
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+@media (max-width: 560px) {
+  .datos {
+    grid-template-columns: 1fr;
+  }
+}

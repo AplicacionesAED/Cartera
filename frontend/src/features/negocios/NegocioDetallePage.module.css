@@ -414,11 +414,6 @@
   gap: var(--space-md);
 }
 
-.totalMovimientos {
-  max-width: 280px;
-  margin-bottom: var(--space-md);
-}
-
 .saldosGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
