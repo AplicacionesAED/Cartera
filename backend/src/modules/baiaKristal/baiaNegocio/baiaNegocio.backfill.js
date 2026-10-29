@@ -5,7 +5,7 @@
 // que el legado: "wipe existing Negocio data so we start fresh"), pensado
 // para correr después de cada subida de Excel nueva o cuando cambie la
 // lógica de parseo.
-const { Op, QueryTypes } = require('sequelize');
+const { QueryTypes } = require('sequelize');
 const sequelize = require('../../../config/db');
 const HojaFiduciaria = require('../baiaFiducia/hojaFiduciaria.model');
 const { excluirEnResumen } = require('../../../config/columnasExcluidas');
@@ -73,6 +73,10 @@ function findHeaderInStoredFilas(filas, knownCol, knownIdx) {
   return null;
 }
 
+// "Última hoja" = la del correo más reciente (no la que se subió más tarde: una subida manual o un reproceso de un
+// correo viejo no debe pisar estados y saldos más nuevos). Requiere `JOIN encargos_fiduciarios e ON e.id = h.encarg_id`.
+const FECHA_HOJA = 'COALESCE(e.email_fecha, h.creado_en)';
+
 let running = false;
 let result = null;
 
@@ -97,11 +101,12 @@ async function runBackfill() {
   progreso.iniciar('Preparando la reconstrucción');
 
   try {
-    const hojaIds = await HojaFiduciaria.findAll({
-      where: { nombre_hoja: { [Op.in]: ['Movimientos', 'Mov_Por_Propietario'] } },
-      attributes: ['id', 'nombre_hoja'],
-      order: [['creado_en', 'ASC']],
-    });
+    const hojaIds = await sequelize.query(
+      `SELECT h.id, h.nombre_hoja FROM hojas_fiduciarias h JOIN encargos_fiduciarios e ON e.id = h.encarg_id
+       WHERE h.nombre_hoja IN ('Movimientos', 'Mov_Por_Propietario')
+       ORDER BY ${FECHA_HOJA} ASC, h.id ASC`,
+      { type: QueryTypes.SELECT }
+    );
 
     // ── Fase 1: hoja "Movimientos" -> Negocio.datos + estado ──────────────
     const hojasFase1 = hojaIds.filter((h) => h.nombre_hoja === 'Movimientos');
@@ -174,7 +179,8 @@ async function runBackfill() {
     progreso.fase('Analizando las hojas de movimientos', hojasFase2.length);
     progreso.verificar();
     const cabeceras = await sequelize.query(
-      "SELECT id, columnas FROM hojas_fiduciarias WHERE nombre_hoja = 'Mov_Por_Propietario' ORDER BY creado_en ASC, id ASC",
+      `SELECT h.id, h.columnas FROM hojas_fiduciarias h JOIN encargos_fiduciarios e ON e.id = h.encarg_id
+       WHERE h.nombre_hoja = 'Mov_Por_Propietario' ORDER BY ${FECHA_HOJA} ASC, h.id ASC`,
       { type: QueryTypes.SELECT }
     );
     // Hojas agrupadas por la posición de sus columnas (normalmente es una sola disposición para todas).
@@ -197,12 +203,12 @@ async function runBackfill() {
       const ref = `f.fila->>${idx.negRefIdx}`;
       const idMov = `f.fila->>${idx.idMovIdx}`;
       const prop = `f.fila->>${idx.propIdx}`;
-      const desde = `FROM hojas_fiduciarias h CROSS JOIN LATERAL jsonb_array_elements(h.filas) WITH ORDINALITY AS f(fila, pos) WHERE h.id = ANY($1::int[])`;
+      const desde = `FROM hojas_fiduciarias h JOIN encargos_fiduciarios e ON e.id = h.encarg_id CROSS JOIN LATERAL jsonb_array_elements(h.filas) WITH ORDINALITY AS f(fila, pos) WHERE h.id = ANY($1::int[])`;
 
       // Movimientos: una fila por ID Movimiento (la de la primera hoja, y dentro de ella la primera posición).
       const filasMov = await sequelize.query(
         `SELECT DISTINCT ON (${idMov}) f.fila ${desde} AND NULLIF(btrim(${idMov}), '') IS NOT NULL
-         ORDER BY ${idMov}, h.creado_en ASC, h.id ASC, f.pos ASC`,
+         ORDER BY ${idMov}, ${FECHA_HOJA} ASC, h.id ASC, f.pos ASC`,
         { bind: [ids], type: QueryTypes.SELECT }
       );
       for (const { fila } of filasMov) {
@@ -216,13 +222,13 @@ async function runBackfill() {
       // Compradores: por cada referencia, la última hoja que trae propietarios y TODAS sus filas de esa referencia.
       const ultimas = await sequelize.query(
         `SELECT DISTINCT ON (${ref}) ${ref} AS ref, h.id AS hoja ${desde} AND NULLIF(btrim(${prop}), '') IS NOT NULL AND NULLIF(btrim(${ref}), '') IS NOT NULL
-         ORDER BY ${ref}, h.creado_en DESC, h.id DESC`,
+         ORDER BY ${ref}, ${FECHA_HOJA} DESC, h.id DESC`,
         { bind: [ids], type: QueryTypes.SELECT }
       );
       if (ultimas.length > 0) {
         const filasComp = await sequelize.query(
           `SELECT f.fila ${desde} AND (h.id, ${ref}) IN (SELECT * FROM unnest($2::int[], $3::text[]))
-           ORDER BY h.creado_en ASC, h.id ASC, f.pos ASC`,
+           ORDER BY ${FECHA_HOJA} ASC, h.id ASC, f.pos ASC`,
           { bind: [ids, ultimas.map((u) => u.hoja), ultimas.map((u) => u.ref)], type: QueryTypes.SELECT }
         );
         for (const { fila } of filasComp) {
