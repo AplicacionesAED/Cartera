@@ -13,6 +13,7 @@ import { ListaInfo, ListaFinanciera } from '../../components/ui/DatosFinancieros
 import { getNegocio, getMovimientosNegocio } from '../../api/negocios.js';
 import { MovimientosTabla } from '../fiducia/MovimientosTabla.jsx';
 import { ResumenMovimientos } from './ResumenMovimientos.jsx';
+import { ConciliacionSinPlan } from './ConciliacionSinPlan.jsx';
 import base from './NegociosPage.module.css';
 import { getSubformsOportunidad, refrescarSubformsOportunidad } from '../../api/oportunidades.js';
 import { Button } from '../../components/ui/Button.jsx';
@@ -395,10 +396,10 @@ function ConciliacionSection({ negocio }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oportunidad?.id, negocio.id]);
 
-  if (!oportunidad) return <p className={styles.sinDatosPad}>Sin oportunidad de Zoho vinculada a esta referencia.</p>;
+  if (!oportunidad) return <ConciliacionSinPlan negocio={negocio} motivo="sin-oportunidad" />;
   if (loading) return <p className={styles.cargando}>Cargando conciliación…</p>;
   if (error) return <p className={styles.error}>Error cargando la conciliación: {error}</p>;
-  if (!datos.resumen) return <p className={styles.sinDatosPad}>La oportunidad vinculada no tiene plan de pagos registrado.</p>;
+  if (!datos.resumen) return <ConciliacionSinPlan negocio={negocio} motivo="sin-plan" />;
 
   const { cuotas, resumen } = datos;
 

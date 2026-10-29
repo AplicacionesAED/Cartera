@@ -1,0 +1,19 @@
+/* Aviso de la conciliación genérica (negocio sin plan de pagos): una franja informativa, no una alerta. */
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--color-info-surface);
+  color: var(--color-ink-secondary);
+  border-radius: var(--radius-md);
+  font-size: var(--text-data-size);
+  line-height: 1.5;
+}
+
+.aviso svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-info-ink);
+}
