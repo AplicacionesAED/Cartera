@@ -356,9 +356,17 @@ async function getMovimientos(id, { page = 1, limit = 50 }) {
   ]);
   const total = totalRows[0]?.total ?? 0;
 
+  // TOTAL MOVIMIENTOS: suma de la columna Valor de TODOS los movimientos del negocio (no solo los de la página), leída
+  // igual que la tabla (se quitan los símbolos y se respeta el signo).
+  const valores = await sequelize.query(`SELECT datos->>'Valor' AS valor FROM negocio_movimientos WHERE negocio_id = $1`, { bind: [negocioId], type: QueryTypes.SELECT });
+  const totalValor = valores.reduce((suma, { valor }) => {
+    const n = parseFloat(String(valor ?? '').replace(/[^0-9.-]/g, ''));
+    return Number.isNaN(n) ? suma : suma + n;
+  }, 0);
+
   // fecha_contable/id_movimiento: la conciliación y el estado de cuenta (PDF) los leen en crudo.
   const data = movimientos.map((m) => ({ ...mapMovimientoRow(m), fecha_contable: m.fecha_contable, id_movimiento: m.id_movimiento }));
-  return { data, pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) } };
+  return { data, pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) }, totalValor };
 }
 
 // Construye el WHERE de negocio_movimientos a partir de los mismos filtros

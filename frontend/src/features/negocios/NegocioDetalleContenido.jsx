@@ -265,6 +265,7 @@ function MovimientosSection({ id }) {
   const [movimientos, setMovimientos] = useState(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
+  const [totalValor, setTotalValor] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(
@@ -274,6 +275,7 @@ function MovimientosSection({ id }) {
         .then((res) => {
           setMovimientos(res.data?.data ?? []);
           setPagination(res.data?.pagination ?? null);
+          setTotalValor(res.data?.totalValor ?? null);
           setPage(p);
         })
         .finally(() => setLoading(false));
@@ -289,6 +291,11 @@ function MovimientosSection({ id }) {
       {!loading && movimientos && movimientos.length === 0 && <p className={styles.sinDatosPad}>Sin movimientos registrados</p>}
       {!loading && movimientos && movimientos.length > 0 && (
         <>
+          <div className={`${styles.kpiCard} ${styles.totalMovimientos}`}>
+            <p className={styles.miniLabel}>Total movimientos</p>
+            <p className={styles.kpiValor}>{formatCOP(totalValor) ?? '$ 0'}</p>
+            {pagination && <p className={styles.kpiSub}>{pagination.total} {pagination.total === 1 ? 'movimiento' : 'movimientos'}</p>}
+          </div>
           <div className={base.tableWrap}>
             <MovimientosTabla movimientos={movimientos} />
           </div>
@@ -398,6 +405,16 @@ function ConciliacionSection({ negocio }) {
 
   const { cuotas, resumen } = datos;
 
+  // Saldo inicial = la cuota inicial del plan: todas las cuotas menos el Saldo Contraentrega (la última).
+  const cuotasIniciales = cuotas.slice(0, -1);
+  const saldoInicial = cuotasIniciales.length > 0
+    ? {
+        valorPlan: cuotasIniciales.reduce((suma, c) => suma + c.valorPlan, 0),
+        cubierto: cuotasIniciales.reduce((suma, c) => suma + c.cubierto, 0),
+        fechaEstimada: cuotasIniciales[cuotasIniciales.length - 1].fechaEstimada,
+      }
+    : null;
+
   return (
     <div className={styles.seccionBody}>
       <div className={styles.kpiGrid}>
@@ -432,19 +449,38 @@ function ConciliacionSection({ negocio }) {
         </div>
       </div>
 
-      {resumen.saldoContraentrega && (
-        <div className={styles.card}>
-          <p className={styles.miniLabel}>Saldo Contraentrega</p>
-          <div className={styles.filaEntreDos}>
-            <div>
-              <p className={styles.kpiValor}>{formatCOP(resumen.saldoContraentrega.valorPlan) ?? '—'}</p>
-              {resumen.saldoContraentrega.cubierto > 0 && <p className={styles.notaAmbar}>Pagado: {formatCOP(resumen.saldoContraentrega.cubierto)}</p>}
+      {(saldoInicial || resumen.saldoContraentrega) && (
+        <div className={styles.saldosGrid}>
+          {saldoInicial && (
+            <div className={styles.card}>
+              <p className={styles.miniLabel}>Saldo inicial</p>
+              <div className={styles.filaEntreDos}>
+                <div>
+                  <p className={styles.kpiValor}>{formatCOP(saldoInicial.valorPlan) ?? '—'}</p>
+                  {saldoInicial.cubierto > 0 && <p className={styles.notaAmbar}>Pagado: {formatCOP(saldoInicial.cubierto)}</p>}
+                </div>
+                <div className={styles.textoDerecha}>
+                  {saldoInicial.fechaEstimada ? <p className={styles.dataText}>{formatFechaUTC(saldoInicial.fechaEstimada)}</p> : <p className={styles.vacio}>—</p>}
+                  <p className={styles.mutedSmall}>Fecha esperada</p>
+                </div>
+              </div>
             </div>
-            <div className={styles.textoDerecha}>
-              {resumen.saldoContraentrega.fechaEstimada ? <p className={styles.dataText}>{formatFechaUTC(resumen.saldoContraentrega.fechaEstimada)}</p> : <p className={styles.vacio}>—</p>}
-              <p className={styles.mutedSmall}>Fecha esperada</p>
+          )}
+          {resumen.saldoContraentrega && (
+            <div className={styles.card}>
+              <p className={styles.miniLabel}>Saldo Contraentrega</p>
+              <div className={styles.filaEntreDos}>
+                <div>
+                  <p className={styles.kpiValor}>{formatCOP(resumen.saldoContraentrega.valorPlan) ?? '—'}</p>
+                  {resumen.saldoContraentrega.cubierto > 0 && <p className={styles.notaAmbar}>Pagado: {formatCOP(resumen.saldoContraentrega.cubierto)}</p>}
+                </div>
+                <div className={styles.textoDerecha}>
+                  {resumen.saldoContraentrega.fechaEstimada ? <p className={styles.dataText}>{formatFechaUTC(resumen.saldoContraentrega.fechaEstimada)}</p> : <p className={styles.vacio}>—</p>}
+                  <p className={styles.mutedSmall}>Fecha esperada</p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
