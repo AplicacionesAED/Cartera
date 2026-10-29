@@ -40,9 +40,9 @@ async function cargarLogo() {
 }
 
 const NOTA_BAIA_KRISTAL =
-  'Réplica del Excel "CONSOLIDADO DE CARTERA" que arma Gerencia cada mes, calculada sobre la conciliación real. ' +
-  'Vendidas (FIDU): inmuebles con cualquier estado fiducia distinto de Libre. ' +
-  'Disponibles: inmuebles con estado fiducia Libre; su valor es la suma del precio unitario.';
+  'Réplica del Excel "CONSOLIDADO DE CARTERA" que arma Gerencia cada mes. ' +
+  'Vendidas: inmuebles con estado fiducia distinto de Libre. Disponibles: inmuebles con estado fiducia Libre, valorados con su precio unitario de Zoho. ' +
+  'Ventas fiduciaria y cuotas iniciales: valores de la fiducia. Recaudado: Total pagado de la conciliación. Cartera > 5 días: plan de pagos de Zoho.';
 
 // Por defecto arma el consolidado por ETAPA de Baía Kristal; Oliv (consolidado por TORRE) pasa `titulo`,
 // `encabezadoPrimera`, `filasDatos`, `etiquetaFila`, `nota` y `prefijoArchivo`.
