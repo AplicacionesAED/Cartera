@@ -45,8 +45,7 @@ Mismas que `backend/.env.example`. Las imprescindibles en producción:
 | `CENTRO_APLICACIONES_DATABASE_URL` | Solo lectura (plan de pago de la cotización aceptada de Oliv). |
 | `PRECALENTAR_CACHE` | `false` desactiva el precalentado del cálculo de cartera al arrancar. |
 
-`PORT` ya queda en `3000` dentro de la imagen; `NODE_ENV=production` también. **No** configures `LEGACY_DATABASE_URL` en producción (es de un script de migración de un solo uso).
-
+`PORT` ya queda en `3000` dentro de la imagen; `NODE_ENV=production` también.
 ### Primer despliegue
 
 1. Crea la base PostgreSQL vacía y configura las variables.
@@ -82,7 +81,7 @@ refresco directo en ruta profunda, logo, API y cookies (`path=/cartera/`, `Secur
 1. **Cartera (recurso propio en Coolify):** repositorio `Gestion-servicios-TI-AED/Cartera`, rama `main`, *Build Pack: Dockerfile*,
    Base Directory `/`, Ports Exposes `3000`, y un **dominio público propio** (es el `CARTERA_UPSTREAM` del gateway).
    *Build arguments:* `VITE_API_BASE_URL=/cartera/api` y `VITE_BASE_PATH=/cartera/`. *Variables de entorno:* las de `backend/.env`
-   salvo `PORT`, `NODE_ENV`, `FRONTEND_URL`, `ADMIN_*`, `LEGACY_DATABASE_URL`; `PG*` apuntan a la base nueva;
+   salvo `PORT`, `NODE_ENV`, `FRONTEND_URL`, `ADMIN_*`; `PG*` apuntan a la base nueva;
    `JWT_SECRET` nuevo y propio; `CORS_ORIGIN` = dominio del gateway (con `https://`).
 2. **Gateway:** definir `CARTERA_UPSTREAM` = dominio público de Cartera **sin** `https://`, y redeployar.
 3. Los usuarios entran por `https://<dominio-del-gateway>/cartera/`. Con `VITE_BASE_PATH=/cartera/` el dominio propio de

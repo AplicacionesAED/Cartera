@@ -34,7 +34,7 @@ Desde la raíz: `npm run dev` (backend **3011** + frontend **5183**), `npm run i
 Desde `backend/`: `npm run db:migrate` (sequelize-cli), `npm run db:seed` (solo el admin inicial; **nunca en producción**),
 `npm run dev`, `npm start` (migra y arranca). `.env` desde `.env.example`: `PG*`/`DATABASE_URL`, `CORS_ORIGIN` (admite varios
 separados por coma), `PORT`, `JWT_SECRET`, `ADMIN_*`, `ZOHO_*` (solo lectura), `EXCEL_PASSWORD`, `HUBSPOT_ACCESS_TOKEN`,
-`INTEGRACION_API_KEY`, `LEGACY_DATABASE_URL` (solo scripts de migración), `PRECALENTAR_CACHE=false` para desactivar el
+`INTEGRACION_API_KEY`, `PRECALENTAR_CACHE=false` para desactivar el
 precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.fields.READ`: el sync de Oportunidades depende de
 `zoho_field_metadata` ya poblada.
 
@@ -159,8 +159,8 @@ precalentado. El refresh token de Zoho no tiene el scope `ZohoCRM.settings.field
 
 - Dockerfile en la raíz (3 stages), `entrypoint.sh` (migra y arranca; **nunca** `db:seed`), `.gitattributes` fuerza LF en
   `*.sh`/`Dockerfile`. `app.js` sirve `frontend/dist` con fallback a `index.html` fuera de `/api/*`.
-- Migración de datos reales: `scripts/importarDatosLegado.js` (idempotente, solo lectura del legado) y
-  `scripts/migracion/copiarDesdeV2.js`; pasos y "pasada final" en `backend/scripts/migracion/README.md`. **Pendiente del corte**:
-  pasada final cuando Baía Kristal deje de recibir movimientos en la legada, apuntar variables del despliegue a la base nueva.
-- Normalización de movimientos: ver `backend/scripts/migracion/normalizacion/DISENO.md` (pasos 0-8 hechos en producción).
+- Migración a una base nueva: solo queda `scripts/migracion/copiarDesdeV2.js` (Oliv y tablas solo-v2; pasos en
+  `backend/scripts/migracion/README.md`). Los scripts de importación desde la base legada y los de normalización de
+  `movimientos_fiduciarios` se eliminaron (siguen en git). **Pendiente del corte**: apuntar las variables del despliegue a la
+  base nueva; encargos, hojas y negocios de Baía Kristal no los copia ese script.
 - Respaldos previos en `Respaldos-Cartera` (fuera del repo, del usuario).

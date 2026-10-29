@@ -6,8 +6,8 @@
 //   - Lo que solo existe en la v2: usuarios/roles/auditoria, inventario, otrosíes,
 //     configuraciones de frente, oportunidades de Baía Kristal, logs de sync.
 //   - Baía Kristal "con movimientos" (negocios, compradores, movimientos, encargos,
-//     hojas, resumen) NO va aquí: viene de la base legada con
-//     scripts/importarDatosLegado.js apuntado al destino.
+//     hojas, resumen) NO va aquí (antes venía de la base legada con
+//     scripts/importarDatosLegado.js, que ya se eliminó).
 //
 // Uso:  node scripts/migracion/copiarDesdeV2.js              (primera copia: no pisa filas existentes)
 //       node scripts/migracion/copiarDesdeV2.js --actualizar (pasada final: actualiza las filas existentes)
