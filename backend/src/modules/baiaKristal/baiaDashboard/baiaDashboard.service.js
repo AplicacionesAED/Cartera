@@ -602,7 +602,6 @@ function acumuladoEtapaVacio() {
     uniTotales: 0, uniVendidasFidu: 0, uniVendidasCRM: 0,
     valorTotalVentasFiduciaria: 0, valorCuotasIniciales: 0, valorTotalUnidadesDisponibles: 0,
     recaudoReal: 0, recaudoCuotaInicial: 0, carteraMas5Dias: 0, esperadoAFechaInicial: 0,
-    pendienteTotalFiduciaria: 0, pendienteCuotaInicial: 0, pendienteCredito: 0,
   };
 }
 
@@ -637,10 +636,7 @@ async function obtenerResumenPorEtapa() {
       e.recaudoReal += pagado;
       if (cuotaInicial != null) {
         e.recaudoCuotaInicial += Math.min(pagado, cuotaInicial);
-        e.pendienteCuotaInicial += Math.max(0, cuotaInicial - pagado);
       }
-      if (venta != null) e.pendienteTotalFiduciaria += Math.max(0, venta - pagado);
-      if (venta != null && cuotaInicial != null) e.pendienteCredito += Math.max(0, venta - Math.max(pagado, cuotaInicial));
       if (f.esperadoAFechaInicial != null) e.esperadoAFechaInicial += f.esperadoAFechaInicial;
       if ((f.maxDiasAtrasoInicial ?? 0) > UMBRAL_CARTERA_DIAS) e.carteraMas5Dias += f.montoEnMoraInicial ?? 0;
     } else if (f.precioUnitario != null) {
@@ -651,13 +647,16 @@ async function obtenerResumenPorEtapa() {
   const fechaCorte = new Date().toISOString();
   const etapas = [...porEtapa.keys()].sort(compararEtapas).map((etapa) => {
     const e = porEtapa.get(etapa);
+    const valorTotalVenta = e.valorTotalVentasFiduciaria + e.valorTotalUnidadesDisponibles;
+    const pendienteTotal = Math.max(0, valorTotalVenta - e.recaudoReal);
+    const pendienteCuotaInicial = Math.max(0, e.valorCuotasIniciales - e.recaudoCuotaInicial);
     return {
       etapa,
       uniTotales: e.uniTotales,
       uniVendidasFidu: e.uniVendidasFidu,
       uniVendidasCRM: e.uniVendidasCRM,
       uniDisponible: e.uniTotales - e.uniVendidasFidu,
-      valorTotalVenta: e.valorTotalVentasFiduciaria + e.valorTotalUnidadesDisponibles,
+      valorTotalVenta,
       valorTotalVentasFiduciaria: e.valorTotalVentasFiduciaria,
       valorCuotasIniciales: e.valorCuotasIniciales,
       valorTotalUnidadesDisponibles: e.valorTotalUnidadesDisponibles,
@@ -669,9 +668,10 @@ async function obtenerResumenPorEtapa() {
       pctRecaudoSobreCuotaInicial: e.valorCuotasIniciales > 0 ? e.recaudoCuotaInicial / e.valorCuotasIniciales : null,
       carteraMas5Dias: e.carteraMas5Dias,
       pctCarteraMas5Dias: e.esperadoAFechaInicial > 0 ? e.carteraMas5Dias / e.esperadoAFechaInicial : null,
-      pendienteTotalFiduciaria: e.pendienteTotalFiduciaria,
-      pendienteCuotaInicial: e.pendienteCuotaInicial,
-      pendienteCredito: e.pendienteCredito,
+      // Pendientes: siempre la resta de las columnas de al lado (valor total de venta, valor cuotas iniciales y lo recaudado).
+      pendienteTotalFiduciaria: pendienteTotal,
+      pendienteCuotaInicial: pendienteCuotaInicial,
+      pendienteCredito: Math.max(0, pendienteTotal - pendienteCuotaInicial),
       fechaCorte,
     };
   });
