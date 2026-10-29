@@ -134,6 +134,7 @@ async function construirFilasCompletas() {
     let fechaSaldoContraentrega = null;
     let valorSaldoContraentrega = null;
     let totalAbonado = null;
+    let recaudoFiducia = null;
     let cuotasEnMora = 0;
     let montoEnMora = 0;
     let maxDiasAtraso = 0;
@@ -186,6 +187,7 @@ async function construirFilasCompletas() {
       }
 
       totalAbonado = resumen.totalPagado;
+      recaudoFiducia = resumen.totalPagado;
       cuotasEnMora = resumen.cuotasEnMora;
       montoEnMora = resumen.montoEnMora;
       maxDiasAtraso = resumen.maxDiasAtraso;
@@ -218,6 +220,12 @@ async function construirFilasCompletas() {
     const precioUnitarioNum = Number(inv.datos?.Unit_Price);
     const precioUnitario = !isNaN(precioUnitarioNum) && precioUnitarioNum > 0 ? precioUnitarioNum : null;
     if (valorInmueble == null && precioUnitario != null) valorInmueble = precioUnitario;
+    // Recaudado del Resumen: el Total pagado de la conciliación. Si el negocio no tiene oportunidad (no hay plan que
+    // conciliar), se suman sus movimientos con la misma normalización de la conciliación (sin el asiento de venta y desde
+    // el último desistimiento), para que sus pagos también cuenten.
+    if (recaudoFiducia == null && negocio) {
+      recaudoFiducia = normalizarPagos(movimientosPorNegocioId.get(negocio.id) || []).reduce((suma, p) => suma + p.valor, 0);
+    }
     // Valor de venta y cuota inicial tal como los trae el Excel de la fiducia (no el plan de pagos de Zoho): con ellos
     // se suman el valor ventas fiduciaria y el valor cuotas iniciales del Resumen, tenga o no el negocio oportunidad.
     let valorVentaFiducia = null;
@@ -247,6 +255,7 @@ async function construirFilasCompletas() {
       fechaSaldoContraentrega,
       valorSaldoContraentrega,
       totalAbonado,
+      recaudoFiducia,
       opportunityId: oportunidad?.id ?? null,
       cuotasEnMora,
       montoEnMora,
@@ -624,7 +633,7 @@ async function obtenerResumenPorEtapa() {
       // que debe otro.
       const venta = f.valorVentaFiducia;
       const cuotaInicial = f.cuotaInicialFiducia;
-      const pagado = f.totalAbonado ?? 0;
+      const pagado = f.recaudoFiducia ?? 0;
       e.recaudoReal += pagado;
       if (cuotaInicial != null) {
         e.recaudoCuotaInicial += Math.min(pagado, cuotaInicial);
