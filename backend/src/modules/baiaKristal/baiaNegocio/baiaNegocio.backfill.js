@@ -102,7 +102,7 @@ async function runBackfill() {
 
   try {
     const hojaIds = await sequelize.query(
-      `SELECT h.id, h.nombre_hoja FROM hojas_fiduciarias h JOIN encargos_fiduciarios e ON e.id = h.encarg_id
+      `SELECT h.id, h.nombre_hoja, e.codigo FROM hojas_fiduciarias h JOIN encargos_fiduciarios e ON e.id = h.encarg_id
        WHERE h.nombre_hoja IN ('Movimientos', 'Mov_Por_Propietario')
        ORDER BY ${FECHA_HOJA} ASC, h.id ASC`,
       { type: QueryTypes.SELECT }
@@ -111,6 +111,10 @@ async function runBackfill() {
     // ── Fase 1: hoja "Movimientos" -> Negocio.datos + estado ──────────────
     const hojasFase1 = hojaIds.filter((h) => h.nombre_hoja === 'Movimientos');
     const resumenMap = new Map();
+    // DESVINCULADO: una referencia que no viene en la última hoja "Movimientos" de su fideicomiso (la fiducia dejó de
+    // reportarla). `ultimaHojaPorCodigo` guarda la última hoja leída de cada código (las hojas vienen por fecha ASC) y cada
+    // referencia, la última hoja que la trajo. Los marcadores de unidad libre (referencia con '*') no son negocios.
+    const ultimaHojaPorCodigo = new Map();
     progreso.fase('Leyendo los resúmenes de la fiducia', hojasFase1.length);
     for (const hojaRef of hojasFase1) {
       progreso.verificar(); // todavía no se escribió nada en la base: cancelar es seguro
@@ -130,6 +134,7 @@ async function runBackfill() {
         console.warn('[backfill] Resumen: header row not found'); // eslint-disable-line no-console
         continue;
       }
+      ultimaHojaPorCodigo.set(hojaRef.codigo, hojaRef.id);
       const estadoIdx = headers.findIndex((h) => h.toLowerCase() === 'estado');
       const propietariosIdx = headers.findIndex((h) => h.toLowerCase() === 'propietarios');
 
@@ -148,11 +153,13 @@ async function runBackfill() {
 
         const existing = resumenMap.get(referencia);
         if (!existing) {
-          resumenMap.set(referencia, { estado, datos, saldoActual, propietariosRaw });
+          resumenMap.set(referencia, { estado, datos, saldoActual, propietariosRaw, codigo: hojaRef.codigo, hojaId: hojaRef.id });
         } else {
           existing.estado = estado;
           existing.datos = datos;
           existing.saldoActual = saldoActual;
+          existing.codigo = hojaRef.codigo;
+          existing.hojaId = hojaRef.id;
           if (!existing.propietariosRaw && propietariosRaw) existing.propietariosRaw = propietariosRaw;
         }
       }
@@ -166,6 +173,7 @@ async function runBackfill() {
         estado: data.estado,
         datos: data.datos,
         saldoActual: data.saldoActual,
+        desvinculado: !referencia.includes('*') && data.hojaId !== ultimaHojaPorCodigo.get(data.codigo),
         compradores: comps.map((c, i) => ({ nombre: c.nombre, nroId: c.nroId, porcentaje: c.porcentaje, orden: i })),
       });
     }
@@ -290,7 +298,7 @@ async function runBackfill() {
       for (let i = 0; i < referencias.length; i += LOTE) {
         const lote = referencias.slice(i, i + LOTE).map((referencia) => {
           const n = negocios.get(referencia);
-          return { referencia, estado: n.estado, datos: n.datos, saldo_actual: n.saldoActual };
+          return { referencia, estado: n.estado, datos: n.datos, saldo_actual: n.saldoActual, desvinculado: n.desvinculado === true };
         });
         const creados = await Negocio.bulkCreate(lote, { transaction: t, returning: ['id', 'referencia'] });
         for (const c of creados) idPorReferencia.set(c.referencia, c.id);
@@ -325,9 +333,10 @@ async function runBackfill() {
     });
 
     const total = negocios.size;
+    const desvinculados = [...negocios.values()].filter((n) => n.desvinculado).length;
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    result = { ok: true, negocios: total, compradores: totalComp, movimientos: movimientos.size, elapsed: `${elapsed}s` };
-    console.log(`[backfill] Listo: ${total} negocios, ${totalComp} compradores, ${movimientos.size} movimientos en ${elapsed}s`); // eslint-disable-line no-console
+    result = { ok: true, negocios: total, desvinculados, compradores: totalComp, movimientos: movimientos.size, elapsed: `${elapsed}s` };
+    console.log(`[backfill] Listo: ${total} negocios (${desvinculados} desvinculados), ${totalComp} compradores, ${movimientos.size} movimientos en ${elapsed}s`); // eslint-disable-line no-console
     // Los negocios se reconstruyeron: se vuelve a decidir a qué inmueble corresponde cada uno.
     await recalcularVinculos().catch((e) => console.error('[vinculos] Error al recalcular:', e.message)); // eslint-disable-line no-console
     invalidarCacheDashboard();

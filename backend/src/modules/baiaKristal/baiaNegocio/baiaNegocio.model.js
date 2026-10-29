@@ -16,6 +16,8 @@ const Negocio = sequelize.define(
     saldo_actual: { type: DataTypes.FLOAT, allowNull: true },
     en_tramite: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     es_canje: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    // La fiducia dejó de reportar la referencia (no viene en el Excel más reciente de su fideicomiso); lo fija el backfill.
+    desvinculado: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
   },
   {
     tableName: 'negocios',

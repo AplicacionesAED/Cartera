@@ -44,7 +44,7 @@ async function cargarDatos() {
       { bind: [[...PROYECTO_TORRE_EXCLUIDOS]], type: QueryTypes.SELECT }
     ),
     sequelize.query(
-      `SELECT id, referencia, estado, datos->>'Nomenclatura' AS nom, upper(datos->>'Fideicomiso') AS fid, datos->>'Area' AS area,
+      `SELECT id, referencia, estado, desvinculado, datos->>'Nomenclatura' AS nom, upper(datos->>'Fideicomiso') AS fid, datos->>'Area' AS area,
               datos->>'Categoria' AS categoria, upper(datos->>'Tipo Inmueble') AS tipo
        FROM negocios WHERE referencia IS NOT NULL`,
       { type: QueryTypes.SELECT }
@@ -69,6 +69,12 @@ function resolverNegocio(n, ctx) {
   const sinInmueble = (estado, detalle, requiere, extra = {}) => ({
     ...base, inventario_id: null, estado, requiere_revision: requiere, detalle, observaciones: extra.observaciones ?? null, senales: extra.senales ?? null,
   });
+
+  // La fiducia dejó de reportar este negocio (ver `negocios.desvinculado`): no cuenta para ningún inmueble, así el estado
+  // fiducia del inmueble sale siempre del negocio que sí viene (o LIBRE si no queda ninguno).
+  if (n.desvinculado) {
+    return sinInmueble('DESVINCULADO', 'La fiducia dejó de reportar este negocio en su Excel más reciente: no se vincula a ningún inmueble.', false);
+  }
 
   // Depósitos y parqueaderos no están en el inventario de inmuebles del CRM.
   if (!TIPOS_CON_INMUEBLE.has(n.tipo)) {

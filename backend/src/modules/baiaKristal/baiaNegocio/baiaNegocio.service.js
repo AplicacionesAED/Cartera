@@ -38,6 +38,7 @@ WITH inmuebles AS (
     neg.estado AS estado,
     neg.saldo_actual AS saldo_actual,
     neg.datos AS negocio_datos,
+    neg.desvinculado AS desvinculado,
     neg.v_metodo AS vinculo_metodo
   FROM inventario_items inv
   LEFT JOIN LATERAL (
@@ -63,6 +64,7 @@ huerfanos AS (
     n.estado AS estado,
     n.saldo_actual AS saldo_actual,
     n.datos AS negocio_datos,
+    n.desvinculado AS desvinculado,
     NULL::text AS vinculo_metodo
   FROM negocios n
   WHERE NOT EXISTS (SELECT 1 FROM inmuebles i WHERE i.negocio_id = n.id)
@@ -139,7 +141,7 @@ async function list({ search, estado, etapa, frente, torre, vinculacion, page = 
     sequelize.query(
       `${BASE_CTE}
        SELECT
-         c.id, c.inventario_datos, c.inv_proyecto, c.inv_torre, c.inv_piso, c.inv_nombre, c.negocio_id, c.referencia, c.estado, c.saldo_actual, c.negocio_datos,
+         c.id, c.inventario_datos, c.inv_proyecto, c.inv_torre, c.inv_piso, c.inv_nombre, c.negocio_id, c.referencia, c.estado, c.saldo_actual, c.negocio_datos, c.desvinculado,
          COALESCE((
            SELECT jsonb_agg(jsonb_build_object('id', comp.id, 'nombre', comp.nombre, 'nroId', comp.nro_id, 'porcentaje', comp.porcentaje, 'orden', comp.orden) ORDER BY comp.orden)
            FROM negocio_compradores comp WHERE comp.negocio_id = c.negocio_id
@@ -163,6 +165,7 @@ async function list({ search, estado, etapa, frente, torre, vinculacion, page = 
       referencia: f.referencia,
       estado: f.estado,
       saldoActual: f.saldo_actual,
+      desvinculado: f.desvinculado === true,
       datos: f.negocio_datos,
       compradores: f.compradores,
       totalMovimientos: f.total_movimientos,
