@@ -4,65 +4,82 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
   color: var(--color-ink-muted);
   cursor: help;
   border-radius: 50%;
-  transition: color var(--duration-fast) var(--ease-standard);
+  transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
 
 .wrapper:hover,
 .wrapper:focus-visible {
   color: var(--color-primary);
+  background: var(--color-info-surface);
   outline: none;
 }
 
 .wrapper:focus-visible {
   box-shadow: 0 0 0 2px var(--color-primary);
-  border-radius: 50%;
 }
 
+/* La burbuja vive en un portal con `position: fixed` (ver InfoTooltip.jsx): ningun contenedor con `overflow` la recorta.
+   Invisible hasta que el componente calcula su posicion, para que no parpadee en la esquina. La flecha apunta al icono
+   (`--flecha-x` la desplaza cuando la burbuja se corrio para no salirse de la pantalla). */
 .bubble {
-  position: absolute;
+  position: fixed;
   z-index: var(--z-tooltip);
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translate(-50%, 4px);
   width: max-content;
-  max-width: min(220px, 60vw);
+  max-width: min(300px, calc(100vw - 16px));
   background: var(--color-ink);
-  color: var(--color-surface);
+  color: color-mix(in srgb, var(--color-surface) 92%, transparent);
   font-family: var(--font-body);
-  font-size: var(--text-data-size);
+  font-size: 0.8125rem;
   font-weight: 400;
-  line-height: 1.45;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-sm);
+  line-height: 1.5;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  padding: 10px 14px 11px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-floating);
-  /* display:none en reposo: un tooltip oculto pero con layout (opacity:0) se extendia
-     fuera del borde derecho y agrandaba el area de scroll de la pagina en pantallas
-     angostas (bug real a 768px). */
-  display: none;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
-.wrapper:hover .bubble,
-.wrapper:focus-visible .bubble {
+.bubble::after {
+  content: '';
+  position: absolute;
+  left: var(--flecha-x, 50%);
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-ink);
+  border-radius: 2px;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.debajo::after {
+  bottom: auto;
+  top: -5px;
+}
+
+.titulo {
   display: block;
+  margin-bottom: 3px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.visible {
   opacity: 1;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bubble {
-    transition: opacity var(--duration-fast) linear;
-    transform: translateX(-50%);
-  }
-
-  .wrapper:hover .bubble,
-  .wrapper:focus-visible .bubble {
-    transform: translateX(-50%);
+  .visible {
+    transition: none;
   }
 }

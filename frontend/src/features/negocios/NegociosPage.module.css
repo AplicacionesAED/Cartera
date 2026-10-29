@@ -232,6 +232,7 @@
 /* --- filtros --- */
 
 .filtros {
+  composes: tarjeta from '../../components/ui/Filtros.module.css';
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-md);

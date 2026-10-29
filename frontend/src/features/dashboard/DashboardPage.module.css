@@ -312,13 +312,10 @@
 /* ── Barra de filtros: zona de campos + zona de controles ───────────────── */
 
 .toolbarCard {
+  composes: tarjeta from '../../components/ui/Filtros.module.css';
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  padding: 20px 24px;
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
 }
 
 .filtrosGrid {

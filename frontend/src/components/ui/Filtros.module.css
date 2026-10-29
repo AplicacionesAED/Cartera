@@ -1,0 +1,11 @@
+/* Tarjeta de búsqueda y filtros: el mismo contenedor en todas las pantallas (Negocios, Inmuebles, Encargos, Resumen,
+   Dashboard, Cartera, Otrosíes...). Cada página lo usa con `composes` en su propia clase de filtros y solo define la
+   distribución de sus campos. Sin `overflow` a propósito: los desplegables (MultiSelect) y los tooltips salen de la
+   tarjeta y un `overflow: hidden` aquí los recortaría. */
+.tarjeta {
+  padding: var(--space-lg);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-brand-deep) 6%, transparent);
+}
