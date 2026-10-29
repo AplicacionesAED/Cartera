@@ -648,7 +648,7 @@ async function obtenerResumenPorEtapa() {
   const etapas = [...porEtapa.keys()].sort(compararEtapas).map((etapa) => {
     const e = porEtapa.get(etapa);
     const valorTotalVenta = e.valorTotalVentasFiduciaria + e.valorTotalUnidadesDisponibles;
-    const pendienteTotal = Math.max(0, valorTotalVenta - e.recaudoReal);
+    const pendienteTotal = Math.max(0, e.valorTotalVentasFiduciaria - e.recaudoReal);
     const pendienteCuotaInicial = Math.max(0, e.valorCuotasIniciales - e.recaudoCuotaInicial);
     return {
       etapa,
@@ -668,7 +668,8 @@ async function obtenerResumenPorEtapa() {
       pctRecaudoSobreCuotaInicial: e.valorCuotasIniciales > 0 ? e.recaudoCuotaInicial / e.valorCuotasIniciales : null,
       carteraMas5Dias: e.carteraMas5Dias,
       pctCarteraMas5Dias: e.esperadoAFechaInicial > 0 ? e.carteraMas5Dias / e.esperadoAFechaInicial : null,
-      // Pendientes: siempre la resta de las columnas de al lado (valor total de venta, valor cuotas iniciales y lo recaudado).
+      // Recaudado y pendientes son de los negocios VENDIDOS: la resta de las columnas de al lado (valor ventas fiduciaria,
+      // valor cuotas iniciales y lo recaudado). Las unidades disponibles no tienen recaudo ni pendiente.
       pendienteTotalFiduciaria: pendienteTotal,
       pendienteCuotaInicial: pendienteCuotaInicial,
       pendienteCredito: Math.max(0, pendienteTotal - pendienteCuotaInicial),
