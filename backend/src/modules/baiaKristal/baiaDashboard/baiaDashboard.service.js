@@ -665,7 +665,7 @@ async function obtenerResumenPorEtapa() {
       recaudoCuotaInicial: e.recaudoCuotaInicial,
       recaudoCredito: e.recaudoReal - e.recaudoCuotaInicial,
       esperadoAFechaInicial: e.esperadoAFechaInicial,
-      pctRecaudoSobreVentasFiduciaria: e.valorTotalVentasFiduciaria > 0 ? e.recaudoReal / e.valorTotalVentasFiduciaria : null,
+      pctRecaudoSobreVentasFiduciaria: e.valorTotalVentasFiduciaria + e.valorTotalUnidadesDisponibles > 0 ? e.recaudoReal / (e.valorTotalVentasFiduciaria + e.valorTotalUnidadesDisponibles) : null, // sobre el valor total de venta (fiduciaria + disponibles)
       pctRecaudoSobreCuotaInicial: e.valorCuotasIniciales > 0 ? e.recaudoCuotaInicial / e.valorCuotasIniciales : null,
       carteraMas5Dias: e.carteraMas5Dias,
       pctCarteraMas5Dias: e.esperadoAFechaInicial > 0 ? e.carteraMas5Dias / e.esperadoAFechaInicial : null,
@@ -683,7 +683,7 @@ async function obtenerResumenPorEtapa() {
   Object.assign(total, {
     etapa: 'TOTAL GENERAL',
     uniDisponible: total.uniTotales - total.uniVendidasFidu,
-    pctRecaudoSobreVentasFiduciaria: total.valorTotalVentasFiduciaria > 0 ? total.recaudoReal / total.valorTotalVentasFiduciaria : null,
+    pctRecaudoSobreVentasFiduciaria: total.valorTotalVenta > 0 ? total.recaudoReal / total.valorTotalVenta : null,
     pctRecaudoSobreCuotaInicial: total.valorCuotasIniciales > 0 ? total.recaudoCuotaInicial / total.valorCuotasIniciales : null,
     pctCarteraMas5Dias: total.esperadoAFechaInicial > 0 ? total.carteraMas5Dias / total.esperadoAFechaInicial : null,
     fechaCorte: null,
