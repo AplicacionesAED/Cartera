@@ -401,12 +401,11 @@ export function ResumenPage() {
     if (!t) return null;
     // Total / Cuota inicial / Crédito: los mismos valores de la fiducia del Consolidado (el backend los calcula con la
     // misma función), a la fecha y con los filtros de etapa, frente y torre.
-    const cuotaInicialPendiente = Math.max(0, t.cuotasInicialesFiducia - t.recaudadoCuotaInicialFiducia);
     return {
       cuotasEnMora: t.cuotasEnMora, montoEnMora: t.montoEnMora, valorDisponible: t.valorDisponible, cantidadDisponible: t.cantidadDisponible, cuotasEnMoraInicial: t.cuotasEnMoraInicial, montoEnMoraInicial: t.montoEnMoraInicial, valorVendidos: t.valorVendidos, cantidadVendidos: t.cantidadVendidos,
       totalidad100: t.ventasFiducia, recaudado100: t.recaudadoFiducia, porRecaudar100: t.pendienteFiducia,
-      totalidad30: t.cuotasInicialesFiducia, recaudado30: t.recaudadoCuotaInicialFiducia, porRecaudar30: cuotaInicialPendiente,
-      totalidad70: t.ventasFiducia - t.cuotasInicialesFiducia, recaudado70: t.recaudadoFiducia - t.recaudadoCuotaInicialFiducia, porRecaudar70: Math.max(0, t.pendienteFiducia - cuotaInicialPendiente),
+      totalidad30: t.cuotasInicialesFiducia, recaudado30: t.recaudadoCuotaInicialFiducia, porRecaudar30: t.pendienteCuotaInicialFiducia,
+      totalidad70: t.ventasFiducia - t.cuotasInicialesFiducia, recaudado70: t.recaudadoFiducia - t.recaudadoCuotaInicialFiducia, porRecaudar70: t.pendienteCreditoFiducia,
     };
   }, [planRecaudo]);
 

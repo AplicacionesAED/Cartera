@@ -389,7 +389,7 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
     cuotasEnMoraInicial: 0, montoEnMoraInicial: 0,
     valorDisponible: 0, cantidadDisponible: 0,
     valorVendidos: 0, cantidadVendidos: 0,
-    ventasFiducia: 0, cuotasInicialesFiducia: 0, recaudadoFiducia: 0, recaudadoCuotaInicialFiducia: 0, pendienteFiducia: 0,
+    ventasFiducia: 0, cuotasInicialesFiducia: 0, recaudadoFiducia: 0, recaudadoCuotaInicialFiducia: 0, pendienteFiducia: 0, pendienteCuotaInicialFiducia: 0, pendienteCreditoFiducia: 0,
   };
   const fiduciaPorEtapa = new Map();
   for (const f of filas) {
@@ -413,9 +413,11 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
         totalesColumnasFijas.cuotasInicialesFiducia += aporte.cuotaInicial;
         totalesColumnasFijas.recaudadoFiducia += aporte.pagado;
         totalesColumnasFijas.recaudadoCuotaInicialFiducia += aporte.pagadoCuotaInicial;
-        const acum = fiduciaPorEtapa.get(f.etapa) ?? { venta: 0, pagado: 0 };
+        const acum = fiduciaPorEtapa.get(f.etapa) ?? { venta: 0, pagado: 0, cuotaInicial: 0, pagadoCuotaInicial: 0 };
         acum.venta += aporte.venta;
         acum.pagado += aporte.pagado;
+        acum.cuotaInicial += aporte.cuotaInicial;
+        acum.pagadoCuotaInicial += aporte.pagadoCuotaInicial;
         fiduciaPorEtapa.set(f.etapa, acum);
       }
     } else {
@@ -469,8 +471,14 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
     }
   }
 
-  // El pendiente se suma etapa por etapa (nunca negativo), igual que en el Consolidado.
-  for (const { venta, pagado } of fiduciaPorEtapa.values()) totalesColumnasFijas.pendienteFiducia += Math.max(0, venta - pagado);
+  // Los pendientes se suman etapa por etapa (nunca negativos), igual que en el Consolidado.
+  for (const { venta, pagado, cuotaInicial, pagadoCuotaInicial } of fiduciaPorEtapa.values()) {
+    const pendienteTotal = Math.max(0, venta - pagado);
+    const pendienteCuotaInicial = Math.max(0, cuotaInicial - pagadoCuotaInicial);
+    totalesColumnasFijas.pendienteFiducia += pendienteTotal;
+    totalesColumnasFijas.pendienteCuotaInicialFiducia += pendienteCuotaInicial;
+    totalesColumnasFijas.pendienteCreditoFiducia += Math.max(0, pendienteTotal - pendienteCuotaInicial);
+  }
 
   const abonadoHaciaCuotaInicial = Math.min(totalesColumnasFijas.valorCuotaInicial, totalesColumnasFijas.totalAbonado);
   const abonadoHaciaContraentrega = Math.max(0, totalesColumnasFijas.totalAbonado - totalesColumnasFijas.valorCuotaInicial);
