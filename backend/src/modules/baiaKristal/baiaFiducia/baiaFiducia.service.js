@@ -361,4 +361,25 @@ async function getApartamentoDetalle(encargoId, referencia) {
   };
 }
 
-module.exports = { listEncargos, getEncargo, getHoja, updateEncargo, removeEncargo, listMovimientos, listPropietarios, listNomenclaturas, getApartamentoDetalle };
+// Las filas de `movimientos_fiduciarios` son una copia de las hojas (`hojas_fiduciarias.filas`, que es lo que lee la
+// reconstrucción de Negocios) y solo sirven para ver el detalle de un encargo. Pesan ~2,3 GB y cada Excel diario trae casi
+// todo el historial, así que solo se conservan las de los últimos `conservar` encargos de cada código. Las hojas no se tocan.
+async function compactarMovimientos({ conservar = 7 } = {}) {
+  const viejos = await sequelize.query(
+    `SELECT id FROM (
+       SELECT e.id, ROW_NUMBER() OVER (PARTITION BY e.codigo ORDER BY COALESCE(e.email_fecha, e.creado_en) DESC, e.id DESC) AS rn
+       FROM encargos_fiduciarios e
+       WHERE EXISTS (SELECT 1 FROM movimientos_fiduciarios m WHERE m.encarg_id = e.id)
+     ) r WHERE rn > $1`,
+    { bind: [conservar], type: QueryTypes.SELECT }
+  );
+  const ids = viejos.map((v) => v.id);
+  let filas = 0;
+  for (let i = 0; i < ids.length; i += 20) {
+    const [, meta] = await sequelize.query('DELETE FROM movimientos_fiduciarios WHERE encarg_id = ANY($1::int[])', { bind: [ids.slice(i, i + 20)] });
+    filas += meta.rowCount;
+  }
+  return { encargos: ids.length, filas };
+}
+
+module.exports = { listEncargos, getEncargo, getHoja, updateEncargo, removeEncargo, listMovimientos, listPropietarios, listNomenclaturas, getApartamentoDetalle, compactarMovimientos };

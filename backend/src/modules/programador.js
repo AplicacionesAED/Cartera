@@ -13,6 +13,7 @@
 //   2. HubSpot: Oportunidades e Inmuebles por cambios (Oliv)
 //   3. Reconstruir Negocios desde los encargos de la fiducia (Baía Kristal) -- lo que alimenta
 //      Dashboard, Resumen, Negocios y Estado de cuenta
+//   3b. Compactar: borrar la copia fila por fila (movimientos_fiduciarios) de los encargos viejos; las hojas se quedan
 //   4. Cerrar el mes anterior si todavía no tiene foto (Baía Kristal y Oliv; no hace nada si ya existe)
 // Cada paso es independiente: si uno falla se registra y se sigue con el siguiente. Los botones
 // manuales siguen funcionando (cada sync ya evita correr dos veces a la vez).
@@ -86,7 +87,8 @@ async function ejecutarSincronizaciones() {
     resultados.push(await paso('HubSpot · Oportunidades Oliv (cambios)', () => require('./oliv/olivOportunidad/olivOportunidad.sync').syncOportunidadesOliv('cambios')));
     resultados.push(await paso('HubSpot · Inmuebles Oliv (cambios)', () => require('./oliv/olivInmueble/olivInmueble.sync').syncInmueblesOliv('cambios')));
     resultados.push(await paso('Negocios desde la fiducia', () => require('./baiaKristal/baiaNegocio/baiaNegocio.backfill').runBackfill()));
-    resultados.push(await paso('Cierre de mes · Baía Kristal', () => require('./baiaKristal/baiaDashboard/baiaDashboard.service').cerrarMesAnteriorSiFalta()));
+    resultados.push(await paso('Compactar movimientos viejos de la fiducia', () => require('./baiaKristal/baiaFiducia/baiaFiducia.service').compactarMovimientos()));
+    resultados.push(await paso('Cierre de mes · Baía Kristal',() => require('./baiaKristal/baiaDashboard/baiaDashboard.service').cerrarMesAnteriorSiFalta()));
     resultados.push(await paso('Cierre de mes · Oliv', () => require('./oliv/olivResumen/olivResumen.service').cerrarMesAnteriorSiFalta()));
     ultimaEjecucion = { tipo: 'diaria', en: new Date().toISOString(), resultados };
     console.log('[programador] Sincronizaciones diarias terminadas'); // eslint-disable-line no-console
