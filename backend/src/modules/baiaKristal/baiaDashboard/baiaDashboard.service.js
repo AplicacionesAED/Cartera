@@ -295,6 +295,20 @@ async function construirFilasCompletas() {
 // disponibles/vendidos del Resumen y para "Uni. disponible" del Consolidado.
 const esVendido = (f) => f.estadoFiducia !== 'LIBRE';
 
+// Lo que un negocio vendido aporta a las ventas, las cuotas iniciales y el recaudo, todo con valores de la fiducia: lo
+// pagado cubre primero la cuota inicial y lo que sobra es crédito. Lo usan el Consolidado y los KPI del Resumen, para
+// que sus cifras salgan del mismo cálculo.
+function aporteFiducia(f) {
+  const pagado = f.recaudoFiducia ?? 0;
+  const cuotaInicial = f.cuotaInicialFiducia ?? 0;
+  return {
+    venta: f.valorVentaFiducia ?? 0,
+    cuotaInicial,
+    pagado,
+    pagadoCuotaInicial: Math.min(pagado, cuotaInicial),
+  };
+}
+
 async function obtenerCache() {
   const cached = getCache();
   if (cached) return cached;
@@ -375,7 +389,9 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
     cuotasEnMoraInicial: 0, montoEnMoraInicial: 0,
     valorDisponible: 0, cantidadDisponible: 0,
     valorVendidos: 0, cantidadVendidos: 0,
+    ventasFiducia: 0, cuotasInicialesFiducia: 0, recaudadoFiducia: 0, recaudadoCuotaInicialFiducia: 0, pendienteFiducia: 0,
   };
+  const fiduciaPorEtapa = new Map();
   for (const f of filas) {
     if (f.valorInmueble != null) totalesColumnasFijas.valorInmueble += f.valorInmueble;
     if (f.valorCuotaInicial != null) totalesColumnasFijas.valorCuotaInicial += f.valorCuotaInicial;
@@ -390,6 +406,18 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
     if (esVendido(f)) {
       if (f.valorVentaFiducia != null) totalesColumnasFijas.valorVendidos += f.valorVentaFiducia;
       totalesColumnasFijas.cantidadVendidos += 1;
+      // KPI de Total / Cuota inicial / Saldo del Resumen: los mismos valores de la fiducia del Consolidado (por etapa, como él).
+      if (f.etapa != null) {
+        const aporte = aporteFiducia(f);
+        totalesColumnasFijas.ventasFiducia += aporte.venta;
+        totalesColumnasFijas.cuotasInicialesFiducia += aporte.cuotaInicial;
+        totalesColumnasFijas.recaudadoFiducia += aporte.pagado;
+        totalesColumnasFijas.recaudadoCuotaInicialFiducia += aporte.pagadoCuotaInicial;
+        const acum = fiduciaPorEtapa.get(f.etapa) ?? { venta: 0, pagado: 0 };
+        acum.venta += aporte.venta;
+        acum.pagado += aporte.pagado;
+        fiduciaPorEtapa.set(f.etapa, acum);
+      }
     } else {
       if (f.precioUnitario != null) totalesColumnasFijas.valorDisponible += f.precioUnitario;
       totalesColumnasFijas.cantidadDisponible += 1;
@@ -440,6 +468,9 @@ async function obtenerDashboardRecaudo({ search, etapa, frente, torre, conMovimi
       t.esperado += v.esperado; t.recaudado += v.recaudado; t.porRecaudar += v.porRecaudar ?? 0;
     }
   }
+
+  // El pendiente se suma etapa por etapa (nunca negativo), igual que en el Consolidado.
+  for (const { venta, pagado } of fiduciaPorEtapa.values()) totalesColumnasFijas.pendienteFiducia += Math.max(0, venta - pagado);
 
   const abonadoHaciaCuotaInicial = Math.min(totalesColumnasFijas.valorCuotaInicial, totalesColumnasFijas.totalAbonado);
   const abonadoHaciaContraentrega = Math.max(0, totalesColumnasFijas.totalAbonado - totalesColumnasFijas.valorCuotaInicial);
@@ -625,18 +656,11 @@ async function obtenerResumenPorEtapa() {
     if (ESTADOS_INV_VENDIDA_CRM.has(f.estadoInventario)) e.uniVendidasCRM += 1;
 
     if (esVendido(f)) {
-      if (f.valorVentaFiducia != null) e.valorTotalVentasFiduciaria += f.valorVentaFiducia;
-      if (f.cuotaInicialFiducia != null) e.valorCuotasIniciales += f.cuotaInicialFiducia;
-      // Recaudado y pendiente por negocio, sobre los valores de la fiducia: lo pagado cubre primero la cuota inicial y lo
-      // que sobra va al crédito (saldo). Así cada negocio queda entre 0 y su valor, sin que un sobrepago de uno tape lo
-      // que debe otro.
-      const venta = f.valorVentaFiducia;
-      const cuotaInicial = f.cuotaInicialFiducia;
-      const pagado = f.recaudoFiducia ?? 0;
-      e.recaudoReal += pagado;
-      if (cuotaInicial != null) {
-        e.recaudoCuotaInicial += Math.min(pagado, cuotaInicial);
-      }
+      const aporte = aporteFiducia(f);
+      e.valorTotalVentasFiduciaria += aporte.venta;
+      e.valorCuotasIniciales += aporte.cuotaInicial;
+      e.recaudoReal += aporte.pagado;
+      e.recaudoCuotaInicial += aporte.pagadoCuotaInicial;
       if (f.esperadoAFechaInicial != null) e.esperadoAFechaInicial += f.esperadoAFechaInicial;
       if ((f.maxDiasAtrasoInicial ?? 0) > UMBRAL_CARTERA_DIAS) e.carteraMas5Dias += f.montoEnMoraInicial ?? 0;
     } else if (f.precioUnitario != null) {
