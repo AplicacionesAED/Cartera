@@ -414,6 +414,12 @@
   gap: var(--space-md);
 }
 
+.saldosGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-md);
+}
+
 .kpiCard,
 .card {
   border: 1px solid var(--color-border);

@@ -14,8 +14,6 @@ import { getNegocio, getMovimientosNegocio } from '../../api/negocios.js';
 import { MovimientosTabla } from '../fiducia/MovimientosTabla.jsx';
 import { ResumenMovimientos } from './ResumenMovimientos.jsx';
 import { ConciliacionSinPlan } from './ConciliacionSinPlan.jsx';
-import { ConciliacionHero, HitoCard, BarraProgreso } from './ConciliacionUI.jsx';
-import concStyles from './Conciliacion.module.css';
 import base from './NegociosPage.module.css';
 import { getSubformsOportunidad, refrescarSubformsOportunidad } from '../../api/oportunidades.js';
 import { Button } from '../../components/ui/Button.jsx';
@@ -330,12 +328,7 @@ function CuotaRow({ c }) {
         <td className={styles.nowrap}>{c.estado === 'pagada' && c.fechaCubierta ? formatFechaUTC(c.fechaCubierta) : '—'}</td>
         <td className={`${styles.nowrap} ${styles.right} ${styles.tabular}`}>{formatCOP(c.valorPlan) ?? '—'}</td>
         <td className={`${styles.nowrap} ${styles.right} ${styles.tabular}`}>
-          {c.cubierto > 0 ? (
-            <span className={concStyles.celdaPagado}>
-              <span className={c.estado === 'pagada' ? styles.textoExito : styles.textoAmbar}>{formatCOP(c.cubierto)}</span>
-              {c.estado !== 'pagada' && <BarraProgreso pagado={c.cubierto} total={c.valorPlan} etiqueta={`Cuota ${labelCuota(c.etiqueta)}: ${Math.round((c.cubierto / c.valorPlan) * 100)}% pagado`} compacta />}
-            </span>
-          ) : <span className={styles.vacio}>—</span>}
+          {c.cubierto > 0 ? <span className={c.estado === 'pagada' ? styles.textoExito : styles.textoAmbar}>{formatCOP(c.cubierto)}</span> : <span className={styles.vacio}>—</span>}
         </td>
         <td className={`${styles.nowrap} ${styles.right} ${styles.tabular}`}>{formatCOP(c.valorPlan - c.cubierto) ?? '—'}</td>
         <td className={`${styles.nowrap} ${styles.right} ${styles.tabular}`}>
@@ -422,41 +415,69 @@ function ConciliacionSection({ negocio }) {
 
   return (
     <div className={styles.seccionBody}>
-      <ConciliacionHero
-        etiquetaTotal="Total plan"
-        total={resumen.totalPlan}
-        infoTotal="Suma de todas las cuotas del plan de pagos de Zoho. La última cuota (Saldo Contraentrega) se ajusta al valor de venta de la fiducia."
-        pagado={resumen.totalPagado}
-        saldoAFavor={resumen.saldoAFavor}
-        pendiente={Math.max(0, resumen.totalPlan - resumen.totalPagado)}
-        datos={[
-          { etiqueta: 'Cuotas pagadas', valor: `${resumen.cuotasPagadas} de ${resumen.totalCuotas}` },
-          resumen.cuotasEnMora > 0
-            ? { etiqueta: 'En mora', alerta: true, valor: `${resumen.cuotasEnMora} ${resumen.cuotasEnMora === 1 ? 'cuota' : 'cuotas'} · ${formatCOP(resumen.montoEnMora) ?? '$ 0'}`, sub: `${resumen.maxDiasAtraso} días de atraso máximo` }
-            : { etiqueta: 'En mora', valor: 'Sin cuotas en mora' },
-        ]}
-      />
+      <div className={styles.kpiGrid}>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Total plan</p>
+          <p className={styles.kpiValor}>{formatCOP(resumen.totalPlan) ?? '—'}</p>
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Total pagado</p>
+          <p className={`${styles.kpiValor} ${styles.textoExito}`}>
+            {formatCOP(resumen.totalPagado) ?? '$ 0'} <span className={styles.kpiPorcentaje}>({resumen.porcentaje}%)</span>
+          </p>
+          {resumen.saldoAFavor > 0 && (
+            <p className={`${styles.kpiSub} ${styles.textoExito}`}>Saldo a favor: {formatCOP(resumen.saldoAFavor)}</p>
+          )}
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Cuotas pagadas</p>
+          <p className={styles.kpiValor}>{resumen.cuotasPagadas}/{resumen.totalCuotas}</p>
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>En mora</p>
+          {resumen.cuotasEnMora > 0 ? (
+            <p className={`${styles.kpiValor} ${styles.textoPeligro}`}>
+              {resumen.cuotasEnMora} {resumen.cuotasEnMora === 1 ? 'cuota' : 'cuotas'}
+              <span className={styles.kpiSub}>{formatCOP(resumen.montoEnMora) ?? '$ 0'}</span>
+              <span className={styles.kpiSub}>{resumen.maxDiasAtraso} días</span>
+            </p>
+          ) : (
+            <p className={styles.kpiValorVacio}>—</p>
+          )}
+        </div>
+      </div>
 
       {(saldoInicial || resumen.saldoContraentrega) && (
-        <div className={concStyles.hitos}>
+        <div className={styles.saldosGrid}>
           {saldoInicial && (
-            <HitoCard
-              titulo="Saldo inicial"
-              subtitulo={`${cuotasIniciales.length} ${cuotasIniciales.length === 1 ? 'cuota' : 'cuotas'} antes de la entrega`}
-              valor={saldoInicial.valorPlan}
-              pagado={saldoInicial.cubierto}
-              fecha={saldoInicial.fechaEstimada}
-              textoFecha="Última cuota"
-            />
+            <div className={styles.card}>
+              <p className={styles.miniLabel}>Saldo inicial</p>
+              <div className={styles.filaEntreDos}>
+                <div>
+                  <p className={styles.kpiValor}>{formatCOP(saldoInicial.valorPlan) ?? '—'}</p>
+                  {saldoInicial.cubierto > 0 && <p className={styles.notaAmbar}>Pagado: {formatCOP(saldoInicial.cubierto)}</p>}
+                </div>
+                <div className={styles.textoDerecha}>
+                  {saldoInicial.fechaEstimada ? <p className={styles.dataText}>{formatFechaUTC(saldoInicial.fechaEstimada)}</p> : <p className={styles.vacio}>—</p>}
+                  <p className={styles.mutedSmall}>Fecha esperada</p>
+                </div>
+              </div>
+            </div>
           )}
           {resumen.saldoContraentrega && (
-            <HitoCard
-              titulo="Saldo contraentrega"
-              subtitulo="Última cuota del plan"
-              valor={resumen.saldoContraentrega.valorPlan}
-              pagado={resumen.saldoContraentrega.cubierto}
-              fecha={resumen.saldoContraentrega.fechaEstimada}
-            />
+            <div className={styles.card}>
+              <p className={styles.miniLabel}>Saldo Contraentrega</p>
+              <div className={styles.filaEntreDos}>
+                <div>
+                  <p className={styles.kpiValor}>{formatCOP(resumen.saldoContraentrega.valorPlan) ?? '—'}</p>
+                  {resumen.saldoContraentrega.cubierto > 0 && <p className={styles.notaAmbar}>Pagado: {formatCOP(resumen.saldoContraentrega.cubierto)}</p>}
+                </div>
+                <div className={styles.textoDerecha}>
+                  {resumen.saldoContraentrega.fechaEstimada ? <p className={styles.dataText}>{formatFechaUTC(resumen.saldoContraentrega.fechaEstimada)}</p> : <p className={styles.vacio}>—</p>}
+                  <p className={styles.mutedSmall}>Fecha esperada</p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

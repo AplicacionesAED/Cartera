@@ -9,8 +9,7 @@ import { normalizarPagos, parseMonto } from '../../utils/conciliacion.js';
 import { formatFechaUTC } from '../../utils/planDePagos.js';
 import { resolverValorVenta } from './obtenerConciliacionCompleta.js';
 import styles from './NegocioDetallePage.module.css';
-import { ConciliacionHero, HitoCard } from './ConciliacionUI.jsx';
-import concStyles from './Conciliacion.module.css';
+import propios from './ConciliacionSinPlan.module.css';
 
 function formatCOP(val) {
   if (val == null || Number.isNaN(val)) return null;
@@ -67,11 +66,12 @@ export function ConciliacionSinPlan({ negocio, motivo }) {
   const { filas, totalPagado, valorVenta, cuotaInicial } = datos;
   const pendiente = valorVenta != null ? Math.max(0, valorVenta - totalPagado) : null;
   const saldoAFavor = valorVenta != null ? Math.max(0, totalPagado - valorVenta) : 0;
+  const pctPagado = valorVenta > 0 ? Math.round((totalPagado / valorVenta) * 100) : null;
   const pagadoCuotaInicial = cuotaInicial != null ? Math.min(Math.max(0, totalPagado), cuotaInicial) : null;
 
   return (
     <div className={styles.seccionBody}>
-      <p className={concStyles.aviso}>
+      <p className={propios.aviso}>
         <Info size={15} aria-hidden="true" />
         <span>
           {motivo === 'sin-oportunidad'
@@ -81,34 +81,31 @@ export function ConciliacionSinPlan({ negocio, motivo }) {
         </span>
       </p>
 
-      <ConciliacionHero
-        etiquetaTotal="Valor de venta"
-        total={valorVenta}
-        infoTotal="Valor de venta que trae el Excel de la fiducia para el negocio (en Etapas 1 y 2, si está VENDIDO, el Valor factura)."
-        pagado={totalPagado}
-        saldoAFavor={saldoAFavor}
-        pendiente={pendiente}
-        datos={[{ etiqueta: 'Pagos registrados', valor: `${filas.length}`, sub: filas.length > 0 ? 'Con las reglas de la conciliación' : undefined }]}
-      />
-
-      {cuotaInicial != null && (
-        <div className={concStyles.hitos}>
-          <HitoCard
-            titulo="Cuota inicial"
-            subtitulo="Según la fiducia"
-            valor={cuotaInicial}
-            pagado={pagadoCuotaInicial ?? 0}
-          />
-          {valorVenta != null && valorVenta > cuotaInicial && (
-            <HitoCard
-              titulo="Saldo restante"
-              subtitulo="Valor de venta menos cuota inicial"
-              valor={valorVenta - cuotaInicial}
-              pagado={Math.max(0, totalPagado - cuotaInicial)}
-            />
-          )}
+      <div className={styles.kpiGrid}>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Valor de venta</p>
+          <p className={styles.kpiValor}>{formatCOP(valorVenta) ?? '—'}</p>
+          <p className={styles.kpiSub}>Según la fiducia</p>
         </div>
-      )}
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Total pagado</p>
+          <p className={`${styles.kpiValor} ${styles.textoExito}`}>
+            {formatCOP(totalPagado) ?? '$ 0'}
+            {pctPagado != null && <span className={styles.kpiPorcentaje}> ({pctPagado}%)</span>}
+          </p>
+          {saldoAFavor > 0 && <p className={`${styles.kpiSub} ${styles.textoExito}`}>Saldo a favor: {formatCOP(saldoAFavor)}</p>}
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Pendiente por pagar</p>
+          <p className={styles.kpiValor}>{pendiente != null ? formatCOP(pendiente) : '—'}</p>
+          <p className={styles.kpiSub}>Valor de venta menos lo pagado</p>
+        </div>
+        <div className={styles.kpiCard}>
+          <p className={styles.miniLabel}>Cuota inicial</p>
+          <p className={styles.kpiValor}>{formatCOP(cuotaInicial) ?? '—'}</p>
+          {pagadoCuotaInicial != null && <p className={styles.kpiSub}>Pagado: {formatCOP(pagadoCuotaInicial)}</p>}
+        </div>
+      </div>
 
       {filas.length === 0 ? (
         <p className={styles.sinDatosPad}>Este negocio no tiene pagos registrados en la fiducia.</p>
